@@ -1,0 +1,57 @@
+# Local clone of the Sentinel sandbox grid.
+# The real grid exposes:
+#   RTSP   rtsp://<host>:8554/stream/<id>
+#   WHEP   http://<host>:8889/stream/<id>/whep
+#   HLS    http://<host>/live/stream/<id>/index.m3u8
+# MediaMTX defaults match those ports, so behaviour here mirrors the real thing:
+# GOP replay on connect, no seeking, per-client stream copies, loop discontinuity.
+
+logLevel: info
+logDestinations: [stdout]
+
+# Read-only for clients: publishing is restricted to localhost (our own simgrid
+# publisher). Mirrors the "DON'T publish to the gateway" rule in their guide.
+authInternalUsers:
+  - user: any
+    ips: []
+    permissions:
+      - action: read
+      - action: playback
+  - user: any
+    ips: ['127.0.0.1', '::1']
+    permissions:
+      - action: publish
+      - action: read
+      - action: playback
+      - action: api
+
+api: yes
+apiAddress: :9997
+
+rtsp: yes
+rtspTransports: [tcp, udp]
+rtspAddress: :8554
+
+hls: yes
+hlsAddress: :8888
+hlsVariant: lowLatency
+hlsAlwaysRemux: no
+hlsSegmentCount: 7
+hlsSegmentDuration: 1s
+
+webrtc: yes
+webrtcAddress: :8889
+webrtcLocalUDPAddress: :8189
+webrtcAdditionalHosts: [127.0.0.1, localhost]
+
+rtmp: no
+srt: no
+
+pathDefaults:
+  source: publisher
+  # Keep a GOP buffered so a joining client starts at a keyframe -- this is what
+  # produces the faster-than-realtime burst on connect that breaks naive trackers.
+  rtspTransport: tcp
+
+paths:
+  all_others:

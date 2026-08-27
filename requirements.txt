@@ -1,0 +1,8 @@
+opencv-python
+numpy
+pillow
+fastapi
+uvicorn[standard]
+requests
+psycopg2-binary
+pydantic-settings

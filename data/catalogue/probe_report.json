@@ -1,0 +1,70 @@
+{
+  "base": "https://live.corp8.cloud",
+  "hostname": "live.corp8.cloud",
+  "checked_at": 1787832842.8522532,
+  "ports": {
+    "http": {
+      "port": 80,
+      "open": true
+    },
+    "rtsp": {
+      "port": 8554,
+      "open": false
+    },
+    "hls": {
+      "port": 8888,
+      "open": false
+    },
+    "whep": {
+      "port": 8889,
+      "open": false
+    },
+    "api": {
+      "port": 9997,
+      "open": false
+    }
+  },
+  "camera_count": 30,
+  "camera_keys": [
+    "bitrate_kbps",
+    "bits_per_pixel",
+    "codec",
+    "fps",
+    "height",
+    "hls_live_url",
+    "id",
+    "live",
+    "location",
+    "name",
+    "number",
+    "rtsp_url",
+    "webrtc_url",
+    "width"
+  ],
+  "probes": [
+    {
+      "id": "1",
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/1",
+      "probe": {
+        "ok": false,
+        "error": "timeout after 25s"
+      }
+    },
+    {
+      "id": "2",
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/2",
+      "probe": {
+        "ok": false,
+        "error": "timeout after 25s"
+      }
+    },
+    {
+      "id": "3",
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/3",
+      "probe": {
+        "ok": false,
+        "error": "timeout after 25s"
+      }
+    }
+  ]
+}
