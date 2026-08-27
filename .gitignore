@@ -16,3 +16,8 @@ infra/mediamtx.yml
 infra/LICENSE
 logs/
 *.log
+
+data/snapshots/*.jpg
+!data/snapshots/grid_contact_sheet.jpg
+logs_api.txt
+cams_tmp.json

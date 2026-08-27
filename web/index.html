@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prahari — Unified CCTV Operations</title>
+  <link rel="stylesheet" href="/vendor/leaflet.css">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="devanagari">प्रहरी</span>
+      <h1>PRAHARI</h1>
+      <small>UNIFIED CCTV INTEGRATION &amp; VIDEO INTELLIGENCE</small>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b id="stat-total">–</b><span>Cameras</span></div>
+      <div class="stat ok"><b id="stat-online">–</b><span>Reachable</span></div>
+      <div class="stat err"><b id="stat-down">–</b><span>Degraded</span></div>
+      <div class="stat warn"><b id="stat-fps">–</b><span>FPS Mismatch</span></div>
+      <div class="stat"><b id="stat-playing">0</b><span>Streaming</span></div>
+      <button class="action" id="btn-sync">Sync catalogue</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="map"></div>
+
+    <div class="right">
+      <div class="toolbar">
+        <label for="f-status">Status</label>
+        <select id="f-status">
+          <option value="reachable">Reachable only</option>
+          <option value="all">All cameras</option>
+          <option value="degraded">Degraded only</option>
+        </select>
+
+        <label for="f-dept">Department</label>
+        <select id="f-dept"><option value="all">All</option></select>
+
+        <label for="f-count">Wall size</label>
+        <select id="f-count">
+          <option value="6">6 tiles</option>
+          <option value="9" selected>9 tiles</option>
+          <option value="12">12 tiles</option>
+          <option value="24">24 tiles</option>
+        </select>
+
+        <button class="action" id="btn-play">Start wall</button>
+        <button class="action" id="btn-stop">Stop all</button>
+      </div>
+
+      <div class="wall" id="wall"></div>
+    </div>
+  </main>
+
+  <script src="/vendor/leaflet.js"></script>
+  <script src="/vendor/hls.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
