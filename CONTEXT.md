@@ -9,7 +9,7 @@ and know exactly where things stand, what is proven, and what to do next.
 | | |
 |---|---|
 | **Last updated** | 2026-08-27 18:30 IST |
-| **HEAD** | `7b99f81` on `main` |
+| **HEAD** | `5862c68` on `main` |
 | **Repo** | https://github.com/Priyanshu-byte-coder/prahari (**private**) |
 | **Submission deadline** | **2026-09-07** — 11 days remaining |
 | **Event** | 2026-09-10 → 11, i-Hub Gujarat, Gandhinagar |
@@ -243,5 +243,6 @@ python -m venv .venv
 
 | Commit | Date | Change |
 |---|---|---|
+| `5862c68` | 2026-08-27 18:34 | CONTEXT.md living state file + CLAUDE.md working agreement |
 | `7b99f81` | 2026-08-27 18:22 | Stream gateway (cookie session, HLS rewrite, LL-tag stripping), operator console (GIS map + video wall), snapshot tooling, grid reconnaissance |
 | `357c2e3` | 2026-08-27 17:52 | Grid survey tooling, MediaMTX clone of the Sentinel grid, Indian plate renderer, first measurements of the live grid |
