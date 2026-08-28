@@ -6,6 +6,7 @@ Submission for the Gujarat Police Innovation Challenge 2026. Deadline **7 Sep 20
 
 1. **[CONTEXT.md](CONTEXT.md)** — current state, measured grid facts, decisions, action items.
 2. [PLAN.md](PLAN.md) — competition strategy and day-by-day schedule.
+3. [ROLES.md](ROLES.md) — who owns which files, so two people can work without collisions.
 
 ## Keep CONTEXT.md current
 

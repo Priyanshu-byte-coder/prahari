@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import re
 import threading
+from collections import Counter, defaultdict
 
 import cv2
 import numpy as np
@@ -84,3 +85,46 @@ def read_plate(image: np.ndarray, bbox: tuple[float, float, float, float]) -> st
         if PLATE_RE.match(candidate) and conf > best_conf:
             best, best_conf = candidate, conf
     return best
+
+
+class PlateReader:
+    """Owns everything plate-domain: OCR throttling and per-track vote fusion.
+
+    This is the whole interface the grid/tracking side needs to know about --
+    call observe() once per track per frame, call reset() on stream
+    discontinuity. No OCR/voting details leak into run_worker.py, so the
+    plate pipeline (this file) and the grid pipeline (stream_reader.py,
+    vehicle_tracker.py, run_worker.py) can be worked on independently without
+    touching each other's code.
+    """
+
+    def __init__(self, ocr_every_n_frames: int = 5, votes_per_track: int = 5) -> None:
+        self.ocr_every_n_frames = ocr_every_n_frames
+        self.votes_per_track = votes_per_track
+        self._frame_count = 0
+        self._votes: dict[int, Counter] = defaultdict(Counter)
+        self._final: dict[int, str] = {}
+
+    def reset(self) -> None:
+        """Drop all per-track vote state. Call on stream discontinuity (the
+        grid loops its recordings) so a stale plate doesn't leak onto a
+        different physical vehicle that reuses the track id."""
+        self._votes.clear()
+        self._final.clear()
+
+    def observe(
+        self, track_id: int, image: np.ndarray, bbox: tuple[float, float, float, float]
+    ) -> str | None:
+        """Feed one frame's vehicle crop for this track. Returns the current
+        best fused plate for the track (None until at least one valid read)."""
+        self._frame_count += 1
+        votes = self._votes[track_id]
+
+        if sum(votes.values()) < self.votes_per_track and self._frame_count % self.ocr_every_n_frames == 0:
+            candidate = read_plate(image, bbox)
+            if candidate:
+                votes[candidate] += 1
+                winner, _ = votes.most_common(1)[0]
+                self._final[track_id] = winner
+
+        return self._final.get(track_id)

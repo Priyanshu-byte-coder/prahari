@@ -13,10 +13,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-from collections import Counter, defaultdict
 from pathlib import Path
 
-from services.worker.plate_reader import read_plate
+from services.worker.plate_reader import PlateReader
 from services.worker.stream_reader import read_frames
 from services.worker.vehicle_tracker import VehicleTracker
 
@@ -24,15 +23,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger("prahari.worker")
 
 DATA = Path(__file__).resolve().parents[2] / "data" / "detections"
-
-# OCR is far more expensive than detection; only attempt it every N frames.
-OCR_EVERY_N_FRAMES = 5
-
-# PLAN.md §4.2: don't trust a single frame's read. Collect reads across a
-# track's life and vote -- OCR noise on individual frames (glare, motion
-# blur, partial occlusion) rarely repeats the same wrong string twice, so a
-# majority vote across several reads is far more reliable than the first hit.
-VOTES_PER_TRACK = 5
 
 
 def main() -> None:
@@ -44,37 +34,22 @@ def main() -> None:
 
     url = f"{args.gateway}/stream/{args.camera}/index.m3u8"
     tracker = VehicleTracker(weights=args.weights)
+    plates = PlateReader()
 
     DATA.mkdir(parents=True, exist_ok=True)
     out_path = DATA / f"cam_{args.camera}.jsonl"
 
     n_frames = 0
-    track_votes: dict[int, Counter] = defaultdict(Counter)
-    track_final: dict[int, str] = {}
 
     with out_path.open("a", encoding="utf-8") as f:
         for frame in read_frames(args.camera, url):
             if frame.discontinuous:
                 tracker.reset()
-                track_votes.clear()
-                track_final.clear()
+                plates.reset()
 
             tracks = tracker.update(frame.camera_id, frame.image, frame.pts_seconds)
             for t in tracks:
-                votes = track_votes[t.track_id]
-                if sum(votes.values()) < VOTES_PER_TRACK and n_frames % OCR_EVERY_N_FRAMES == 0:
-                    candidate = read_plate(frame.image, t.bbox)
-                    if candidate:
-                        votes[candidate] += 1
-                        winner, count = votes.most_common(1)[0]
-                        if winner != track_final.get(t.track_id):
-                            track_final[t.track_id] = winner
-                            logger.info(
-                                "cam %s: track %d plate vote -> %s (%d/%d reads)",
-                                args.camera, t.track_id, winner, count, sum(votes.values()),
-                            )
-
-                plate = track_final.get(t.track_id)
+                plate = plates.observe(t.track_id, frame.image, t.bbox)
                 f.write(
                     json.dumps(
                         {
