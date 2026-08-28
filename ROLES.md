@@ -31,7 +31,7 @@ Neither side needs to read the other's internals to work.
 | `services/worker/bytetrack_traffic.yaml` | ✅ tracker tuning | |
 | `services/worker/run_worker.py` | ✅ orchestration (calls `plates.observe()` as a black box) | |
 | `services/api/gateway.py` | ✅ stream relay, cookie session | |
-| `services/api/main.py` — registry/GIS/camera endpoints | ✅ | |
+| `services/api/main.py` — registry/GIS/camera endpoints |  | |
 | `services/worker/plate_reader.py` | | ✅ detector, OCR, `PlateReader` vote fusion |
 | `services/api/main.py` — `/api/search/plate` | | ✅ (extract to its own router — see below) |
 | Plate format validation (RTO state codes) | | ✅ |
