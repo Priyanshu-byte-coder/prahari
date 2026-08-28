@@ -5,8 +5,26 @@ Submission for the Gujarat Police Innovation Challenge 2026. Deadline **7 Sep 20
 ## Read first
 
 1. **[CONTEXT.md](CONTEXT.md)** — current state, measured grid facts, decisions, action items.
-2. [PLAN.md](PLAN.md) — competition strategy and day-by-day schedule.
-3. [ROLES.md](ROLES.md) — who owns which files, so two people can work without collisions.
+2. [ROLES.md](ROLES.md) — who owns which files, so two people can work without collisions.
+3. [STATUS.md](STATUS.md) — one table, every task, every owner.
+4. [PLAN.md](PLAN.md) — competition strategy and day-by-day schedule.
+
+## The team, and how to address it
+
+Two people share this repository, each working with their own AI coding session:
+
+- **Priyanshu Doshi** — grid, ingestion, tracking, platform.
+- **Neev Modh** — number plates, OCR, plate search.
+
+**Write every document and comment in the third person, naming people
+explicitly.** Never write "you" or "we" in a repo file. Both sessions read
+these files as instructions, so "you" resolves to a different person depending
+on which session is reading — this has already caused confusion once. Before
+starting work, identify which lane the current session is in and stay inside
+the file ownership table in ROLES.md §3.
+
+Always `git pull` before starting. Both lanes now edit `services/worker/` and
+the API routes.
 
 ## Keep CONTEXT.md current
 

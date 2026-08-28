@@ -8,13 +8,14 @@ and know exactly where things stand, what is proven, and what to do next.
 
 | | |
 |---|---|
-| **Last updated** | 2026-08-28 11:38 IST |
-| **HEAD** | `8f7ea09` on `main` |
+| **Last updated** | 2026-08-28 12:20 IST |
+| **HEAD** | `255ece3` on `main` |
 | **Repo** | https://github.com/Priyanshu-byte-coder/prahari (**private**) |
-| **Submission deadline** | **2026-09-07** — 11 days remaining |
+| **Submission deadline** | **2026-09-07** — 10 days remaining |
 | **Event** | 2026-09-10 → 11, i-Hub Gujarat, Gandhinagar |
 | **Category** | Category 1 (student team) |
-| **Owner** | Priyanshu Doshi (Priyanshu-byte-coder) |
+| **Repo owner** | Priyanshu Doshi (`Priyanshu-byte-coder`) |
+| **Team** | Priyanshu Doshi — grid, ingestion, tracking, platform<br>Neev Modh (`neevmodh`) — number plates, OCR, plate search |
 
 ---
 
@@ -23,7 +24,12 @@ and know exactly where things stand, what is proven, and what to do next.
 and the plate/OCR side, so two people can build in parallel.
 
 **Task status at a glance:** see [STATUS.md](STATUS.md) — one table, all
-tasks, done/partial/not-started.
+tasks, done/partial/not-started, every row owned by a named person.
+
+**Writing convention:** every document in this repository is written in the
+third person and names people explicitly (*Priyanshu*, *Neev*). Second person
+is banned, because both team members work with their own AI coding sessions
+and "you" resolves differently depending on which session is reading.
 
 ## 1. What this is
 
@@ -47,10 +53,10 @@ Prize pool ₹51,00,000. Full strategy in [PLAN.md](PLAN.md).
 
 ### Working and verified
 - **Camera registry** — 30 cameras merged from three sources (upstream catalogue,
-  our own probe survey, geocoding). `GET /api/cameras`.
+  the team's own probe survey, geocoding). `GET /api/cameras`.
 - **GIS map** — all 30 plotted, colour-coded by status, **drag a marker to correct
   its position**; persists via `PUT /api/cameras/{id}/geo`.
-- **Stream gateway** — relays HLS for all reachable cameras on our own origin,
+- **Stream gateway** — relays HLS for all reachable cameras on Prahari's own origin,
   terminating the upstream cookie-gate session server-side.
 - **Video wall** — staggered connects, exponential backoff with jitter, non-fatal
   decoder warnings, per-tile **measured** frame rate.
@@ -59,7 +65,7 @@ Prize pool ₹51,00,000. Full strategy in [PLAN.md](PLAN.md).
 - **Reconnaissance tooling** — `probe_grid.py`, `survey_grid.py`,
   `geocode_cameras.py`, `snapshot_all.py`.
 - **End-to-end proof** — real frames pulled from live Gujarat Police cameras
-  through our own gateway; see `data/snapshots/grid_contact_sheet.jpg`.
+  through Prahari's own gateway; see `data/snapshots/grid_contact_sheet.jpg`.
 - **ANPR worker (vehicle stage)** — `services/worker/`: PTS-driven stream
   reader (TCP-forced, backoff reconnect, discontinuity detection) → YOLOv8s
   vehicle detection → ByteTrack tracking (custom `bytetrack_traffic.yaml`,
@@ -99,7 +105,7 @@ Prize pool ₹51,00,000. Full strategy in [PLAN.md](PLAN.md).
   detector (see D13): once plate localization is tight instead of "whole
   vehicle," EasyOCR *does* pull real signal (a `GJ` state-code fragment, a
   digit group, a stable repeated read across 4 consecutive frames on one
-  vehicle) — but our fragment-vs-full-regex matching throws all of it away
+  vehicle) — but the fragment-vs-full-regex matching throws all of it away
   because EasyOCR returns each plate as multiple text fragments, not one
   string. This is a fixable integration gap, not a dead end. Not yet wired in.
 
@@ -132,7 +138,7 @@ rendering feeds in a browser at all.
 
 **LL-HLS is a trap.** Playlists advertise `CAN-BLOCK-RELOAD=YES` with
 `#EXT-X-PART`. Players negotiate low-latency mode, issue blocking part-requests
-several times per second per camera, and — in our case — never advanced to a
+several times per second per camera, and — on this grid — never advanced to a
 media segment. The gateway strips the low-latency tags and serves plain HLS.
 
 **Camera identities are burned into the video overlay**, and are more informative
@@ -179,7 +185,7 @@ web/
   vendor/               hls.js + leaflet, vendored for offline demo safety
 data/
   catalogue/ingest.json         upstream catalogue snapshot
-  catalogue/grid_survey.json    our measured per-camera truth table
+  catalogue/grid_survey.json    the measured per-camera truth table
   camera_geo.json               coordinates, with precision provenance
   snapshots/                    captured frames + contact sheet
 ```
@@ -213,7 +219,7 @@ python -m venv .venv
 |---|---|---|
 | D1 | Hybrid Model 1+3+4, edge-first | 80k cameras centralised = ~160 Gbps backhaul and ~26 PB storage. Metadata to centre, compute to edge. |
 | D2 | Docker for infra only; CV on host Python | RTX 3050 is reachable natively on Windows; GPU passthrough via WSL is avoidable pain. |
-| D3 | HLS as primary transport | RTSP 8554 filtered on our network. Auto-detect per camera, prefer RTSP where it works. |
+| D3 | HLS as primary transport | RTSP 8554 filtered on Priyanshu's network. Auto-detect per camera, prefer RTSP where it works. |
 | D4 | Own stream gateway rather than direct browser playback | Upstream cookie gate blocks cross-origin browsers. Also where access control, pooling and audit belong. |
 | D5 | Strip LL-HLS at the gateway | ~10x fewer upstream requests; players failed to reach a media segment otherwise. ~800 ms latency cost is irrelevant for a monitoring wall. |
 | D6 | Repo private until submission | Competitors. Flip to public on 7 Sep — the submission may include a repo link. |
@@ -240,14 +246,20 @@ python -m venv .venv
 
 **Unresolved internally:**
 - Is RTSP blocked by the ISP/college firewall or closed at the server? Untested
-  on a second network.
-- Team size and role split — unknown, changes what gets automated vs documented.
+  on a second network. Assigned to Priyanshu; blocks the ingestion decision.
+- **Four mandatory submission artifacts have no owner** — HLD document, the
+  14-slide deck, and both demo videos (STATUS.md #33–36). Two people and ten
+  days do not cover the current backlog. Either a third member joins for
+  documentation and video, or scope is cut per the triage in ROLES.md §7.
+  This is the largest open risk in the project and it is not technical.
+- Whether the Postgres/PostGIS/Timescale migration is worth a day of the
+  remaining ten, given JSON-on-disk demonstrates identically to a judge.
 
 ---
 
 ## 8. Action items
 
-### Owner (Priyanshu)
+### Priyanshu — manual, cannot be delegated to a coding session
 - [ ] **Test RTSP on a mobile hotspot.** Run
       `.venv\Scripts\python.exe scripts\probe_grid.py --host https://live.corp8.cloud --cameras 2`
       and report whether port 8554 shows open. **Blocks the ingestion decision.**
@@ -256,7 +268,9 @@ python -m venv .venv
       submission form fields, HLD template, team/participant ID.
 - [ ] Record 2–3 minutes of **daytime Indian traffic footage** (phone at a
       junction is fine) into `data/videos/`. Highest-value input for OCR accuracy.
-- [ ] Confirm team size and who can take frontend / docs / video editing.
+- [ ] Decide who owns the HLD, deck and demo videos (STATUS.md #33–36), or
+      recruit a third member for them.
+- [ ] Confirm or reassign the proposed owners in ROLES.md §7 and STATUS.md.
 - [ ] Verify camera coordinates with local knowledge — drag pins on the map.
 
 ### Build queue (next up, in order)
@@ -289,6 +303,9 @@ python -m venv .venv
 
 | Commit | Date | Change |
 |---|---|---|
+| `255ece3` | 2026-08-28 12:20 | Merge of both lanes. ROLES.md and STATUS.md rewritten in the third person with named owners, proposed owners for the 16 previously unassigned tasks, a critical-path chain, and an explicit scope triage. Recorded that four mandatory submission artifacts still have no owner. |
+| `bf44ce6` | 2026-08-28 | STATUS.md added — single-table task tracker. |
+| `6bbc1f0` | 2026-08-28 | ROLES.md updated. |
 | `8f7ea09` | 2026-08-28 | ROLES.md added (grid/tracking vs plate/OCR split); `plate_reader.py` gained a `PlateReader` class encapsulating OCR throttling + vote fusion behind `observe()`/`reset()`, so `run_worker.py` no longer contains plate-domain logic -- clean interface boundary for parallel work. |
 | `a6315b9` | 2026-08-28 11:38 | ANPR worker (stream reader, YOLOv8s+ByteTrack vehicle tracking, tuned occlusion buffer), live box overlay + fullscreen data panel in the console, `/api/detections` and `/api/search/plate` endpoints, unique-track counting bugfix. Plate OCR still not producing real reads -- measured across 22 cameras, root cause identified, real detector sourced but not yet integrated (see §6 D9-D13). |
 | `5862c68` | 2026-08-27 18:34 | CONTEXT.md living state file + CLAUDE.md working agreement |

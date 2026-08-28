@@ -1,44 +1,81 @@
 # STATUS — task completion at a glance
 
-One table. Update the Status/Owner cells as work lands; don't let this drift
-from [CONTEXT.md](CONTEXT.md), which has the full detail behind each row.
+One table. Owner cells name a person — never "you" — because both team members
+work with their own AI sessions and second person does not resolve the same way
+for both readers. Full detail behind each row lives in [CONTEXT.md](CONTEXT.md);
+ownership rules live in [ROLES.md](ROLES.md).
+
+**Updated 2026-08-28 · HEAD `255ece3` · 10 days to submission (7 Sep)**
+
+Legend: ✅ done and verified · 🟡 partial or scaffolded · 🔴 not started ·
+⛔ blocked on another row
 
 | # | Task | Status | Owner | Notes |
 |---|---|---|---|---|
-| 1 | Camera registry (Model 1) | ✅ Done | — | 30 cameras merged from catalogue+survey+geo, `/api/cameras` |
-| 2 | GIS map, drag-to-correct pins | ✅ Done | — | `PUT /api/cameras/{id}/geo` |
-| 3 | Catalogue auto-sync/diff | ✅ Done | — | `POST /api/registry/sync` |
-| 4 | Stream gateway (cookie session, LL-HLS strip) | ✅ Done | — | Verified live against real grid |
-| 5 | Video wall (mixed codec, reconnect, measured fps) | ✅ Done | — | |
-| 6 | Live box overlay + fullscreen data panel | ✅ Done | — | Verified in browser |
-| 7 | Vehicle detection + tracking (ByteTrack) | ✅ Done | Priyanshu | Counting bug fixed, track-buffer tuned |
-| 8 | Unique-vehicle counting (not per-frame) | ✅ Done | — | Bug found + fixed this session |
-| 9 | RTSP-on-hotspot test | 🔴 Not done | Priyanshu | Blocks ingestion-path decision |
+| 1 | Camera registry (Model 1) | ✅ Done | Priyanshu | 30 cameras merged from catalogue + survey + geo, `/api/cameras` |
+| 2 | GIS map, drag-to-correct pins | ✅ Done | Priyanshu | `PUT /api/cameras/{id}/geo` |
+| 3 | Catalogue auto-sync / diff | ✅ Done | Priyanshu | `POST /api/registry/sync` |
+| 4 | Stream gateway (cookie session, LL-HLS strip) | ✅ Done | Priyanshu | Verified live against the real grid |
+| 5 | Video wall (mixed codec, reconnect, measured fps) | ✅ Done | Priyanshu | |
+| 6 | Live box overlay + fullscreen data panel | ✅ Done | Neev | Verified in browser; `cover` vs `contain` box math correct |
+| 7 | Vehicle detection + tracking (ByteTrack) | ✅ Done | Priyanshu | Occlusion buffer 30 → 90 frames (D9) |
+| 8 | Unique-vehicle counting (not per-frame) | ✅ Done | Priyanshu | Real bug, user-reported, fixed (D10) |
+| 9 | **RTSP-on-hotspot test** | 🔴 Not done | **Priyanshu (manual)** | Blocks ingestion-path decision. Cannot be delegated to a coding session. |
 | 10 | Multi-camera concurrent workers | 🔴 Not done | Priyanshu | Currently one process per camera, started by hand |
-| 11 | Postgres/PostGIS/Timescale migration | 🔴 Not done | Priyanshu | Still JSON-on-disk |
+| 11 | Postgres/PostGIS/Timescale migration | 🔴 Not done | Priyanshu | Still JSON-on-disk. **Triage candidate — see ROLES.md §7** |
 | 12 | Camera health / NOC dashboard | 🔴 Not done | Priyanshu | |
-| 13 | Plate detector (real, localized crop) | 🟡 Sourced, not wired in | You | Real MIT model verified; not yet in `plate_reader.py` |
-| 14 | Plate OCR producing real reads | 🔴 Not working | You | 0 confirmed reads / ~1,500 attempts across 22 cameras |
-| 15 | OCR fragment merging | 🔴 Not done | You | Root cause of #14, identified not fixed |
-| 16 | RTO state-code validation | 🔴 Not done | You | Needed to reject false positives like `LQ07209` |
-| 17 | Track-level plate vote fusion | ✅ Scaffolding done | You | `PlateReader` class works; nothing real to vote on yet |
-| 18 | Fuzzy plate search (`/api/search/plate`) | ✅ Done | You | Levenshtein matcher, verified correct |
-| 19 | Confusion-class character repair | 🔴 Not done | You | Blocked on #14 |
-| 20 | Watchlist DB + admin UI + CSV import | 🔴 Not started | — | |
-| 21 | Fuzzy watchlist matching + confidence bands | 🔴 Not started | — | |
-| 22 | Alert engine (WebSocket push, ack/dismiss) | 🔴 Not started | — | |
-| 23 | Cross-camera route reconstruction | 🔴 Not started | — | The G3 mandatory-gate feature |
-| 24 | Spatio-temporal plausibility filter | 🔴 Not started | — | |
-| 25 | Vehicle Re-ID fallback | 🔴 Not started | — | |
-| 26 | PDF/CSV route report export | 🔴 Not started | — | Required submission artifact |
-| 27 | RBAC + department scoping | 🔴 Not started | — | |
-| 28 | Hash-chained audit log | 🔴 Not started | — | |
-| 29 | `scripts/preflight.py` (8-point checklist) | 🔴 Not built | — | |
-| 30 | Public deployment + test credentials | 🔴 Not started | — | Currently localhost only |
-| 31 | Docker Compose one-command bring-up | 🔴 Not started | — | |
-| 32 | HLD document | 🔴 Not started | — | |
-| 33 | 14-slide PPT | 🔴 Not started | — | |
-| 34 | Demo Video A (own footage) | 🔴 Not started | — | |
-| 35 | Demo Video B (govt feed + report) | 🔴 Not started | — | |
+| 13 | Plate detector (real, localised crop) | 🟡 Sourced, not wired | Neev | MIT model verified (D13); not yet in `plate_reader.py` |
+| 14 | **Plate OCR producing real reads** | 🔴 Not working | Neev | 0 confirmed reads / ~1,500 attempts across 22 cameras. **Highest-value open task in the project.** |
+| 15 | OCR fragment merging | 🔴 Not done | Neev | Root cause of #14; identified, not fixed |
+| 16 | RTO state-code validation | 🔴 Not done | Neev | Rejects false positives such as `LQ07209` |
+| 17 | Track-level plate vote fusion | 🟡 Scaffolded | Neev | `PlateReader` works; nothing real to vote on until #14 |
+| 18 | Fuzzy plate search (`/api/search/plate`) | ✅ Done | Neev | Levenshtein matcher, verified correct |
+| 19 | Confusion-class character repair | ⛔ Blocked | Neev | Blocked on #14 |
+| 20 | Extract `services/api/plate_routes.py` | 🔴 Not done | Neev | Removes the last shared-file conflict in `main.py` |
+| 21 | Watchlist DB + admin UI + CSV import | 🔴 Not started | Neev *(proposed)* | Plate-domain data model |
+| 22 | Fuzzy watchlist matching + confidence bands | 🔴 Not started | Neev *(proposed)* | Extends #18 |
+| 23 | Alert engine (WebSocket push, ack/dismiss) | 🔴 Not started | Priyanshu *(proposed)* | |
+| 24 | **Cross-camera route reconstruction** | 🔴 Not started | Priyanshu *(proposed)* | **Mandatory gate G3 — the thing judges test on stage** |
+| 25 | Spatio-temporal plausibility filter | 🔴 Not started | Priyanshu *(proposed)* | |
+| 26 | PDF/CSV route report export | 🔴 Not started | Priyanshu *(proposed)* | Required submission artifact |
+| 27 | Vehicle Re-ID fallback | 🔴 Not started | Priyanshu *(proposed)* | Triage candidate |
+| 28 | RBAC + department scoping | 🔴 Not started | Priyanshu *(proposed)* | Triage candidate |
+| 29 | Hash-chained audit log | 🔴 Not started | Priyanshu *(proposed)* | Triage candidate |
+| 30 | `scripts/preflight.py` (8-point checklist) | 🔴 Not built | Priyanshu *(proposed)* | Cheap; good demo-video material |
+| 31 | Public deployment + test credentials | 🔴 Not started | Priyanshu *(proposed)* | Currently localhost only |
+| 32 | Docker Compose one-command bring-up | 🔴 Not started | Priyanshu *(proposed)* | Triage candidate |
+| 33 | **HLD document** | 🔴 Not started | **Unassigned** | Scored evaluation area |
+| 34 | **14-slide PPT** | 🔴 Not started | **Unassigned** | Scored evaluation area |
+| 35 | **Demo Video A** (own footage) | 🔴 Not started | **Unassigned** | Needs footage Priyanshu must record |
+| 36 | **Demo Video B** (govt feed + output report) | 🔴 Not started | **Unassigned** | Depends on #14 working |
 
-**Rollup:** 9 done, 2 partial/scaffolded, 24 not started — **9 days to submission (7 Sep)**.
+---
+
+## Rollup
+
+- **10 done · 3 partial · 1 blocked · 22 not started**
+- **10 days to submission** (7 Sep), **8 days to feature freeze** (5 Sep 18:00)
+- **4 mandatory submission artifacts have no owner** (#33–36)
+
+## Critical path
+
+The chain that must complete for the submission to score at all:
+
+```
+#14 plate OCR real reads
+      └─> #17 vote fusion  ──> #22 watchlist matching ──> #23 alerts
+      └─> #24 cross-camera route ──> #26 route report ──> #36 Demo Video B
+```
+
+Everything downstream of #14 is currently blocked on it. If OCR is still not
+producing reads by **1 September**, the fallback in PLAN.md §4.4 — vehicle
+Re-ID (#27) to carry a route when the plate is unreadable — stops being a
+bonus feature and becomes the primary plan, and must be started that day.
+
+## Decisions needed from Priyanshu
+
+1. Confirm or reassign the *(proposed)* owners above.
+2. Decide who writes the HLD, the deck, and the two videos — or recruit a third
+   member for them.
+3. Accept or reject the scope triage in ROLES.md §7, in particular whether the
+   Postgres migration (#11) is cut.
