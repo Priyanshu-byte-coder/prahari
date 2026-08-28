@@ -29,6 +29,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from services.api.gateway import router as gateway_router
+from services.api.route_routes import router as route_router
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "data"
@@ -52,6 +53,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(gateway_router)
+app.include_router(route_router)
 
 
 def _read_json(path: Path, default: Any) -> Any:

@@ -5,7 +5,7 @@ work with their own AI sessions and second person does not resolve the same way
 for both readers. Full detail behind each row lives in [CONTEXT.md](CONTEXT.md);
 ownership rules live in [ROLES.md](ROLES.md).
 
-**Updated 2026-08-28 · HEAD `411d068` · 10 days to submission (7 Sep)**
+**Updated 2026-08-28 · branch `priyanshu/platform` · 10 days to submission (7 Sep)**
 
 Legend: ✅ done and verified · 🟡 partial or scaffolded · 🔴 not started ·
 ⛔ blocked on another row
@@ -35,9 +35,9 @@ Legend: ✅ done and verified · 🟡 partial or scaffolded · 🔴 not started 
 | 21 | Watchlist DB + admin UI + CSV import | 🔴 Not started | Neev | Plate-domain data model |
 | 22 | Fuzzy watchlist matching + confidence bands | 🔴 Not started | Neev | Extends #18 |
 | 23 | Alert engine (WebSocket push, ack/dismiss) | 🔴 Not started | Priyanshu | |
-| 24 | **Cross-camera route reconstruction** | 🔴 Not started | Priyanshu | **Mandatory gate G3 — the thing judges test on stage** |
-| 25 | Spatio-temporal plausibility filter | 🔴 Not started | Priyanshu | |
-| 26 | PDF/CSV route report export | 🔴 Not started | Priyanshu | Required submission artifact |
+| 24 | **Cross-camera route reconstruction** | ✅ Done | Priyanshu | Gate G3. Verified against synthetic ground truth by `scripts/route_fixture.py` |
+| 25 | Spatio-temporal plausibility filter | ✅ Done | Priyanshu | Largest-consistent-chain selection (D17); flags and removes impossible hops |
+| 26 | Route report export | 🟡 CSV done, PDF pending | Priyanshu | `GET /api/route/export.csv` verified over HTTP |
 | 27 | Vehicle Re-ID fallback | 🔴 Not started | Priyanshu | **Promoted to primary route mechanism if #14 has no reads by 1 Sep** |
 | 28 | RBAC + department scoping | 🔴 Not started | Priyanshu | Ship if time (WORKPLAN.md §4) |
 | 29 | Hash-chained audit log | 🔴 Not started | Priyanshu | Ship if time |

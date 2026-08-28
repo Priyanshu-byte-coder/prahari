@@ -23,3 +23,5 @@ logs_api.txt
 cams_tmp.json
 data/detections/
 yolov8*.pt
+data/detections_fixture/
+route*.csv
