@@ -326,7 +326,9 @@ python -m venv .venv
 - [ ] **Confirm the CV environment is on storage that will be present at the
       venue.** The worker cannot start without it (D18). Anything removable is a
       failure mode to rehearse against, per the finale playbook in PLAN.md §12.
-- [ ] **Test RTSP on a mobile hotspot.** Run
+- [ ] **Test whether RTSP is usable, or only HLS.** Full procedure in
+      [docs/runbook-rtsp-transport.md](docs/runbook-rtsp-transport.md). In short, on a
+      network that is not the development one:
       `.venv\Scripts\python.exe scripts\probe_grid.py --host https://live.corp8.cloud --cameras 2`
       and report whether port 8554 shows open. **Blocks the ingestion decision.**
 - [ ] Email the organisers the questions in §7.
