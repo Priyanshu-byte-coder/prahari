@@ -8,7 +8,7 @@ and know exactly where things stand, what is proven, and what to do next.
 
 | | |
 |---|---|
-| **Last updated** | 2026-08-28 13:45 IST |
+| **Last updated** | 2026-08-28 14:05 IST |
 | **HEAD** | `411d068` on `main`; work in progress on `priyanshu/platform` |
 | **Repo** | https://github.com/Priyanshu-byte-coder/prahari (**private**) |
 | **Submission deadline** | **2026-09-07** — 10 days remaining |
@@ -218,7 +218,16 @@ data/
 
 ## 5. How to run
 
+Two environments, deliberately:
+
+- **`.venv` on C:** — API, gateway, registry, route engine, all scripts. Light,
+  pure-Python, no GPU needed.
+- **`E:\prahari\venv` on the external drive** — the CV worker: torch (CUDA),
+  ultralytics, easyocr. Kept off C: because the system SSD has under 6 GB free
+  (D18).
+
 ```bash
+# API and tooling (C:)
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 
@@ -230,6 +239,15 @@ python -m venv .venv
 
 # one frame from every camera
 .venv\Scripts\python.exe scripts\snapshot_all.py
+
+# CV worker (external drive, GPU)
+E:\prahari\venv\Scripts\python.exe -m services.worker.supervisor --auto --max-cameras 4
+
+# verify the route engine against known ground truth (no GPU, no live grid)
+.venv\Scripts\python.exe scripts\route_fixture.py
+
+# consume-only compliance gate — run before every ingestion commit
+.venv\Scripts\python.exe scripts\compliance_check.py
 ```
 
 **Keep the console tab in the foreground** — Chrome stalls MediaSource
@@ -255,6 +273,7 @@ python -m venv .venv
 | D12 | Fuzzy plate search is a Python Levenshtein matcher, not OpenSearch | Standing up an OpenSearch cluster is out of scope for this pass; same ±N-char matching behaviour without the infra. |
 | D14 | Cross-camera timeline = PTS anchored to wall clock after a 3s settle, not raw PTS and not the overlay | Raw PTS has a per-stream origin so it cannot order sightings across cameras; the burned-in overlay is per-camera source time that runs backwards on loop (D8). Anchoring `(pts, wall)` once the connect burst has passed yields a shared, burst-immune, drift-free timeline. Route reconstruction depends on this. |
 | D15 | Consume-only, request pacing and a connection budget enforced in `gateway.py`, not left as a rule | Publishing upstream or calling the control API is the clearest disqualification risk in the project, and hammering the grid already drew an "authentication error" once. Every upstream request funnels through `_assert_consume_only()` + `_throttle()` + a 12-slot semaphore. `scripts/compliance_check.py` additionally fails the build on a static scan. |
+| D18 | Heavy Python environment lives on the external USB drive at `E:\prahari\venv`, not on `C:` | The system SSD had 5.7 GB free (1.2%), and the CUDA build of torch needs roughly 3-5 GB installed plus download space. The first attempt failed with `OSError: [Errno 28] No space left on device` and rolled back cleanly. The external disk (JMicron USB, mounted as D: and E:) has 118 GB free on E:. **Consequence: the drive must be attached for the worker to run, which is a live risk for the finale demo — see §8.** |
 | D17 | Implausible sightings are removed by keeping the **largest self-consistent chain**, not by deleting "the sighting that caused the bad hop" | A bad hop implicates two sightings and there is no local way to tell which is the impostor; the first attempt guessed wrong and kept an exact-match outlier while dropping good data. Framed globally the question has one answer: the longest time-ordered chain in which every consecutive pair is physically reachable. A lone spurious match cannot join that chain; a genuine five-camera route can. Ties break toward exact plate matches. |
 | D16 | Multi-camera workers are process-per-camera, not threads | Ultralytics keeps tracker state on the model instance, so a shared model cannot track two cameras independently; separate processes also stop one camera's decoder failure taking the others down. GPU memory, not CPU, is the ceiling — `--max-cameras` is a VRAM budget. |
 | D13 | Found a real plate-region detector to integrate: `Muhammad-Zeerak-Khan/Automatic-License-Plate-Recognition-using-YOLOv8` (MIT, 471★, verified 6.24MB working YOLOv8 weights, single class `license_plate`) | A widely-cited "94.5% accuracy" alternative (`lavanyashree2805/yolov8-license-plate-india`) was checked and is **fake** — its committed weights file is 2 bytes. Always verify a model repo's actual file sizes before trusting its README. |
@@ -288,6 +307,11 @@ python -m venv .venv
 ## 8. Action items
 
 ### Priyanshu — manual, cannot be delegated to a coding session
+- [ ] **Free space on the C: drive, or plan the demo around the external disk.**
+      C: has 5.7 GB free (1.2%). The CV environment now lives on an external USB
+      drive (D18), so unplugging it stops the worker. For the finale that means
+      one more thing to carry and one more thing that can fail on stage. Freeing
+      ~20 GB on C: and moving the environment back is the safer end state.
 - [ ] **Test RTSP on a mobile hotspot.** Run
       `.venv\Scripts\python.exe scripts\probe_grid.py --host https://live.corp8.cloud --cameras 2`
       and report whether port 8554 shows open. **Blocks the ingestion decision.**
