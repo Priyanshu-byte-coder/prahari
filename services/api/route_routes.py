@@ -520,6 +520,33 @@ def export_route_csv(
     )
 
 
+@router.get("/api/route/export.pdf")
+def export_route_pdf(
+    plate: str = Query(..., min_length=3),
+    max_distance: int = Query(1, ge=0, le=3),
+    max_speed_kmh: float = Query(DEFAULT_MAX_SPEED_KMH, gt=0),
+    window_hours: float | None = Query(None, gt=0),
+) -> StreamingResponse:
+    """The same movement report as a printable document."""
+    result = reconstruct(plate, max_distance, max_speed_kmh, window_hours, False)
+    if not result["sightings"]:
+        raise HTTPException(status_code=404, detail=f"no sightings for {plate}")
+    try:
+        from services.api.route_report import build_route_pdf
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="PDF export needs reportlab: pip install reportlab",
+        )
+    pdf = build_route_pdf(result, plate)
+    filename = f"prahari_route_{_normalise_plate(plate)}.pdf"
+    return StreamingResponse(
+        iter([pdf]),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/api/route/coverage")
 def coverage() -> dict:
     """What the route engine actually has to work with.

@@ -10,3 +10,4 @@ av
 ultralytics
 lap
 easyocr
+reportlab

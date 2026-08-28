@@ -738,10 +738,17 @@ $('route-plate').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') traceRoute();
 });
 $('btn-route-clear').addEventListener('click', clearRoute);
-$('btn-route-csv').addEventListener('click', () => {
+// Both exports are the artifact the organisers asked for: detected vehicles
+// with corresponding timestamps. CSV for analysis, PDF for the case file.
+function exportRoute(kind) {
   const { plate, qs } = routeQueryString();
-  if (!plate) return;
-  // The CSV endpoint is the artifact the organisers asked for: detected
-  // vehicles with corresponding timestamps.
-  window.open(`/api/route/export.csv?${qs}`, '_blank');
-});
+  if (!plate) {
+    $('route-status').textContent = 'enter a registration number';
+    $('route-status').className = 'route-status err';
+    return;
+  }
+  window.open(`/api/route/export.${kind}?${qs}`, '_blank');
+}
+
+$('btn-route-csv').addEventListener('click', () => exportRoute('csv'));
+$('btn-route-pdf').addEventListener('click', () => exportRoute('pdf'));

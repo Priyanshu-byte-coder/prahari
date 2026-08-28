@@ -113,6 +113,14 @@ Prize pool ₹51,00,000. Full strategy in [PLAN.md](PLAN.md).
   the rejected leg is deliberate: it is the difference between a system that
   found a car and one that can explain itself.
 
+- **Movement report export** — `GET /api/route/export.csv` and
+  `/export.pdf`. The PDF is a printable case-file document: query header,
+  movement history table with per-sighting match quality, a legs table, and a
+  "basis and limitations" section stating that times come from anchored PTS
+  rather than the burned-in overlay, that a sighting is a track rather than a
+  frame, and which camera positions are still approximate. Rejected legs are
+  printed with their reason rather than omitted.
+
 ### Not built yet
 - **Plate detection + OCR that actually works** — see "Known broken" below;
   this is the single biggest gap versus PLAN.md §4.1.
