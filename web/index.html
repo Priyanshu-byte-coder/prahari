@@ -52,6 +52,27 @@
         <button class="action" id="btn-stop">Stop all</button>
       </div>
 
+      <!-- Gate G3: a judge supplies a registration number and expects the
+           vehicle's route back. This is the demo's money moment, so it sits in
+           the toolbar rather than behind a menu. -->
+      <div class="toolbar route-bar">
+        <label for="route-plate">Trace vehicle</label>
+        <input id="route-plate" placeholder="GJ 01 AB 1234" spellcheck="false" autocomplete="off">
+        <label for="route-fuzz">Tolerance</label>
+        <select id="route-fuzz">
+          <option value="0">Exact</option>
+          <option value="1" selected>±1 character</option>
+          <option value="2">±2 characters</option>
+        </select>
+        <label class="check"><input type="checkbox" id="route-clean" checked> Drop impossible hops</label>
+        <button class="action primary" id="btn-route">Trace route</button>
+        <button class="action" id="btn-route-csv">Export CSV</button>
+        <button class="action" id="btn-route-clear">Clear</button>
+        <span class="route-status" id="route-status"></span>
+      </div>
+
+      <div class="route-result" id="route-result" hidden></div>
+
       <div class="wall" id="wall"></div>
     </div>
   </main>

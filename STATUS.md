@@ -38,6 +38,7 @@ Legend: ✅ done and verified · 🟡 partial or scaffolded · 🔴 not started 
 | 24 | **Cross-camera route reconstruction** | ✅ Done | Priyanshu | Gate G3. Verified against synthetic ground truth by `scripts/route_fixture.py` |
 | 25 | Spatio-temporal plausibility filter | ✅ Done | Priyanshu | Largest-consistent-chain selection (D17); flags and removes impossible hops |
 | 26 | Route report export | 🟡 CSV done, PDF pending | Priyanshu | `GET /api/route/export.csv` verified over HTTP |
+| 39 | Route tracing UI (map polyline + timeline) | ✅ Done | Priyanshu | Numbered pins in travel order, rejected legs shown in red with the reason |
 | 27 | Vehicle Re-ID fallback | 🔴 Not started | Priyanshu | **Promoted to primary route mechanism if #14 has no reads by 1 Sep** |
 | 28 | RBAC + department scoping | 🔴 Not started | Priyanshu | Ship if time (WORKPLAN.md §4) |
 | 29 | Hash-chained audit log | 🔴 Not started | Priyanshu | Ship if time |

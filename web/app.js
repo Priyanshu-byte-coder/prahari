@@ -571,3 +571,177 @@ $('btn-sync').addEventListener('click', async () => {
 initMap();
 loadCameras();
 startOverlayLoop();
+
+/* ------------------------------------------------------- route tracing (G3)
+ *
+ * A judge supplies a registration number and expects to see where the vehicle
+ * went. The API does the reasoning; this draws it: numbered pins in travel
+ * order, a polyline between them, and a legible reason next to any leg the
+ * engine judged physically impossible. Showing the rejected leg matters as
+ * much as showing the route -- it is the difference between a system that
+ * found a car and a system that can explain itself.
+ */
+
+state.routeLayer = null;
+state.routeMarkers = [];
+state.lastRouteQuery = null;
+
+function clearRoute() {
+  if (state.routeLayer) { state.map.removeLayer(state.routeLayer); state.routeLayer = null; }
+  state.routeMarkers.forEach((m) => state.map.removeLayer(m));
+  state.routeMarkers = [];
+  $('route-result').hidden = true;
+  $('route-result').innerHTML = '';
+  $('route-status').textContent = '';
+  $('route-status').className = 'route-status';
+  state.lastRouteQuery = null;
+}
+
+function routeQueryString() {
+  const plate = $('route-plate').value.trim();
+  const params = new URLSearchParams({
+    plate,
+    max_distance: $('route-fuzz').value,
+    drop_implausible: $('route-clean').checked ? 'true' : 'false',
+  });
+  return { plate, qs: params.toString() };
+}
+
+async function traceRoute() {
+  const { plate, qs } = routeQueryString();
+  if (!plate) {
+    $('route-status').textContent = 'enter a registration number';
+    $('route-status').className = 'route-status err';
+    return;
+  }
+
+  clearRoute();
+  state.lastRouteQuery = qs;
+  $('route-status').textContent = 'searching…';
+
+  let data;
+  try {
+    const res = await fetch(`/api/route?${qs}`);
+    data = await res.json();
+  } catch (err) {
+    $('route-status').textContent = 'route lookup failed';
+    $('route-status').className = 'route-status err';
+    return;
+  }
+
+  const s = data.summary;
+  if (!data.sightings.length) {
+    $('route-status').textContent = `no sightings of ${plate}`;
+    $('route-status').className = 'route-status err';
+    return;
+  }
+
+  $('route-status').textContent =
+    `${s.sightings} sightings across ${s.cameras} cameras`;
+  $('route-status').className = 'route-status ok';
+
+  drawRouteOnMap(data);
+  renderRoutePanel(data, plate);
+}
+
+function drawRouteOnMap(data) {
+  const points = data.sightings
+    .filter((s) => s.lat != null && s.lon != null)
+    .map((s) => [s.lat, s.lon]);
+
+  if (points.length > 1) {
+    state.routeLayer = L.polyline(points, {
+      color: '#ff6b00', weight: 3, opacity: 0.85, dashArray: '6 4',
+    }).addTo(state.map);
+  }
+
+  data.sightings.forEach((s, i) => {
+    if (s.lat == null || s.lon == null) return;
+    const marker = L.marker([s.lat, s.lon], {
+      icon: L.divIcon({
+        className: '',
+        html: `<div class="route-marker">${i + 1}</div>`,
+        iconSize: [22, 22],
+      }),
+      zIndexOffset: 1000,
+    }).addTo(state.map);
+    marker.bindPopup(
+      `<b>${i + 1}. ${s.location || 'camera ' + s.camera_id}</b>
+       <table>
+         <tr><td>Camera</td><td>${s.camera_id}</td></tr>
+         <tr><td>Seen</td><td>${s.first_seen_iso || '—'}</td></tr>
+         <tr><td>Dwell</td><td>${s.dwell_seconds}s</td></tr>
+         <tr><td>Plate read</td><td>${s.plate_read}</td></tr>
+         <tr><td>Edit distance</td><td>${s.plate_distance}</td></tr>
+         <tr><td>Class</td><td>${s.vehicle_class}</td></tr>
+       </table>`);
+    state.routeMarkers.push(marker);
+  });
+
+  if (points.length) {
+    state.map.fitBounds(points.length > 1 ? points : [points[0]],
+      { padding: [60, 60], maxZoom: 14 });
+  }
+}
+
+function renderRoutePanel(data, plate) {
+  const s = data.summary;
+  const box = $('route-result');
+  box.hidden = false;
+
+  const rows = data.sightings.map((sight, i) => {
+    const hop = data.hops[i];  // leg leaving this sighting
+    const fuzzy = sight.plate_distance > 0;
+    const legHtml = hop ? `
+      <div class="leg ${hop.plausible ? '' : 'bad'}">
+        ${hop.plausible ? '↓' : '⚠'}
+        ${hop.distance_km != null ? `${hop.distance_km} km` : 'distance unknown'} ·
+        ${Math.round(hop.gap_seconds)}s
+        ${hop.implied_speed_kmh != null ? `· ${hop.implied_speed_kmh} km/h` : ''}
+        ${hop.note ? `<br>${hop.note}` : ''}
+      </div>` : '';
+
+    return `
+      <div class="hop-row">
+        <div class="hop-rail">
+          <div class="hop-dot">${i + 1}</div>
+          ${hop ? `<div class="hop-line ${hop.plausible ? '' : 'bad'}"></div>` : ''}
+        </div>
+        <div class="hop-body">
+          <div class="where">${sight.location || 'Camera ' + sight.camera_id}
+            <span class="when">· cam ${sight.camera_id}</span></div>
+          <div class="when">${sight.first_seen_iso || 'timing not anchored'}
+            · dwell ${sight.dwell_seconds}s</div>
+          <div class="plate ${fuzzy ? 'fuzzy' : ''}">${sight.plate_read}
+            ${fuzzy ? `(fuzzy, distance ${sight.plate_distance})` : '(exact)'}</div>
+          ${legHtml}
+        </div>
+      </div>`;
+  }).join('');
+
+  box.innerHTML = `
+    <h3>Movement of ${plate}</h3>
+    <div class="route-summary">
+      <span>Sightings <b>${s.sightings}</b></span>
+      <span>Cameras <b>${s.cameras}</b></span>
+      <span>Exact <b>${s.exact_matches}</b></span>
+      <span>Fuzzy <b>${s.fuzzy_matches}</b></span>
+      <span>Distance <b>${s.route_distance_km} km</b></span>
+      <span>Span <b>${Math.round(s.time_span_seconds)}s</b></span>
+      ${s.implausible_hops ? `<span style="color:var(--err)">Rejected legs <b>${s.implausible_hops}</b></span>` : ''}
+    </div>
+    <div class="route-hops">${rows}</div>`;
+}
+
+$('btn-route').addEventListener('click', traceRoute);
+$('route-plate').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') traceRoute();
+});
+$('btn-route-clear').addEventListener('click', clearRoute);
+$('btn-route-csv').addEventListener('click', () => {
+  const { plate, qs } = routeQueryString();
+  if (!plate) return;
+  // The CSV endpoint is the artifact the organisers asked for: detected
+  // vehicles with corresponding timestamps.
+  window.open(`/api/route/export.csv?${qs}`, '_blank');
+});

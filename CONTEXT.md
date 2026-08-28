@@ -105,6 +105,14 @@ Prize pool ₹51,00,000. Full strategy in [PLAN.md](PLAN.md).
   fuzzy matching only, and a planted 325 km/20 s sighting flagged at 94,404 km/h
   and removed.
 
+- **Route tracing in the console** — plate box in the toolbar, numbered pins in
+  travel order on the GIS map, dashed polyline, and a timeline panel showing
+  each sighting with its plate read, whether the match was exact or fuzzy, and
+  the leg to the next camera. Legs the engine rejected are drawn in red with
+  the reason in plain language ("implies 94404 km/h over 325.2 km"). Showing
+  the rejected leg is deliberate: it is the difference between a system that
+  found a car and one that can explain itself.
+
 ### Not built yet
 - **Plate detection + OCR that actually works** — see "Known broken" below;
   this is the single biggest gap versus PLAN.md §4.1.
