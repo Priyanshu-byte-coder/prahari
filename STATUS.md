@@ -5,7 +5,7 @@ work with their own AI sessions and second person does not resolve the same way
 for both readers. Full detail behind each row lives in [CONTEXT.md](CONTEXT.md);
 ownership rules live in [ROLES.md](ROLES.md).
 
-**Updated 2026-08-28 · HEAD `255ece3` · 10 days to submission (7 Sep)**
+**Updated 2026-08-28 · HEAD `411d068` · 10 days to submission (7 Sep)**
 
 Legend: ✅ done and verified · 🟡 partial or scaffolded · 🔴 not started ·
 ⛔ blocked on another row

@@ -9,7 +9,7 @@ and know exactly where things stand, what is proven, and what to do next.
 | | |
 |---|---|
 | **Last updated** | 2026-08-28 12:20 IST |
-| **HEAD** | `255ece3` on `main` |
+| **HEAD** | `411d068` on `main` |
 | **Repo** | https://github.com/Priyanshu-byte-coder/prahari (**private**) |
 | **Submission deadline** | **2026-09-07** — 10 days remaining |
 | **Event** | 2026-09-10 → 11, i-Hub Gujarat, Gandhinagar |
@@ -303,7 +303,7 @@ python -m venv .venv
 
 | Commit | Date | Change |
 |---|---|---|
-| `255ece3` | 2026-08-28 12:20 | Merge of both lanes. ROLES.md and STATUS.md rewritten in the third person with named owners, proposed owners for the 16 previously unassigned tasks, a critical-path chain, and an explicit scope triage. Recorded that four mandatory submission artifacts still have no owner. |
+| `411d068` | 2026-08-28 12:22 | Merge of both lanes. ROLES.md and STATUS.md rewritten in the third person with named owners, proposed owners for the 16 previously unassigned tasks, a critical-path chain, and an explicit scope triage. Recorded that four mandatory submission artifacts still have no owner. |
 | `bf44ce6` | 2026-08-28 | STATUS.md added — single-table task tracker. |
 | `6bbc1f0` | 2026-08-28 | ROLES.md updated. |
 | `8f7ea09` | 2026-08-28 | ROLES.md added (grid/tracking vs plate/OCR split); `plate_reader.py` gained a `PlateReader` class encapsulating OCR throttling + vote fusion behind `observe()`/`reset()`, so `run_worker.py` no longer contains plate-domain logic -- clean interface boundary for parallel work. |
