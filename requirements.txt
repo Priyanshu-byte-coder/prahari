@@ -6,3 +6,7 @@ uvicorn[standard]
 requests
 psycopg2-binary
 pydantic-settings
+av
+ultralytics
+lap
+easyocr

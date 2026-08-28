@@ -8,8 +8,8 @@ and know exactly where things stand, what is proven, and what to do next.
 
 | | |
 |---|---|
-| **Last updated** | 2026-08-27 18:30 IST |
-| **HEAD** | `5862c68` on `main` |
+| **Last updated** | 2026-08-28 11:38 IST |
+| **HEAD** | pending this commit on `main` |
 | **Repo** | https://github.com/Priyanshu-byte-coder/prahari (**private**) |
 | **Submission deadline** | **2026-09-07** — 11 days remaining |
 | **Event** | 2026-09-10 → 11, i-Hub Gujarat, Gandhinagar |
@@ -53,9 +53,24 @@ Prize pool ₹51,00,000. Full strategy in [PLAN.md](PLAN.md).
   `geocode_cameras.py`, `snapshot_all.py`.
 - **End-to-end proof** — real frames pulled from live Gujarat Police cameras
   through our own gateway; see `data/snapshots/grid_contact_sheet.jpg`.
+- **ANPR worker (vehicle stage)** — `services/worker/`: PTS-driven stream
+  reader (TCP-forced, backoff reconnect, discontinuity detection) → YOLOv8s
+  vehicle detection → ByteTrack tracking (custom `bytetrack_traffic.yaml`,
+  90-frame occlusion buffer). Writes per-camera JSONL to `data/detections/`.
+  Verified live against the real grid: sane per-class unique-vehicle counts,
+  no runaway track-id churn.
+- **Live operator console upgrades** — per-tile fullscreen (⛶) with a
+  right-side data panel (metadata + live vehicle counts + recent tracks), and
+  a live bounding-box overlay drawn on every playing tile, polling
+  `/api/detections/{id}` every 800ms. Box math correctly matches `cover`
+  (grid) vs `contain` (expanded) CSS, verified in a real browser.
+- **Detections + fuzzy search API** — `GET /api/detections/{id}` (unique-track
+  vehicle counts, recent track list), `GET /api/search/plate?q=...` (Python
+  Levenshtein ±N matcher over all cameras' logged plates).
 
 ### Not built yet
-- ANPR pipeline (vehicle detect → plate detect → OCR → track-level fusion)
+- **Plate detection + OCR that actually works** — see "Known broken" below;
+  this is the single biggest gap versus PLAN.md §4.1.
 - Watchlist database, fuzzy matching, alert engine
 - Cross-camera route reconstruction
 - Persistence (PostgreSQL/PostGIS/TimescaleDB — currently JSON files on disk)
@@ -68,6 +83,18 @@ Prize pool ₹51,00,000. Full strategy in [PLAN.md](PLAN.md).
   or time out, and the set changes between runs.
 - Geocoding is weak: 9 landmarks resolved via Nominatim, 15 hand-curated,
   the rest are district centroids. **All coordinates need ground-truth correction.**
+- **Plate OCR does not work yet.** Measured, not assumed: a 22-camera sweep
+  (best-resolution cameras first, ~12s live traffic each, ~1,500 vehicle-level
+  OCR attempts) using EasyOCR on the *whole vehicle crop* produced **one** raw
+  regex-valid string (`LQ07209` on cam 11) — and `LQ` is not a real Indian RTO
+  state code, so even that hit is almost certainly noise. **Zero confirmed
+  genuine reads.** Root cause identified by testing a real plate-region
+  detector (see D13): once plate localization is tight instead of "whole
+  vehicle," EasyOCR *does* pull real signal (a `GJ` state-code fragment, a
+  digit group, a stable repeated read across 4 consecutive frames on one
+  vehicle) — but our fragment-vs-full-regex matching throws all of it away
+  because EasyOCR returns each plate as multiple text fragments, not one
+  string. This is a fixable integration gap, not a dead end. Not yet wired in.
 
 ---
 
@@ -185,6 +212,11 @@ python -m venv .venv
 | D6 | Repo private until submission | Competitors. Flip to public on 7 Sep — the submission may include a repo link. |
 | D7 | Registry supports drag-to-correct geo | Most coordinates start as approximations, and route plausibility filtering depends on real inter-camera distance. Doubles as Model 1's "manual entry" requirement. |
 | D8 | Correlate on stream PTS, not burned-in overlay | Overlays are per-camera source time and loop backwards. |
+| D9 | ByteTrack occlusion buffer raised 30 → 90 frames (`bytetrack_traffic.yaml`) | Default caused ID churn on this grid's junction cameras (vehicles briefly blocked by others/poles); measured 452 "unique" tracks from 16k detection rows before the fix, ~15-20 after. |
+| D10 | Vehicle counts computed from unique `track_id`, never per-detection-row | The `/api/detections` endpoint was summing one row per frame a track is visible — a car in frame for 100 frames counted as 100 vehicles. Real bug, user-reported, fixed. |
+| D11 | EasyOCR chosen for plate OCR, not PaddleOCR/PARSeq | `paddlepaddle` ships no wheel for this machine's Python 3.14; PARSeq needs its own weights/preprocessing not set up in this pass. EasyOCR (CRAFT+CRNN) is real and installs cleanly, but see "Plate OCR does not work yet" above — it is not sufficient on its own. |
+| D12 | Fuzzy plate search is a Python Levenshtein matcher, not OpenSearch | Standing up an OpenSearch cluster is out of scope for this pass; same ±N-char matching behaviour without the infra. |
+| D13 | Found a real plate-region detector to integrate: `Muhammad-Zeerak-Khan/Automatic-License-Plate-Recognition-using-YOLOv8` (MIT, 471★, verified 6.24MB working YOLOv8 weights, single class `license_plate`) | A widely-cited "94.5% accuracy" alternative (`lavanyashree2805/yolov8-license-plate-india`) was checked and is **fake** — its committed weights file is 2 bytes. Always verify a model repo's actual file sizes before trusting its README. |
 
 ---
 
@@ -221,8 +253,15 @@ python -m venv .venv
 - [ ] Verify camera coordinates with local knowledge — drag pins on the map.
 
 ### Build queue (next up, in order)
-- [ ] ANPR worker: PTS-driven reader → vehicle detect → plate detect → OCR
+- [x] ANPR worker: PTS-driven reader → vehicle detect → track (ByteTrack)
+- [ ] **Wire in the real plate detector (D13)** to replace whole-vehicle-crop
+      OCR, and fix the fragment-merging bug: EasyOCR returns a plate as
+      multiple text pieces, current code only accepts one fragment matching
+      the full regex. Merge fragments left-to-right by bbox position before
+      validating. This is the highest-value next task — see "Known broken."
 - [ ] Track-level fusion: character voting, format prior, confusion-class repair
+      (vote-across-frames scaffolding exists in `run_worker.py`; needs the
+      fixed OCR above to have anything real to vote on)
 - [ ] Postgres + PostGIS + TimescaleDB, replacing JSON-on-disk
 - [ ] Watchlist schema, admin UI, CSV bulk import
 - [ ] Fuzzy matcher with confidence bands + alert engine + WebSocket push
@@ -243,6 +282,7 @@ python -m venv .venv
 
 | Commit | Date | Change |
 |---|---|---|
+| *(pending)* | 2026-08-28 11:38 | ANPR worker (stream reader, YOLOv8s+ByteTrack vehicle tracking, tuned occlusion buffer), live box overlay + fullscreen data panel in the console, `/api/detections` and `/api/search/plate` endpoints, unique-track counting bugfix. Plate OCR still not producing real reads -- measured across 22 cameras, root cause identified, real detector sourced but not yet integrated (see §6 D9-D13). |
 | `5862c68` | 2026-08-27 18:34 | CONTEXT.md living state file + CLAUDE.md working agreement |
 | `7b99f81` | 2026-08-27 18:22 | Stream gateway (cookie session, HLS rewrite, LL-tag stripping), operator console (GIS map + video wall), snapshot tooling, grid reconnaissance |
 | `357c2e3` | 2026-08-27 17:52 | Grid survey tooling, MediaMTX clone of the Sentinel grid, Indian plate renderer, first measurements of the live grid |

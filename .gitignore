@@ -21,3 +21,5 @@ data/snapshots/*.jpg
 !data/snapshots/grid_contact_sheet.jpg
 logs_api.txt
 cams_tmp.json
+data/detections/
+yolov8*.pt

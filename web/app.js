@@ -157,6 +157,7 @@ function selectCamera(id) {
 /* ------------------------------------------------------------ video wall */
 
 function renderWall() {
+  collapseAll();
   stopAll();
   const wall = $('wall');
   wall.innerHTML = '';
@@ -170,7 +171,9 @@ function renderWall() {
     const res = cam.width ? `${cam.width}x${cam.height}` : '';
     tile.innerHTML = `
       <span class="badge" data-role="badge">idle</span>
+      <button class="expand-btn" data-role="expand" title="Full screen + camera data">⛶</button>
       <video muted playsinline data-role="video"></video>
+      <canvas class="box-overlay" data-role="boxes"></canvas>
       <div class="overlay" data-role="overlay">
         <div>${cam.reachable ? 'Press “Start wall”' : 'Unavailable'}</div>
         ${cam.reachable ? '' : `<div class="why">${cam.status}: ${cam.status_detail || ''}</div>`}
@@ -179,10 +182,194 @@ function renderWall() {
         <span class="id">${cam.id}</span>
         <span class="loc">${cam.location || cam.name}</span>
         <span class="meta" data-role="meta">${cam.codec || ''} ${res}</span>
-      </div>`;
+      </div>
+      <div class="panel" data-role="panel"></div>`;
     tile.addEventListener('click', () => selectCamera(cam.id));
+    tile.querySelector('[data-role=expand]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleExpand(cam.id);
+    });
     wall.appendChild(tile);
   });
+}
+
+/* ------------------------------------------------------ live box overlay */
+
+// One shared poll loop rather than a timer per tile -- a wall of 24 cameras
+// each polling independently would hammer the API for no benefit.
+function startOverlayLoop() {
+  clearInterval(state.overlayTimer);
+  state.overlayTimer = setInterval(updateOverlays, 800);
+}
+
+function updateOverlays() {
+  const liveIds = [...state.players.entries()]
+    .filter(([, p]) => p.hls && p.attempt === 0)
+    .map(([id]) => id);
+  liveIds.forEach(drawOverlay);
+}
+
+async function drawOverlay(id) {
+  const tile = document.querySelector(`.tile[data-id="${id}"]`);
+  const canvas = tile && tile.querySelector('[data-role=boxes]');
+  if (!tile || !canvas) return;
+  const cam = state.cameras.find((c) => c.id === id);
+  if (!cam || !cam.width || !cam.height) return;
+
+  let det;
+  try {
+    const res = await fetch(`/api/detections/${id}?limit=60`);
+    det = await res.json();
+  } catch (_) { return; }
+
+  const ctx = canvas.getContext('2d');
+  const dispW = canvas.clientWidth, dispH = canvas.clientHeight;
+  canvas.width = dispW;
+  canvas.height = dispH;
+  ctx.clearRect(0, 0, dispW, dispH);
+  if (!det.available) return;
+
+  // Keep only the most recent sighting per track id.
+  const latest = new Map();
+  det.tracks.forEach((t) => latest.set(t.track_id, t));
+
+  // Grid tiles use object-fit: cover, the expanded view uses contain -- the
+  // scale math differs, so mirror whichever the tile is currently rendering.
+  const expanded = tile.classList.contains('expanded');
+  const scale = expanded
+    ? Math.min(dispW / cam.width, dispH / cam.height)
+    : Math.max(dispW / cam.width, dispH / cam.height);
+  const drawW = cam.width * scale, drawH = cam.height * scale;
+  const offX = (dispW - drawW) / 2, offY = (dispH - drawH) / 2;
+
+  ctx.lineWidth = 2;
+  ctx.font = '11px ui-monospace, monospace';
+  ctx.textBaseline = 'alphabetic';
+  latest.forEach((t) => {
+    const [x1, y1, x2, y2] = t.bbox;
+    const sx = offX + x1 * scale, sy = offY + y1 * scale;
+    const sw = (x2 - x1) * scale, sh = (y2 - y1) * scale;
+    const color = t.plate ? '#eab308' : '#22c55e';
+
+    ctx.strokeStyle = color;
+    ctx.strokeRect(sx, sy, sw, sh);
+
+    const label = t.plate ? t.plate : `${t.class} #${t.track_id}`;
+    const tw = ctx.measureText(label).width + 6;
+    const ly = Math.max(12, sy - 3);
+    ctx.fillStyle = color;
+    ctx.fillRect(sx, ly - 11, tw, 14);
+    ctx.fillStyle = '#0a0e14';
+    ctx.fillText(label, sx + 3, ly);
+  });
+}
+
+/* ------------------------------------------------------------ fullscreen */
+
+function toggleExpand(id) {
+  const tile = document.querySelector(`.tile[data-id="${id}"]`);
+  if (!tile) return;
+  if (tile.classList.contains('expanded')) collapseTile(id);
+  else expandTile(id);
+}
+
+function expandTile(id) {
+  collapseAll();
+  const tile = document.querySelector(`.tile[data-id="${id}"]`);
+  if (!tile) return;
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'tile-backdrop';
+  backdrop.addEventListener('click', () => collapseTile(id));
+  document.body.appendChild(backdrop);
+
+  tile.classList.add('expanded');
+  const btn = tile.querySelector('[data-role=expand]');
+  if (btn) btn.textContent = '✕';
+
+  refreshPanel(id);
+  tile._panelTimer = setInterval(() => refreshPanel(id), 2000);
+  document.addEventListener('keydown', escHandler);
+}
+
+function collapseTile(id) {
+  const tile = document.querySelector(`.tile[data-id="${id}"]`);
+  if (!tile) return;
+  tile.classList.remove('expanded');
+  const btn = tile.querySelector('[data-role=expand]');
+  if (btn) btn.textContent = '⛶';
+  clearInterval(tile._panelTimer);
+  document.querySelectorAll('.tile-backdrop').forEach((b) => b.remove());
+  document.removeEventListener('keydown', escHandler);
+}
+
+function collapseAll() {
+  document.querySelectorAll('.tile.expanded').forEach((t) => collapseTile(t.dataset.id));
+}
+
+function escHandler(e) {
+  if (e.key === 'Escape') collapseAll();
+}
+
+async function refreshPanel(id) {
+  const tile = document.querySelector(`.tile[data-id="${id}"]`);
+  if (!tile || !tile.classList.contains('expanded')) return;
+  const panel = tile.querySelector('[data-role=panel]');
+  const cam = state.cameras.find((c) => c.id === id);
+  if (!cam || !panel) return;
+
+  let det = { available: false, by_class: {}, unique_tracks: 0, tracks: [] };
+  try {
+    const res = await fetch(`/api/detections/${id}`);
+    det = await res.json();
+  } catch (_) { /* worker may not be running for this camera */ }
+
+  const res_ = cam.width ? `${cam.width}x${cam.height}` : '—';
+  const mismatch = cam.fps_disagreement
+    ? ` <span style="color:var(--warn)">(catalogue: ${cam.catalogue_fps})</span>` : '';
+
+  const classRows = Object.entries(det.by_class)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => `<div class="panel-row"><span>${k}</span><b>${v}</b></div>`)
+    .join('') || '<div class="panel-empty">No detections yet.</div>';
+
+  const recentRows = [...det.tracks].reverse().slice(0, 15).map((t) => `
+    <div class="track-row">
+      <span class="tid">#${t.track_id}</span>
+      <span>${t.class}</span>
+      <span class="conf">${Math.round(t.conf * 100)}%</span>
+      <span class="pts">${t.pts_seconds.toFixed(1)}s</span>
+    </div>`).join('') || '<div class="panel-empty">Run the ANPR worker against this camera to see live tracks:<br><code>python -m services.worker.run_worker --camera ' + id + '</code></div>';
+
+  panel.innerHTML = `
+    <div class="panel-head">
+      <h3>Camera ${cam.id}</h3>
+      <button class="panel-close" data-role="close" title="Close">✕</button>
+    </div>
+    <div class="panel-section">
+      <h4>Metadata</h4>
+      <div class="panel-row"><span>Name</span><b>${cam.name}</b></div>
+      <div class="panel-row"><span>Location</span><b>${cam.location || '—'}</b></div>
+      <div class="panel-row"><span>Department</span><b>${cam.department || '—'}</b></div>
+      <div class="panel-row"><span>Status</span><b>${cam.status}</b></div>
+      <div class="panel-row"><span>Transport</span><b>${cam.transport || '—'}</b></div>
+      <div class="panel-row"><span>Codec</span><b>${cam.codec || '—'}</b></div>
+      <div class="panel-row"><span>Resolution</span><b>${res_}</b></div>
+      <div class="panel-row"><span>FPS (measured)</span><b>${cam.fps ?? '—'}${mismatch}</b></div>
+      <div class="panel-row"><span>Geo precision</span><b>${cam.geo_precision || '—'}</b></div>
+      <div class="panel-row"><span>Lat / Lon</span><b>${cam.lat != null ? cam.lat.toFixed(4) : '—'}, ${cam.lon != null ? cam.lon.toFixed(4) : '—'}</b></div>
+      ${cam.status_detail ? `<div class="panel-row"><span>Detail</span><b style="color:var(--muted);font-weight:400">${cam.status_detail}</b></div>` : ''}
+    </div>
+    <div class="panel-section">
+      <h4>Vehicle counts ${det.available ? `· ${det.unique_tracks} unique tracks` : ''}</h4>
+      ${classRows}
+    </div>
+    <div class="panel-section panel-tracks">
+      <h4>Recent tracks (stream PTS)</h4>
+      ${recentRows}
+    </div>`;
+
+  panel.querySelector('[data-role=close]').addEventListener('click', () => collapseTile(id));
 }
 
 function tileParts(id) {
@@ -333,6 +520,9 @@ function stopCamera(id) {
   setBadge(id, 'idle', '');
   const parts = tileParts(id);
   if (parts) parts.overlay.style.display = 'flex';
+  const tile = document.querySelector(`.tile[data-id="${id}"]`);
+  const canvas = tile && tile.querySelector('[data-role=boxes]');
+  if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
   updatePlayingCount();
 }
 
@@ -380,3 +570,4 @@ $('btn-sync').addEventListener('click', async () => {
 
 initMap();
 loadCameras();
+startOverlayLoop();

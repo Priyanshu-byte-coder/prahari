@@ -97,6 +97,14 @@ main {
 }
 .tile.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .tile video { width: 100%; height: 100%; object-fit: cover; display: block; background: #000; }
+.tile canvas.box-overlay {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  width: auto; height: auto;
+  pointer-events: none;
+}
+/* The panel takes the right 320px in expanded mode -- keep the overlay over
+   the video area only, not stretched across the data panel too. */
+.tile.expanded canvas.box-overlay { right: 320px; }
 
 .tile .label {
   position: absolute; left: 0; right: 0; bottom: 0;
@@ -174,3 +182,64 @@ main {
 .wall::-webkit-scrollbar { width: 9px; }
 .wall::-webkit-scrollbar-track { background: var(--bg); }
 .wall::-webkit-scrollbar-thumb { background: var(--line); border-radius: 5px; }
+
+/* ---- per-tile fullscreen + data panel ---- */
+.tile .expand-btn {
+  position: absolute; top: 8px; right: 8px; z-index: 5;
+  width: 24px; height: 24px; border-radius: 5px;
+  background: rgba(0,0,0,0.65); border: 1px solid var(--line);
+  color: var(--text); font-size: 13px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.tile .expand-btn:hover { border-color: var(--accent); color: #fff; }
+
+.tile-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 999;
+}
+
+.tile.expanded {
+  position: fixed; inset: 5vh 6vw; z-index: 1000;
+  aspect-ratio: unset; display: flex; border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.tile.expanded video { flex: 1 1 auto; width: auto; min-width: 0; object-fit: contain; }
+.tile.expanded .label { display: none; }
+.tile.expanded .expand-btn { z-index: 1001; }
+
+.tile .panel { display: none; }
+.tile.expanded .panel {
+  display: flex; flex-direction: column; gap: 12px;
+  width: 320px; flex-shrink: 0;
+  background: var(--panel); border-left: 1px solid var(--line);
+  padding: 14px; overflow-y: auto;
+}
+
+.panel-head { display: flex; align-items: center; justify-content: space-between; }
+.panel-head h3 { margin: 0; font-size: 14px; color: var(--accent); }
+.panel-close {
+  background: none; border: 1px solid var(--line); border-radius: 4px;
+  color: var(--muted); width: 22px; height: 22px; cursor: pointer;
+}
+.panel-close:hover { border-color: var(--accent); color: #fff; }
+
+.panel-section h4 {
+  margin: 0 0 6px; font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.6px; color: var(--muted);
+}
+.panel-row {
+  display: flex; justify-content: space-between; gap: 8px; font-size: 12px;
+  padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.panel-row span { color: var(--muted); flex-shrink: 0; }
+.panel-row b { font-family: var(--mono); font-weight: 600; text-align: right; }
+.panel-empty { font-size: 11px; color: var(--muted); font-style: italic; line-height: 1.5; }
+.panel-empty code { display: inline-block; margin-top: 4px; color: var(--info); }
+
+.panel-tracks { flex: 1; overflow-y: auto; min-height: 0; }
+.track-row {
+  display: grid; grid-template-columns: 36px 1fr 40px 50px; gap: 6px;
+  font-family: var(--mono); font-size: 10px; padding: 2px 0; color: var(--text);
+}
+.track-row .tid { color: var(--accent); }
+.track-row .conf { color: var(--ok); text-align: right; }
+.track-row .pts { color: var(--muted); text-align: right; }

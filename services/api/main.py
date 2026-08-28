@@ -16,6 +16,7 @@ Run:
 from __future__ import annotations
 
 import json
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,7 @@ UPSTREAM_BASE = "https://live.corp8.cloud"
 CATALOGUE_FILE = DATA / "catalogue" / "ingest.json"
 SURVEY_FILE = DATA / "catalogue" / "grid_survey.json"
 GEO_FILE = DATA / "camera_geo.json"
+DETECTIONS_DIR = DATA / "detections"
 
 app = FastAPI(
     title="Prahari",
@@ -281,6 +283,112 @@ def sync_catalogue() -> dict:
         "removed": sorted(old_ids - new_ids),
         "unchanged": len(new_ids & old_ids),
     }
+
+
+def _tail_lines(path: Path, n: int) -> list[str]:
+    """Read up to the last n lines without loading a possibly large file whole.
+
+    The worker's per-camera JSONL grows unbounded for as long as it runs, so
+    the panel must tail it rather than parse the entire file on every poll.
+    """
+    with path.open("rb") as f:
+        f.seek(0, 2)
+        size = f.tell()
+        block = 8192
+        data = b""
+        while size > 0 and data.count(b"\n") <= n:
+            step = min(block, size)
+            size -= step
+            f.seek(size)
+            data = f.read(step) + data
+    return data.decode("utf-8", errors="ignore").splitlines()[-n:]
+
+
+@app.get("/api/detections/{camera_id}")
+def get_detections(camera_id: str, limit: int = 200) -> dict:
+    """Live vehicle-track data for the fullscreen panel, sourced from the ANPR
+    worker's JSONL output (services/worker/run_worker.py). Empty until the
+    worker has been run against that camera -- not every tile has one."""
+    path = DETECTIONS_DIR / f"cam_{camera_id}.jsonl"
+    if not path.exists():
+        return {"camera_id": camera_id, "available": False, "tracks": [], "by_class": {}, "unique_tracks": 0}
+
+    # Vehicle counts must be by unique track id, not by detection row -- the
+    # worker writes one row per frame a track is visible, so a car sitting in
+    # frame for 100 frames is one vehicle, not 100. Cap how much of the file
+    # is scanned so a long-running worker can't make this endpoint slow.
+    all_lines = _tail_lines(path, 20000)
+    seen_class: dict[int, str] = {}
+    for line in all_lines:
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        seen_class.setdefault(row["track_id"], row["class"])
+
+    by_class: dict[str, int] = {}
+    for cls in seen_class.values():
+        by_class[cls] = by_class.get(cls, 0) + 1
+
+    recent = [json.loads(line) for line in all_lines[-limit:] if line.strip()]
+
+    return {
+        "camera_id": camera_id,
+        "available": True,
+        "tracks": recent[-50:],
+        "by_class": by_class,
+        "unique_tracks": len(seen_class),
+    }
+
+
+def _levenshtein(a: str, b: str) -> int:
+    if a == b:
+        return 0
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i] + [0] * len(b)
+        for j, cb in enumerate(b, 1):
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb))
+        prev = cur
+    return prev[-1]
+
+
+@app.get("/api/search/plate")
+def search_plate(q: str, max_distance: int = 1) -> dict:
+    """Fuzzy plate search across every camera's detection log.
+
+    Not backed by OpenSearch -- a Python-side Levenshtein matcher over the
+    per-camera JSONL files (PLAN.md §4.4 asks for fuzzy ±1-char search; this
+    gives the same matching behaviour without standing up a search cluster).
+    """
+    query = re.sub(r"[^A-Z0-9]", "", q.upper())
+    if not DETECTIONS_DIR.exists():
+        return {"query": query, "matches": []}
+
+    best_per_track: dict[tuple[str, int], dict] = {}
+    for path in DETECTIONS_DIR.glob("cam_*.jsonl"):
+        for line in _tail_lines(path, 20000):
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if not row.get("plate"):
+                continue
+            best_per_track[(row["camera_id"], row["track_id"])] = row  # last write wins
+
+    matches = []
+    for (cam_id, track_id), row in best_per_track.items():
+        dist = _levenshtein(query, row["plate"])
+        if dist <= max_distance:
+            matches.append({
+                "camera_id": cam_id,
+                "track_id": track_id,
+                "plate": row["plate"],
+                "distance": dist,
+                "class": row["class"],
+                "pts_seconds": row["pts_seconds"],
+                "bbox": row["bbox"],
+            })
+    matches.sort(key=lambda m: m["distance"])
+    return {"query": query, "matches": matches}
 
 
 @app.get("/api/health")
