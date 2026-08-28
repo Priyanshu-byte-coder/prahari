@@ -22,6 +22,9 @@ and know exactly where things stand, what is proven, and what to do next.
 `PlateReader.observe()` interface boundary between the grid/tracking side
 and the plate/OCR side, so two people can build in parallel.
 
+**Task status at a glance:** see [STATUS.md](STATUS.md) — one table, all
+tasks, done/partial/not-started.
+
 ## 1. What this is
 
 Submission for the **Gujarat Police Innovation Challenge 2026** (Sentinel CCTV
