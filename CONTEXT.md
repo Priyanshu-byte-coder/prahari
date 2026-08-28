@@ -9,7 +9,7 @@ and know exactly where things stand, what is proven, and what to do next.
 | | |
 |---|---|
 | **Last updated** | 2026-08-28 11:38 IST |
-| **HEAD** | `a6315b9` on `main` |
+| **HEAD** | `8f7ea09` on `main` |
 | **Repo** | https://github.com/Priyanshu-byte-coder/prahari (**private**) |
 | **Submission deadline** | **2026-09-07** — 11 days remaining |
 | **Event** | 2026-09-10 → 11, i-Hub Gujarat, Gandhinagar |
@@ -286,7 +286,7 @@ python -m venv .venv
 
 | Commit | Date | Change |
 |---|---|---|
-| *(pending)* | 2026-08-28 | ROLES.md added (grid/tracking vs plate/OCR split); `plate_reader.py` gained a `PlateReader` class encapsulating OCR throttling + vote fusion behind `observe()`/`reset()`, so `run_worker.py` no longer contains plate-domain logic -- clean interface boundary for parallel work. |
+| `8f7ea09` | 2026-08-28 | ROLES.md added (grid/tracking vs plate/OCR split); `plate_reader.py` gained a `PlateReader` class encapsulating OCR throttling + vote fusion behind `observe()`/`reset()`, so `run_worker.py` no longer contains plate-domain logic -- clean interface boundary for parallel work. |
 | `a6315b9` | 2026-08-28 11:38 | ANPR worker (stream reader, YOLOv8s+ByteTrack vehicle tracking, tuned occlusion buffer), live box overlay + fullscreen data panel in the console, `/api/detections` and `/api/search/plate` endpoints, unique-track counting bugfix. Plate OCR still not producing real reads -- measured across 22 cameras, root cause identified, real detector sourced but not yet integrated (see §6 D9-D13). |
 | `5862c68` | 2026-08-27 18:34 | CONTEXT.md living state file + CLAUDE.md working agreement |
 | `7b99f81` | 2026-08-27 18:22 | Stream gateway (cookie session, HLS rewrite, LL-tag stripping), operator console (GIS map + video wall), snapshot tooling, grid reconnaissance |
