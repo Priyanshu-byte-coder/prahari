@@ -21,8 +21,8 @@ Legend: ✅ done and verified · 🟡 partial or scaffolded · 🔴 not started 
 | 7 | Vehicle detection + tracking (ByteTrack) | ✅ Done | Priyanshu | Occlusion buffer 30 → 90 frames (D9) |
 | 8 | Unique-vehicle counting (not per-frame) | ✅ Done | Priyanshu | Real bug, user-reported, fixed (D10) |
 | 9 | **RTSP-on-hotspot test** | 🔴 Not done | **Priyanshu (manual)** | Blocks ingestion-path decision. Cannot be delegated to a coding session. |
-| 10 | Multi-camera concurrent workers | 🔴 Not done | Priyanshu | Currently one process per camera, started by hand |
-| 11 | Postgres/PostGIS/Timescale migration | 🔴 Not done | Priyanshu | Still JSON-on-disk. **Triage candidate — see ROLES.md §7** |
+| 10 | Multi-camera concurrent workers | 🟡 Built, untested | Priyanshu | `supervisor.py`: process-per-camera, staggered start, restart-with-backoff, health file, `--load-test` |
+| 11 | Postgres/PostGIS/Timescale migration | ⛔ **Cut** | — | JSON-on-disk demos identically; stays in the HLD as the production data layer (WORKPLAN.md §4) |
 | 12 | Camera health / NOC dashboard | 🔴 Not done | Priyanshu | |
 | 13 | Plate detector (real, localised crop) | 🟡 Sourced, not wired | Neev | MIT model verified (D13); not yet in `plate_reader.py` |
 | 14 | **Plate OCR producing real reads** | 🔴 Not working | Neev | 0 confirmed reads / ~1,500 attempts across 22 cameras. **Highest-value open task in the project.** |
@@ -32,18 +32,20 @@ Legend: ✅ done and verified · 🟡 partial or scaffolded · 🔴 not started 
 | 18 | Fuzzy plate search (`/api/search/plate`) | ✅ Done | Neev | Levenshtein matcher, verified correct |
 | 19 | Confusion-class character repair | ⛔ Blocked | Neev | Blocked on #14 |
 | 20 | Extract `services/api/plate_routes.py` | 🔴 Not done | Neev | Removes the last shared-file conflict in `main.py` |
-| 21 | Watchlist DB + admin UI + CSV import | 🔴 Not started | Neev *(proposed)* | Plate-domain data model |
-| 22 | Fuzzy watchlist matching + confidence bands | 🔴 Not started | Neev *(proposed)* | Extends #18 |
-| 23 | Alert engine (WebSocket push, ack/dismiss) | 🔴 Not started | Priyanshu *(proposed)* | |
-| 24 | **Cross-camera route reconstruction** | 🔴 Not started | Priyanshu *(proposed)* | **Mandatory gate G3 — the thing judges test on stage** |
-| 25 | Spatio-temporal plausibility filter | 🔴 Not started | Priyanshu *(proposed)* | |
-| 26 | PDF/CSV route report export | 🔴 Not started | Priyanshu *(proposed)* | Required submission artifact |
-| 27 | Vehicle Re-ID fallback | 🔴 Not started | Priyanshu *(proposed)* | Triage candidate |
-| 28 | RBAC + department scoping | 🔴 Not started | Priyanshu *(proposed)* | Triage candidate |
-| 29 | Hash-chained audit log | 🔴 Not started | Priyanshu *(proposed)* | Triage candidate |
-| 30 | `scripts/preflight.py` (8-point checklist) | 🔴 Not built | Priyanshu *(proposed)* | Cheap; good demo-video material |
-| 31 | Public deployment + test credentials | 🔴 Not started | Priyanshu *(proposed)* | Currently localhost only |
-| 32 | Docker Compose one-command bring-up | 🔴 Not started | Priyanshu *(proposed)* | Triage candidate |
+| 21 | Watchlist DB + admin UI + CSV import | 🔴 Not started | Neev | Plate-domain data model |
+| 22 | Fuzzy watchlist matching + confidence bands | 🔴 Not started | Neev | Extends #18 |
+| 23 | Alert engine (WebSocket push, ack/dismiss) | 🔴 Not started | Priyanshu | |
+| 24 | **Cross-camera route reconstruction** | 🔴 Not started | Priyanshu | **Mandatory gate G3 — the thing judges test on stage** |
+| 25 | Spatio-temporal plausibility filter | 🔴 Not started | Priyanshu | |
+| 26 | PDF/CSV route report export | 🔴 Not started | Priyanshu | Required submission artifact |
+| 27 | Vehicle Re-ID fallback | 🔴 Not started | Priyanshu | **Promoted to primary route mechanism if #14 has no reads by 1 Sep** |
+| 28 | RBAC + department scoping | 🔴 Not started | Priyanshu | Ship if time (WORKPLAN.md §4) |
+| 29 | Hash-chained audit log | 🔴 Not started | Priyanshu | Ship if time |
+| 30 | `scripts/preflight.py` (8-point checklist) | 🔴 Not built | Priyanshu | Cheap; good demo-video material |
+| 37 | Consume-only compliance enforcement + static check | ✅ Done | Priyanshu | `gateway.py` guards + `scripts/compliance_check.py`, passes clean |
+| 38 | Shared cross-camera timeline (PTS→wall anchor) | ✅ Done | Priyanshu | Prerequisite for #24; see CONTEXT.md D14 |
+| 31 | Public deployment + test credentials | 🔴 Not started | Priyanshu | Currently localhost only |
+| 32 | Docker Compose one-command bring-up | 🔴 Not started | Priyanshu | Ship if time |
 | 33 | **HLD document** | 🔴 Not started | **Unassigned** | Scored evaluation area |
 | 34 | **14-slide PPT** | 🔴 Not started | **Unassigned** | Scored evaluation area |
 | 35 | **Demo Video A** (own footage) | 🔴 Not started | **Unassigned** | Needs footage Priyanshu must record |
@@ -74,7 +76,7 @@ bonus feature and becomes the primary plan, and must be started that day.
 
 ## Decisions needed from Priyanshu
 
-1. Confirm or reassign the *(proposed)* owners above.
+1. Confirm or reassign the owners above.
 2. Decide who writes the HLD, the deck, and the two videos — or recruit a third
    member for them.
 3. Accept or reject the scope triage in ROLES.md §7, in particular whether the

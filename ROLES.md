@@ -174,13 +174,15 @@ bytes. Detail in CONTEXT.md D13.
 
 ## 7. Unassigned work — the real risk
 
-STATUS.md currently lists **16 tasks with no owner**, and several are
-mandatory submission artifacts rather than nice-to-haves. Two people and ten
-days do not cover all of it. The assignment below is **proposed by this
-session and needs Priyanshu's confirmation**; it is recorded here so the gap
-is visible rather than discovered on 6 September.
+STATUS.md previously listed 16 tasks with no owner. Priyanshu **confirmed the
+assignment below on 2026-08-28**; it is reproduced here for reference, and the
+day-by-day sequencing lives in [WORKPLAN.md](WORKPLAN.md).
 
-| Task | Proposed owner | Reasoning |
+Four tasks still have no owner — the HLD, the deck and both demo videos — and
+they are scored evaluation areas, not nice-to-haves. WORKPLAN.md §5 sets out
+the options.
+
+| Task | Owner | Reasoning |
 |---|---|---|
 | Cross-camera route reconstruction | **Priyanshu** | Consumes camera geo and PTS, both in his lane. **This is mandatory gate G3.** |
 | Spatio-temporal plausibility filter | **Priyanshu** | Same data, same lane |
@@ -194,10 +196,10 @@ is visible rather than discovered on 6 September.
 | `scripts/preflight.py` | **Priyanshu** | Owns `scripts/` |
 | Public deployment + test credentials | **Priyanshu** | Owns infra |
 | Docker Compose one-command bring-up | **Priyanshu** | Owns infra |
-| HLD document | **Unassigned — needs a decision** | Large; neither lane has slack |
-| 14-slide PPT | **Unassigned — needs a decision** | |
-| Demo Video A (own footage) | **Unassigned — needs a decision** | Needs footage Priyanshu must record |
-| Demo Video B (govt feed + output report) | **Unassigned — needs a decision** | Depends on working ANPR |
+| HLD document | **Unassigned — WORKPLAN.md §5** | Large; neither lane has slack |
+| 14-slide PPT | **Unassigned — WORKPLAN.md §5** | |
+| Demo Video A (own footage) | **Unassigned — WORKPLAN.md §5** | Needs footage Priyanshu must record |
+| Demo Video B (govt feed + output report) | **Unassigned — WORKPLAN.md §5** | Depends on working ANPR |
 
 **The documents and videos are not optional.** The organisers' evaluation
 framework scores "Solution Presentation", "Solution Architecture" and

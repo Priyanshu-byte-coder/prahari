@@ -38,6 +38,32 @@ _session: requests.Session | None = None
 _session_created = 0.0
 SESSION_TTL = 600.0  # re-warm the cookie jar every 10 minutes
 
+# Politeness limits against the sandbox grid.
+#
+# Every connected client receives its own copy of each stream, and the
+# integration guide asks integrators to pace their load. This is not just
+# etiquette: hammering the grid with low-latency part requests already earned
+# an "authentication error" response once (CONTEXT.md), and being throttled or
+# blocked during the evaluation window would be unrecoverable.
+MAX_CONCURRENT_UPSTREAM = 12
+MIN_REQUEST_INTERVAL = 0.02  # seconds between upstream requests, globally
+
+_upstream_slots = threading.Semaphore(MAX_CONCURRENT_UPSTREAM)
+_pace_lock = threading.Lock()
+_last_request_at = 0.0
+
+
+def _throttle() -> None:
+    """Global minimum spacing between upstream requests."""
+    global _last_request_at
+    with _pace_lock:
+        now = time.monotonic()
+        wait = _last_request_at + MIN_REQUEST_INTERVAL - now
+        if wait > 0:
+            time.sleep(wait)
+            now = time.monotonic()
+        _last_request_at = now
+
 # Playlist lines that carry a URI in an attribute rather than on their own line.
 _ATTR_URI = re.compile(r'URI="([^"]+)"')
 
@@ -95,29 +121,80 @@ def _get_session() -> requests.Session:
         return _session
 
 
+def _assert_consume_only(url: str) -> None:
+    """Refuse anything that is not a read of a media path on the sandbox grid.
+
+    The organisers' integration guide is explicit: consume only, never publish
+    to the gateway, never call its control API. Breaching that is the clearest
+    disqualification risk in the whole project, so it is enforced here in code
+    rather than left as a rule somebody remembers. Every upstream request in
+    Prahari funnels through this function.
+    """
+    parsed = urlparse(url)
+    if parsed.netloc != urlparse(UPSTREAM_BASE).netloc:
+        raise HTTPException(status_code=400, detail=f"refusing off-grid host {parsed.netloc}")
+
+    allowed_prefixes = ("/live/", "/api/ingest")
+    if not parsed.path.startswith(allowed_prefixes):
+        raise HTTPException(
+            status_code=403,
+            detail=f"consume-only: {parsed.path} is not a permitted read path",
+        )
+
+    # MediaMTX exposes its control API under these; touching them is forbidden.
+    forbidden = ("/v1/config", "/v2/config", "/v3/config", "/whip", "/publish")  # compliance-allow: enforcement
+    if any(token in parsed.path for token in forbidden):
+        detail = "consume-only: control or publish path refused"  # compliance-allow: enforcement
+        raise HTTPException(status_code=403, detail=detail)
+
+
 def _upstream_get(url: str, *, stream: bool = False) -> requests.Response:
     """Fetch from upstream, following the cookie-check redirect.
 
     The redirect target downgrades to http; we force it back to https so the
     hop stays encrypted, which a plain allow_redirects would not do.
+
+    Only ever issues GET. There is no companion post/put/delete helper in this
+    module, and that is deliberate.
     """
+    _assert_consume_only(url)
+    _throttle()
     session = _get_session()
     current = url
-    for _ in range(4):
-        resp = session.get(current, allow_redirects=False, timeout=25, stream=stream)
-        if resp.status_code in (301, 302, 303, 307, 308):
-            location = resp.headers.get("location")
-            if not location:
-                return resp
-            nxt = urljoin(current, location)
-            parsed = urlparse(nxt)
-            if parsed.scheme == "http" and parsed.netloc == urlparse(UPSTREAM_BASE).netloc:
-                nxt = parsed._replace(scheme="https").geturl()
-            resp.close()
-            current = nxt
-            continue
-        return resp
-    raise HTTPException(status_code=502, detail="too many upstream redirects")
+    if not _upstream_slots.acquire(timeout=20):
+        raise HTTPException(status_code=503, detail="upstream connection budget exhausted")
+
+    # A streamed response keeps the connection open past this function, so the
+    # slot travels with it and the caller releases via release_slot(). Every
+    # other exit path -- buffered response, redirect loop, exception -- must
+    # give the slot back here, or the budget bleeds away to zero.
+    slot_handed_off = False
+    try:
+        for _ in range(4):
+            resp = session.get(current, allow_redirects=False, timeout=25, stream=stream)
+            if resp.status_code in (301, 302, 303, 307, 308):
+                location = resp.headers.get("location")
+                if not location:
+                    slot_handed_off = stream
+                    return resp
+                nxt = urljoin(current, location)
+                parsed = urlparse(nxt)
+                if parsed.scheme == "http" and parsed.netloc == urlparse(UPSTREAM_BASE).netloc:
+                    nxt = parsed._replace(scheme="https").geturl()
+                resp.close()
+                current = nxt
+                continue
+            slot_handed_off = stream
+            return resp
+        raise HTTPException(status_code=502, detail="too many upstream redirects")
+    finally:
+        if not slot_handed_off:
+            _upstream_slots.release()
+
+
+def release_slot() -> None:
+    """Give back a connection slot handed off with a streamed response."""
+    _upstream_slots.release()
 
 
 def _playlist_url(camera_id: str) -> str:
@@ -175,6 +252,7 @@ def segment(camera_id: str, name: str) -> StreamingResponse:
 
     if resp.status_code != 200:
         resp.close()
+        release_slot()
         raise HTTPException(status_code=502, detail=f"segment upstream {resp.status_code}")
 
     media_type = resp.headers.get("content-type", "video/mp4")
@@ -186,6 +264,7 @@ def segment(camera_id: str, name: str) -> StreamingResponse:
                     yield chunk
         finally:
             resp.close()
+            release_slot()
 
     return StreamingResponse(
         body(),
