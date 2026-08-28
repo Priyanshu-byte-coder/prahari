@@ -25,3 +25,6 @@ data/detections/
 yolov8*.pt
 data/detections_fixture/
 route*.csv
+yolov8n.pt
+yolov8s.pt
+*.pt

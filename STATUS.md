@@ -21,7 +21,7 @@ Legend: ✅ done and verified · 🟡 partial or scaffolded · 🔴 not started 
 | 7 | Vehicle detection + tracking (ByteTrack) | ✅ Done | Priyanshu | Occlusion buffer 30 → 90 frames (D9) |
 | 8 | Unique-vehicle counting (not per-frame) | ✅ Done | Priyanshu | Real bug, user-reported, fixed (D10) |
 | 9 | **RTSP-on-hotspot test** | 🔴 Not done | **Priyanshu (manual)** | Blocks ingestion-path decision. Cannot be delegated to a coding session. |
-| 10 | Multi-camera concurrent workers | 🟡 Built, untested | Priyanshu | `supervisor.py`: process-per-camera, staggered start, restart-with-backoff, health file, `--load-test` |
+| 10 | Multi-camera concurrent workers | ✅ Done | Priyanshu | 6 cameras run concurrently for 200s, 2 auto-restarts absorbed; numbers in CONTEXT.md §3 |
 | 11 | Postgres/PostGIS/Timescale migration | ⛔ **Cut** | — | JSON-on-disk demos identically; stays in the HLD as the production data layer (WORKPLAN.md §4) |
 | 12 | Camera health / NOC dashboard | 🔴 Not done | Priyanshu | |
 | 13 | Plate detector (real, localised crop) | 🟡 Sourced, not wired | Neev | MIT model verified (D13); not yet in `plate_reader.py` |
@@ -39,10 +39,11 @@ Legend: ✅ done and verified · 🟡 partial or scaffolded · 🔴 not started 
 | 25 | Spatio-temporal plausibility filter | ✅ Done | Priyanshu | Largest-consistent-chain selection (D17); flags and removes impossible hops |
 | 26 | Route report export (CSV + PDF) | ✅ Done | Priyanshu | Both verified over HTTP; PDF prints rejected legs and a basis/limitations section |
 | 39 | Route tracing UI (map polyline + timeline) | ✅ Done | Priyanshu | Numbered pins in travel order, rejected legs shown in red with the reason |
+| 40 | PTS-based inference sampling | ✅ Done | Priyanshu | `INFERENCE_FPS`; 16-27% of decoded frames inferred, verified live |
 | 27 | Vehicle Re-ID fallback | 🔴 Not started | Priyanshu | **Promoted to primary route mechanism if #14 has no reads by 1 Sep** |
 | 28 | RBAC + department scoping | 🔴 Not started | Priyanshu | Ship if time (WORKPLAN.md §4) |
 | 29 | Hash-chained audit log | 🔴 Not started | Priyanshu | Ship if time |
-| 30 | `scripts/preflight.py` (8-point checklist) | 🔴 Not built | Priyanshu | Cheap; good demo-video material |
+| 30 | `scripts/preflight.py` (8-point checklist) | ✅ Done | Priyanshu | 11/11 green: 8 implementation checks + 3 live grid checks |
 | 37 | Consume-only compliance enforcement + static check | ✅ Done | Priyanshu | `gateway.py` guards + `scripts/compliance_check.py`, passes clean |
 | 38 | Shared cross-camera timeline (PTS→wall anchor) | ✅ Done | Priyanshu | Prerequisite for #24; see CONTEXT.md D14 |
 | 31 | Public deployment + test credentials | 🔴 Not started | Priyanshu | Currently localhost only |

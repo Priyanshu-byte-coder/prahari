@@ -8,7 +8,7 @@ and know exactly where things stand, what is proven, and what to do next.
 
 | | |
 |---|---|
-| **Last updated** | 2026-08-28 14:05 IST |
+| **Last updated** | 2026-08-28 14:40 IST |
 | **HEAD** | `411d068` on `main`; work in progress on `priyanshu/platform` |
 | **Repo** | https://github.com/Priyanshu-byte-coder/prahari (**private**) |
 | **Submission deadline** | **2026-09-07** — 10 days remaining |
@@ -193,6 +193,37 @@ to 23:18, and cam 13 read 23:16 then later 20:59 — time ran backwards, i.e. th
 recording looped. Each camera plays its own 12-hour recording; the overlay is
 source time, not grid time. **Cross-camera correlation must use stream PTS, never
 the overlay and never frame arrival time.**
+
+**Concurrency, measured 2026-08-28.** Six cameras were run concurrently for
+200 s through the supervisor (YOLOv8n, CUDA, one process per camera, inference
+target 5 fps):
+
+| Camera | Decoded | Inferred | Detection rows | Restarts |
+|---|---|---|---|---|
+| 1 | 1450 | 396 (27%) | 391 | 0 |
+| 2 | 1576 | 246 (16%) | 294 | 1 |
+| 3 | ~1000 | ~190 | **0** | 0 |
+| 4 | 1184 | 215 (18%) | 427 | 0 |
+| 5 | 380 | 59 (16%) | 61 | 3 |
+| 6 | 1199 | 223 (19%) | 105 | 1 |
+
+All six stayed alive; the supervisor restarted the two that dropped without
+intervention. Sampling behaved as intended — inferring 16-27% of decoded frames
+against streams delivering 15-30 fps.
+
+Two honest caveats. Achieved inference was roughly **2 fps per camera, not the
+5 fps requested**, and decode kept up with only about half of real time on the
+busier cameras, so at six cameras the node is the constraint rather than the
+grid. Whether decode or inference dominates has not been profiled, so no claim
+is made either way; the safe reading is **~6 cameras at ~2 fps, or ~3 cameras
+at the full 5 fps, on one consumer GPU**. Scaling arithmetic in PLAN.md §6 uses
+datacentre-class accelerators and is unaffected by this figure.
+
+**Camera 3 produces no detections at all**, across ~1000 decoded frames. It is
+not a fault: the feed is infrared monochrome night footage of a near-empty
+road, and the one vehicle visible is blown out by IR glare. Several cameras on
+this grid are like it. This is the concrete basis for the "what happens at
+night" answer in PLAN.md §9.3, and further narrows the ANPR-useful subset.
 
 **Content skew.** Most footage is night. Cams 27/28/29 are indoor bus-station
 cameras with no vehicles. The genuinely ANPR-useful subset is roughly 10–12

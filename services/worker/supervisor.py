@@ -92,7 +92,8 @@ def discover_cameras(gateway: str, limit: int) -> list[str]:
     return reachable[:limit]
 
 
-def spawn(camera_id: str, gateway: str, weights: str, device: str | None) -> subprocess.Popen:
+def spawn(camera_id: str, gateway: str, weights: str, device: str | None,
+          fps: float | None = None) -> subprocess.Popen:
     cmd = [
         sys.executable, "-m", "services.worker.run_worker",
         "--camera", camera_id,
@@ -101,6 +102,8 @@ def spawn(camera_id: str, gateway: str, weights: str, device: str | None) -> sub
     ]
     if device:
         cmd += ["--device", device]
+    if fps is not None:
+        cmd += ["--fps", str(fps)]
 
     # Workers are chatty on stdout; keep the supervisor's own log readable by
     # sending each camera's output to its own file.
@@ -177,6 +180,8 @@ def main() -> int:
     ap.add_argument("--weights", default="yolov8n.pt",
                     help="yolov8n for many cameras, yolov8s for accuracy on few")
     ap.add_argument("--device", default=None, help="cuda / cpu; default lets ultralytics choose")
+    ap.add_argument("--fps", type=float, default=None,
+                    help="inference rate per camera; 0 means every decoded frame")
     ap.add_argument("--load-test", type=int, default=0,
                     help="run for N seconds, then print throughput and exit")
     args = ap.parse_args()
@@ -195,7 +200,8 @@ def main() -> int:
 
     camera_ids = camera_ids[: args.max_cameras]
     logger.info("supervising %d cameras: %s", len(camera_ids), ", ".join(camera_ids))
-    logger.info("weights=%s device=%s", args.weights, args.device or "auto")
+    logger.info("weights=%s device=%s inference_fps=%s", args.weights,
+                args.device or "auto", args.fps if args.fps is not None else "default")
 
     workers = {cid: Worker(camera_id=cid) for cid in camera_ids}
     started_at = time.time()
@@ -211,7 +217,7 @@ def main() -> int:
     # Staggered cold start so the gateway is not hit by N simultaneous joins.
     for i, cid in enumerate(camera_ids):
         w = workers[cid]
-        w.proc = spawn(cid, args.gateway, args.weights, args.device)
+        w.proc = spawn(cid, args.gateway, args.weights, args.device, args.fps)
         w.started_at = time.time()
         logger.info("cam %s started (pid %d)", cid, w.proc.pid)
         if i < len(camera_ids) - 1:
@@ -236,7 +242,7 @@ def main() -> int:
 
                 if now >= w.next_start_at:
                     w.restarts += 1
-                    w.proc = spawn(w.camera_id, args.gateway, args.weights, args.device)
+                    w.proc = spawn(w.camera_id, args.gateway, args.weights, args.device, args.fps)
                     w.started_at = now
                     w.last_exit_code = None
                     logger.info("cam %s restarted (pid %d, restart #%d, next backoff %.0fs)",
@@ -262,7 +268,8 @@ def main() -> int:
     if args.load_test:
         elapsed = time.time() - started_at
         print("\n" + "=" * 64)
-        print(f"LOAD TEST — {len(camera_ids)} cameras, {elapsed:.0f}s, weights={args.weights}")
+        print(f"LOAD TEST — {len(camera_ids)} cameras, {elapsed:.0f}s, "
+              f"weights={args.weights}, fps={args.fps if args.fps is not None else 'default'}")
         print("=" * 64)
         grand = 0
         for cid in camera_ids:
