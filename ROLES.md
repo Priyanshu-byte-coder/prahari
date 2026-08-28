@@ -22,15 +22,15 @@ owns which code and who does the next piece.
 | | Priyanshu Doshi | Neev Modh |
 |---|---|---|
 | GitHub | `Priyanshu-byte-coder` | `neevmodh` |
-| Machine | Windows 11, RTX 3050 6GB, Python 3.12 | macOS (MacBook Air), Python 3.14 |
+| Environment | Windows, CUDA GPU available, Python 3.12 | macOS, no CUDA, Python 3.14 |
 | Repo role | Owner of the GitHub repository | Collaborator |
 | Lane | **Grid, ingestion, tracking, platform** | **Number plates, OCR, plate search** |
 
-Note the machine difference — it is not cosmetic. Priyanshu has CUDA and can
-run GPU inference and model training; Neev's Python 3.14 has no
-`paddlepaddle` wheel, which is why EasyOCR was chosen (CONTEXT.md D11). Any
-dependency added to `requirements.txt` must install on both machines, or it
-must be documented as machine-specific.
+The environment difference is not cosmetic. Only one side has CUDA, so GPU
+inference and any training happen there; and the other side's Python version
+has no `paddlepaddle` wheel, which is why EasyOCR was chosen (CONTEXT.md D11).
+Any dependency added to `requirements.txt` must install on both, or be
+documented as environment-specific.
 
 ---
 

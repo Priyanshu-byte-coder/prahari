@@ -238,9 +238,9 @@ Two environments, deliberately:
 
 - **`.venv` on C:** — API, gateway, registry, route engine, all scripts. Light,
   pure-Python, no GPU needed.
-- **`E:\prahari\venv` on the external drive** — the CV worker: torch (CUDA),
-  ultralytics, easyocr. Kept off C: because the system SSD has under 6 GB free
-  (D18).
+- **A separate CV environment outside the repository** — torch (CUDA),
+  ultralytics, easyocr. Installed outside the working tree because it is
+  several GB; its location is a local choice, set in `.env` (D18).
 
 ```bash
 # API and tooling (C:)
@@ -256,8 +256,8 @@ python -m venv .venv
 # one frame from every camera
 .venv\Scripts\python.exe scripts\snapshot_all.py
 
-# CV worker (external drive, GPU)
-E:\prahari\venv\Scripts\python.exe -m services.worker.supervisor --auto --max-cameras 4
+# CV worker (uses the separate CV environment; see PRAHARI_CV_PYTHON in .env)
+%PRAHARI_CV_PYTHON% -m services.worker.supervisor --auto --max-cameras 4
 
 # verify the route engine against known ground truth (no GPU, no live grid)
 .venv\Scripts\python.exe scripts\route_fixture.py
@@ -276,7 +276,7 @@ E:\prahari\venv\Scripts\python.exe -m services.worker.supervisor --auto --max-ca
 | # | Decision | Why |
 |---|---|---|
 | D1 | Hybrid Model 1+3+4, edge-first | 80k cameras centralised = ~160 Gbps backhaul and ~26 PB storage. Metadata to centre, compute to edge. |
-| D2 | Docker for infra only; CV on host Python | RTX 3050 is reachable natively on Windows; GPU passthrough via WSL is avoidable pain. |
+| D2 | Docker for infra only; CV runs on host Python | The GPU is reachable natively on the host; GPU passthrough through a Linux VM layer is avoidable complexity for no gain here. |
 | D3 | HLS as primary transport | RTSP 8554 filtered on Priyanshu's network. Auto-detect per camera, prefer RTSP where it works. |
 | D4 | Own stream gateway rather than direct browser playback | Upstream cookie gate blocks cross-origin browsers. Also where access control, pooling and audit belong. |
 | D5 | Strip LL-HLS at the gateway | ~10x fewer upstream requests; players failed to reach a media segment otherwise. ~800 ms latency cost is irrelevant for a monitoring wall. |
@@ -289,7 +289,7 @@ E:\prahari\venv\Scripts\python.exe -m services.worker.supervisor --auto --max-ca
 | D12 | Fuzzy plate search is a Python Levenshtein matcher, not OpenSearch | Standing up an OpenSearch cluster is out of scope for this pass; same ±N-char matching behaviour without the infra. |
 | D14 | Cross-camera timeline = PTS anchored to wall clock after a 3s settle, not raw PTS and not the overlay | Raw PTS has a per-stream origin so it cannot order sightings across cameras; the burned-in overlay is per-camera source time that runs backwards on loop (D8). Anchoring `(pts, wall)` once the connect burst has passed yields a shared, burst-immune, drift-free timeline. Route reconstruction depends on this. |
 | D15 | Consume-only, request pacing and a connection budget enforced in `gateway.py`, not left as a rule | Publishing upstream or calling the control API is the clearest disqualification risk in the project, and hammering the grid already drew an "authentication error" once. Every upstream request funnels through `_assert_consume_only()` + `_throttle()` + a 12-slot semaphore. `scripts/compliance_check.py` additionally fails the build on a static scan. |
-| D18 | Heavy Python environment lives on the external USB drive at `E:\prahari\venv`, not on `C:` | The system SSD had 5.7 GB free (1.2%), and the CUDA build of torch needs roughly 3-5 GB installed plus download space. The first attempt failed with `OSError: [Errno 28] No space left on device` and rolled back cleanly. The external disk (JMicron USB, mounted as D: and E:) has 118 GB free on E:. **Consequence: the drive must be attached for the worker to run, which is a live risk for the finale demo — see §8.** |
+| D18 | The CV environment (torch CUDA, ultralytics, easyocr) is installed outside the repository and located via `PRAHARI_CV_PYTHON` | It is several GB, which is more than a working tree should carry and more than every machine has spare on its system volume. Keeping it external also lets the API and tooling run from a light environment with no GPU stack at all. The path is a local choice and belongs in `.env`, not in this file. |
 | D17 | Implausible sightings are removed by keeping the **largest self-consistent chain**, not by deleting "the sighting that caused the bad hop" | A bad hop implicates two sightings and there is no local way to tell which is the impostor; the first attempt guessed wrong and kept an exact-match outlier while dropping good data. Framed globally the question has one answer: the longest time-ordered chain in which every consecutive pair is physically reachable. A lone spurious match cannot join that chain; a genuine five-camera route can. Ties break toward exact plate matches. |
 | D16 | Multi-camera workers are process-per-camera, not threads | Ultralytics keeps tracker state on the model instance, so a shared model cannot track two cameras independently; separate processes also stop one camera's decoder failure taking the others down. GPU memory, not CPU, is the ceiling — `--max-cameras` is a VRAM budget. |
 | D13 | Found a real plate-region detector to integrate: `Muhammad-Zeerak-Khan/Automatic-License-Plate-Recognition-using-YOLOv8` (MIT, 471★, verified 6.24MB working YOLOv8 weights, single class `license_plate`) | A widely-cited "94.5% accuracy" alternative (`lavanyashree2805/yolov8-license-plate-india`) was checked and is **fake** — its committed weights file is 2 bytes. Always verify a model repo's actual file sizes before trusting its README. |
@@ -323,11 +323,9 @@ E:\prahari\venv\Scripts\python.exe -m services.worker.supervisor --auto --max-ca
 ## 8. Action items
 
 ### Priyanshu — manual, cannot be delegated to a coding session
-- [ ] **Free space on the C: drive, or plan the demo around the external disk.**
-      C: has 5.7 GB free (1.2%). The CV environment now lives on an external USB
-      drive (D18), so unplugging it stops the worker. For the finale that means
-      one more thing to carry and one more thing that can fail on stage. Freeing
-      ~20 GB on C: and moving the environment back is the safer end state.
+- [ ] **Confirm the CV environment is on storage that will be present at the
+      venue.** The worker cannot start without it (D18). Anything removable is a
+      failure mode to rehearse against, per the finale playbook in PLAN.md §12.
 - [ ] **Test RTSP on a mobile hotspot.** Run
       `.venv\Scripts\python.exe scripts\probe_grid.py --host https://live.corp8.cloud --cameras 2`
       and report whether port 8554 shows open. **Blocks the ingestion decision.**
