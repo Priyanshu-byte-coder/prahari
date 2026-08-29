@@ -135,12 +135,20 @@ class MediaMTXSource(CameraSource):
                 await sleep_backoff(self._backoff)
 
     async def close(self) -> None:
+        """Close in *this* thread, not a worker thread.
+
+        `asyncio.to_thread(container.close)` closes the container while the
+        demux iterator may still be alive on the loop thread, and PyAV then
+        segfaults (exit 139) or aborts (134) instead of raising. Closing is
+        cheap; it does not need a thread. Callers that stop iterating early
+        should `aclose()` the generator before calling this.
+        """
         if self._container is not None:
+            container, self._container = self._container, None
             try:
-                await asyncio.to_thread(self._container.close)
+                container.close()
             except Exception:
                 pass
-            self._container = None
 
     def health(self) -> Health:
         return self._health

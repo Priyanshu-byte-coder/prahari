@@ -43,7 +43,7 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 | G1 grid recon + cameras.seed.json | 1 | 0 | DONE | 697edc5 | grid returned 502, seed built from salvaged catalogue |
 | G5 infra compose + env + Makefile | 1 | 0 | WIP | | compose+env+Makefile+skeleton written; no Docker in this sandbox to confirm `make up` green -- needs a real run |
 | G2 CameraSource + transport resolution | 2 | 1 | DONE | | frame path proven live: hls_pdt, 6 fps, 26-27/30 resolve |
-| G3 health monitor | 2 | 1 | TODO | | sole producer of `camera.health` |
+| G3 health monitor | 2 | 1 | DONE | | live: LIVE 4.86fps -> DEGRADED +4s -> DOWN +16s |
 | G6 coordinate ground truth | 1 | 1 | TODO | | before any route UI |
 | G7 map layers 1–2 + API fixtures | 2 | 1 | TODO | | fixtures first, they unblock the lane |
 | G8 wedges + bearing editor | 2 | 2 | TODO | | |
@@ -99,6 +99,7 @@ _(nothing yet)_
 - `services/gateway/probe.py` — `probe_rtsp` (socket+DESCRIBE), `probe_hls` (cookie-gated GET), `resolve_transport` → `TransportResult`, `publish` (the G→I seam), `reprobe_forever` (10 min).
 - `services/gateway/sources/rtsp.py` — `RTSPSource`, PyAV `rtsp_transport=tcp`, backoff + stall watchdog. `sources/mediamtx.py` — `MediaMTXSource` (HLS), picks `hls_pdt` vs `server_receive` from the playlist.
 - `services/gateway/selftest.py` — `--probe-all` transport table with per-camera reason; `--publish` writes Redis. `tests/test_g_probe.py` — 10 tests, no network.
+- `services/gateway/health.py` — `classify` (pure), `HealthMonitor.evaluate` (one event per change), `expected_fps` (capped at worker sampling rate), `tick`/`read_fps`/`publish` over `camera:fps:<id>` → `camera.health`. `tests/test_g_health.py` — 22 tests, time injected.
 
 ### lane D
 _(nothing yet)_
@@ -121,6 +122,9 @@ _(nothing yet)_
 - `[G]` PyAV ≥ 9 has **no `av.AVError`** — the base class is `av.FFmpegError`. Catching the old name raises `AttributeError` the first time a stream drops.
 - `[G]` `frame.to_ndarray()` imports numpy **lazily**, so a missing numpy looks like a dead camera, not an ImportError: the stream opens, decodes, then throws per frame. Never wrap a driver's frame loop in `except Exception` — use `STREAM_ERRORS` (`services/gateway/source.py`) so a bug surfaces instead of masquerading as DOWN. Cost an hour of wrong hypotheses.
 - `[G]` `frames()` reconnects **forever** by design, so any caller needs its own bound (`asyncio.wait_for`). A timeout placed inside the `async for` body never fires when zero frames arrive — which is exactly the case you are timing out for. Matters for G3.
+- `[G]` **Never `asyncio.to_thread(container.close)`.** Closing a PyAV container on a worker thread while the demux iterator is alive on the loop thread **segfaults (139) or aborts (134)** — no traceback, no catchable exception, the process just dies. Close synchronously and null the reference first. Stopping early? `await gen.aclose()` *before* `source.close()`. Do not "fix" this with `try/finally: await self.close()` inside the generator — awaiting during `GeneratorExit` made it worse (that attempt turned a working exit 0 into SIGABRT).
+- `[G]` **Measure fps from the first frame, not from connect.** HLS open latency on this grid ranged **1.6 s to 18 s for the same camera**, so a window started at connect time reports ~0 fps for a healthy stream. A naive measurement marks every camera DOWN.
+- `[G]` Open latency up to ~18 s vs a 15 s DOWN threshold means a reconnecting camera can trip DOWN while it is merely connecting. G3 currently rides on `camera:fps:<id>` freshness so it does not hit this, but any future direct-decode path needs a CONNECTING state.
 - `[G]` OSRM needs a preprocessed Gujarat extract (`osrm-extract` + `osrm-contract`) before `osrm-routed` can serve anything — put it behind compose profile `full` rather than crash-looping the default `make up`. D6 owns building the extract.
 - `[G]` No Docker in this dev sandbox — `infra/docker-compose.yml` is YAML-validated but `make up` giving green containers is unverified. Whoever runs it first on a real laptop should update this line.
 - `[G]` Read per-camera properties from `GET http://$GRID_HOST/api/ingest` before decoding.
@@ -170,6 +174,7 @@ changing one without a line here breaks somebody else's lane silently.
 _(none)_
 
 ### lane G
+- 08-29 | G3 | services/gateway/health.py, tests/test_g_health.py, scripts/g3_health_check.py | live cam 1: **4.86 fps -> LIVE, +4s DEGRADED, +16s DOWN**, one event per change. Fixed a PyAV **segfault** on cross-thread container close, and an fps measurement that timed from connect (reported 0 fps for a healthy camera).
 - 08-29 | G2 | services/gateway/*, scripts/g2_frame_check.py, requirements.txt | **frame path proven on live cam 1**: 1920x1080 bgr24, 6.0 fps decoded, monotonic pts, health LIVE, `ts_source=hls_pdt`. Found+fixed: PDT lives on the variant playlist; `av.AVError` gone in PyAV≥9; missing numpy masked as a dead camera by a blanket except.
 - 08-29 | G2 | services/gateway/{source,probe,selftest}.py, sources/{rtsp,mediamtx}.py, tests/test_g_probe.py | probe order RTSP→HLS live-verified: **27/30 resolve, all HLS, rtsp 0/30**; 17/18/22 dead both ways (hls 500/ReadTimeout). 10 tests green, no network needed.
 - 08-29 | G5 | infra/docker-compose.yml, .env.example, .gitignore, requirements.txt, Makefile, repo skeleton | compose+env+Makefile written, YAML-validated; `make up` unverified, no Docker in this sandbox

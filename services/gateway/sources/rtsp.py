@@ -100,12 +100,13 @@ class RTSPSource(CameraSource):
         )
 
     async def close(self) -> None:
+        """Close in *this* thread, not a worker thread. See mediamtx.py."""
         if self._container is not None:
+            container, self._container = self._container, None
             try:
-                await asyncio.to_thread(self._container.close)
+                container.close()
             except Exception:
                 pass
-            self._container = None
 
     def health(self) -> Health:
         if self._health is Health.LIVE and self._stalled():
