@@ -14,6 +14,7 @@ import time
 from typing import AsyncIterator
 
 from ..source import (
+    STREAM_ERRORS,
     WATCHDOG_NO_FRAME_S,
     CameraSource,
     Frame,
@@ -64,7 +65,7 @@ class RTSPSource(CameraSource):
             if self._container is None:
                 try:
                     await self.open()
-                except Exception:
+                except STREAM_ERRORS:
                     self._health = Health.DOWN
                     self._backoff = next_backoff(self._backoff)
                     await sleep_backoff(self._backoff)
@@ -86,7 +87,7 @@ class RTSPSource(CameraSource):
                         )
                     if self._stalled():
                         raise TimeoutError("watchdog: no frame")
-            except Exception:
+            except STREAM_ERRORS:
                 await self.close()
                 self._health = Health.DOWN
                 self._backoff = next_backoff(self._backoff)

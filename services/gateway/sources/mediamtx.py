@@ -17,6 +17,7 @@ from typing import AsyncIterator
 import requests
 
 from ..source import (
+    STREAM_ERRORS,
     CameraSource,
     Frame,
     Health,
@@ -52,16 +53,45 @@ class MediaMTXSource(CameraSource):
         self._ts_source = TsSource.SERVER_RECEIVE
 
     def _playlist_has_pdt(self) -> bool:
-        """One cheap read: does this playlist carry real capture times?"""
+        """Does this stream carry real capture times?
+
+        The master playlist never does -- `EXT-X-PROGRAM-DATE-TIME` lives one
+        level down, in the variant. Checking only the master labels every frame
+        `server_receive` and silently throws away the one honest clock this
+        grid gives us, which is exactly what route ordering depends on.
+        """
         try:
-            resp = _SESSION.get(self.url, timeout=8, stream=True, allow_redirects=True)
-            if resp.status_code >= 400:
+            body = self._fetch_playlist(self.url)
+            if body is None:
                 return False
-            body = resp.raw.read(4096, decode_content=True) or b""
-            resp.close()
-            return b"EXT-X-PROGRAM-DATE-TIME" in body
+            if "EXT-X-PROGRAM-DATE-TIME" in body:
+                return True
+            variant = self._first_variant_url(self.url, body)
+            if variant is None:
+                return False
+            child = self._fetch_playlist(variant)
+            return child is not None and "EXT-X-PROGRAM-DATE-TIME" in child
         except requests.RequestException:
             return False
+
+    @staticmethod
+    def _fetch_playlist(url: str) -> str | None:
+        resp = _SESSION.get(url, timeout=8, allow_redirects=True)
+        try:
+            if resp.status_code >= 400:
+                return None
+            return resp.text
+        finally:
+            resp.close()
+
+    @staticmethod
+    def _first_variant_url(base_url: str, body: str) -> str | None:
+        """First non-comment line of a master playlist is a variant path."""
+        for line in body.splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                return requests.compat.urljoin(base_url, line)
+        return None
 
     async def open(self) -> None:
         if av is None:
@@ -78,7 +108,7 @@ class MediaMTXSource(CameraSource):
             if self._container is None:
                 try:
                     await self.open()
-                except Exception:
+                except STREAM_ERRORS:
                     self._health = Health.DOWN
                     self._backoff = next_backoff(self._backoff)
                     await sleep_backoff(self._backoff)
@@ -98,7 +128,7 @@ class MediaMTXSource(CameraSource):
                             wall_ts=self._last_frame_at,
                             ts_source=self._ts_source,
                         )
-            except Exception:
+            except STREAM_ERRORS:
                 await self.close()
                 self._health = Health.DOWN
                 self._backoff = next_backoff(self._backoff)

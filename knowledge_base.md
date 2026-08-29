@@ -42,7 +42,7 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 |---|---|---|---|---|---|
 | G1 grid recon + cameras.seed.json | 1 | 0 | DONE | 697edc5 | grid returned 502, seed built from salvaged catalogue |
 | G5 infra compose + env + Makefile | 1 | 0 | WIP | | compose+env+Makefile+skeleton written; no Docker in this sandbox to confirm `make up` green -- needs a real run |
-| G2 CameraSource + transport resolution | 2 | 1 | WIP | | probe+drivers done, 27/30 resolve to HLS; PyAV frame path unrun (av not installed) |
+| G2 CameraSource + transport resolution | 2 | 1 | DONE | | frame path proven live: hls_pdt, 6 fps, 26-27/30 resolve |
 | G3 health monitor | 2 | 1 | TODO | | sole producer of `camera.health` |
 | G6 coordinate ground truth | 1 | 1 | TODO | | before any route UI |
 | G7 map layers 1–2 + API fixtures | 2 | 1 | TODO | | fixtures first, they unblock the lane |
@@ -116,8 +116,11 @@ _(nothing yet)_
 - `[G]` `live.corp8.cloud` is intermittent — it 502'd for hours on 08-29 then came back. `probe_grid.py` falls back to `ingest.json.bootstrap` when it does; always re-run once it is up.
 - `[ALL]` The grid is behind a **Cloudflare cookie gate**: first request 302s to `?cookieCheck=1` with a Set-Cookie, then serves. **HEAD answers 404, not 405** — a HEAD probe reports every live camera as down. Use a streamed GET through a cookie-carrying `requests.Session` and confirm the body starts with `#EXTM3U`. This cost a full 0/30-vs-27/30 wrong answer.
 - `[G]` Port 8554 is filtered at the grid: dial it **once at the host**, not once per camera, or 30 full timeouts buy you one fact. RTSP is 0/30; HLS is the real path (27/30 as of 08-29).
-- `[G]` Cameras **17, 18, 22** are dead on both transports (hls HTTP 500 / ReadTimeout), not a probe bug — same three across G1 and G2 runs. Expect 27, not 30, and say so rather than quietly showing 30 pins.
-- `[G]` HLS carries no PTS worth trusting unless the playlist has `EXT-X-PROGRAM-DATE-TIME`; `MediaMTXSource` reads the playlist once at open and labels frames `hls_pdt` or `server_receive` accordingly. A `server_receive` row is **not** a capture time — the UI must show it as approximate.
+- `[G]` Reachability is **26–27 of 30, and varies between consecutive runs** — 17/18/22 are reliably dead (hls 500 / ReadTimeout), others flap. Not a probe bug. Never quote a single run's number as if it were fixed; the deck should say "26–27 of 30" or re-measure at demo time.
+- `[ALL]` **`EXT-X-PROGRAM-DATE-TIME` is on the VARIANT playlist, not the master.** Checking only the master (`index.m3u8`) returns False and labels every frame `server_receive`, throwing away the one real capture clock the grid gives us. Follow master → first non-comment line → variant. Confirmed present on cams 1/5/23; `ts_source=hls_pdt` after the fix.
+- `[G]` PyAV ≥ 9 has **no `av.AVError`** — the base class is `av.FFmpegError`. Catching the old name raises `AttributeError` the first time a stream drops.
+- `[G]` `frame.to_ndarray()` imports numpy **lazily**, so a missing numpy looks like a dead camera, not an ImportError: the stream opens, decodes, then throws per frame. Never wrap a driver's frame loop in `except Exception` — use `STREAM_ERRORS` (`services/gateway/source.py`) so a bug surfaces instead of masquerading as DOWN. Cost an hour of wrong hypotheses.
+- `[G]` `frames()` reconnects **forever** by design, so any caller needs its own bound (`asyncio.wait_for`). A timeout placed inside the `async for` body never fires when zero frames arrive — which is exactly the case you are timing out for. Matters for G3.
 - `[G]` OSRM needs a preprocessed Gujarat extract (`osrm-extract` + `osrm-contract`) before `osrm-routed` can serve anything — put it behind compose profile `full` rather than crash-looping the default `make up`. D6 owns building the extract.
 - `[G]` No Docker in this dev sandbox — `infra/docker-compose.yml` is YAML-validated but `make up` giving green containers is unverified. Whoever runs it first on a real laptop should update this line.
 - `[G]` Read per-camera properties from `GET http://$GRID_HOST/api/ingest` before decoding.
@@ -167,6 +170,7 @@ changing one without a line here breaks somebody else's lane silently.
 _(none)_
 
 ### lane G
+- 08-29 | G2 | services/gateway/*, scripts/g2_frame_check.py, requirements.txt | **frame path proven on live cam 1**: 1920x1080 bgr24, 6.0 fps decoded, monotonic pts, health LIVE, `ts_source=hls_pdt`. Found+fixed: PDT lives on the variant playlist; `av.AVError` gone in PyAV≥9; missing numpy masked as a dead camera by a blanket except.
 - 08-29 | G2 | services/gateway/{source,probe,selftest}.py, sources/{rtsp,mediamtx}.py, tests/test_g_probe.py | probe order RTSP→HLS live-verified: **27/30 resolve, all HLS, rtsp 0/30**; 17/18/22 dead both ways (hls 500/ReadTimeout). 10 tests green, no network needed.
 - 08-29 | G5 | infra/docker-compose.yml, .env.example, .gitignore, requirements.txt, Makefile, repo skeleton | compose+env+Makefile written, YAML-validated; `make up` unverified, no Docker in this sandbox
 - 08-29 | G1 | scripts/probe_grid.py, data/cameras.seed.json | grid came back up; HEAD-probe bug found (Cloudflare gate 404s HEAD) — fixed to streamed GET, reachability went 0/30 → **27/30 via HLS**, rtsp 0/30 (8554 filtered). SonarCloud SSRF/path findings fixed too.

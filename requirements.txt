@@ -24,6 +24,9 @@ weasyprint
 
 # lane G -- gateway drivers
 onvif-zeep
+# numpy is not optional here: PyAV's frame.to_ndarray() imports it lazily, so
+# without it the drivers decode fine and then fail per frame.
+numpy
 
 # shared
 python-ulid

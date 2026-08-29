@@ -61,6 +61,23 @@ BACKOFF_MAX_S = 30.0
 WATCHDOG_NO_FRAME_S = 10.0
 
 
+# What a driver may retry: the stream broke, so reconnect. Anything else --
+# a missing dependency, a typo, a bad attribute -- is our bug and must
+# surface immediately. A blanket `except Exception` here once turned a
+# missing numpy into "camera unreachable, health DOWN" and cost an hour.
+#
+# Note PyAV >= 9 has no `av.AVError`; the base class is `av.FFmpegError`.
+_STREAM_ERRORS: list[type[BaseException]] = [OSError, TimeoutError, EOFError]
+try:
+    import av as _av
+
+    _STREAM_ERRORS.append(_av.FFmpegError)
+except (ImportError, AttributeError):  # pragma: no cover - PyAV optional at import time
+    pass
+
+STREAM_ERRORS: tuple[type[BaseException], ...] = tuple(_STREAM_ERRORS)
+
+
 def next_backoff(current: float | None) -> float:
     if current is None:
         return BACKOFF_START_S
