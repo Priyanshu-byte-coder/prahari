@@ -7,8 +7,9 @@ Updated: 2026-08-29 · KB v2 · cap 300 lines · patched after **every** complet
 - 2026-08-29. **9 days to submission (7 Sep)**, 12 to the live event (10–11 Sep, i-Hub Gandhinagar).
 - `main` holds docs only — commit `416ef26 "Restart"` wiped the tree. Working code from before is at
   `4d0c945` and on `origin/priyanshu/platform`; salvage with `git show`, do not rewrite (`TASK.md §4`).
-- Wave 0 is today: G1 camera seed + G5 compose · D2's fake-sightings generator · I5 `common/plate.py`.
-  After those land, no lane can block another.
+- Wave 0 is today: G1 camera seed + G5 compose · D2's fake-sightings generator (**done**) · I5 `common/plate.py`.
+  Lane D's wave 1 (D1, D2, D3) is done and in PR #37; it was built against throwaway
+  timescaledb-ha and redis containers because G5's compose has not landed.
 - Tickets are mirrored as GitHub issues `#1–#35` on `Priyanshu-byte-coder/prahari` (private repo, all
   three are collaborators). Title prefix is the ticket id — `[I3] …`, `[G7] …`, `[D5] …`. Bodies are
   generated from `TASK.md`, so **edit the ticket in `TASK.md`, not in the issue**.
@@ -58,8 +59,8 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 | id | pt | wave | state | commit | note |
 |---|---|---|---|---|---|
 | D1 schema + registry loader | 2 | 1 | DONE | | applies and re-applies clean on timescaledb-ha:pg16 |
-| D2 fake_sightings + persister | 2 | 1 | WIP | | generator done; persister next |
-| D3 watchlist + CSV + feed stubs | 2 | 1 | TODO | | |
+| D2 fake_sightings + persister | 2 | 1 | DONE | | soak: 14991 rows at 49.5/s, pending stayed 0 |
+| D3 watchlist + CSV + feed stubs | 2 | 1 | DONE | | repo + feeds; HTTP routes land with the app |
 | D4 matcher bands + alert FSM | 2 | 2 | TODO | | imports I5, no second copy |
 | D5 WebSocket fanout | 2 | 2 | TODO | | kills all polling |
 | D6 route API + plausibility + export | 2 | 2 | TODO | | the graded test case |
@@ -102,6 +103,14 @@ _(nothing yet)_
 - `tests/test_d_schema.py` — schema.sql vs migrate.sql drift, index and re-runnability checks.
 - `tests/test_d_registry.py` — the seed/geo join, including every way lane G's two files disagree.
 - `tests/test_d_generator.py` — [C1] field set, ULID ordering, route hop order and gaps.
+- `common/plate_compat.py` — the single stand-in for I5 — `canon`, `normalise`, `is_valid_plate`, `USING_I5`. Delete when `common/plate.py` lands.
+- `services/api/store.py` — Postgres + Redis access — `Store.insert_sightings`, `cache_recent`, `recent_sighting_ids`, `crop_url`.
+- `services/api/persister.py` — consumer group `persister` — `Persister.run_once`, `reclaim`, `lag`, dead-letters to `sightings.dead`.
+- `services/api/watchlist.py` — CRUD + all-or-nothing CSV import — `WatchlistRepo`, `validate_row`, `ImportRejected`.
+- `services/api/feeds.py` — [C6] feeds — `ManualFeed`, `CSVFeed` live; `VahanFeed`, `EGujCopFeed` labelled STUB; `pull_all`.
+- `tests/test_d_persister.py` — redelivery, poisoned message, dead-consumer reclaim. Needs a live Redis and Postgres.
+- `tests/test_d_watchlist.py` — the D3 verify (2 bad rows, nothing written) plus the feed protocol checks.
+- `requirements.txt` — one dependency per line, alphabetical, three lanes append to it.
 
 ## 3. Gotchas
 
@@ -118,6 +127,12 @@ _(nothing yet)_
 - `[G]` District-centroid coordinates make the demo car teleport. G6 before G10, no exceptions.
 - `[G]` Judges' networks block WebRTC — the 3 s HLS fallback badge must be rehearsed on a phone hotspot.
 - `[D]` Timescale hypertable must be created before any row is inserted into `sightings`.
+- `[D]` MinIO only accepts SigV4. boto3 falls back to SigV2 when it cannot infer a region and
+  signs a URL MinIO rejects — pass `Config(signature_version="s3v4")` and a `region_name`.
+- `[D]` Ack after the commit, never before: Redis streams are at-least-once, so the replay is
+  the normal path. `ON CONFLICT (pts_first, sighting_id) DO NOTHING` is what absorbs it.
+- `[D]` A consumer that dies leaves its messages pending and invisible to `>` forever. XAUTOCLAIM
+  on the idle path is the only thing that gets them back — J1's chaos drill tests exactly this.
 - `[D]` `timescale/timescaledb-ha:pg16` already carries timescaledb, pgvector and pg_trgm, so
   `db/migrate.sql` runs on it unchanged — plain `postgres:16` needs all three installed by hand.
   Useful for G5: that image is the one lane D verified against.
@@ -174,7 +189,8 @@ _(none)_
 
 ### lane D
 - 08-29 | D1 | db/schema.sql, db/migrate.sql, scripts/load_registry.py, tests/test_d_{schema,registry}.py | schema applies twice with no errors on a throwaway timescaledb-ha:pg16; loader upserts 3 fixture cameras, and a missing camera_geo.json no longer wipes stored coordinates
-- 08-29 | D2 (part) | scripts/fake_sightings.py, tests/test_d_generator.py | generator publishes [C1] rows at a set rate with a scripted plate crossing 5 cameras in order; persister and store still to come
+- 08-29 | D3 | services/api/watchlist.py, services/api/feeds.py, tests/test_d_watchlist.py | all-or-nothing CSV import reports both bad rows by line number and writes nothing; VAHAN and e-GujCop stubs carry request/response shapes and label every row STUB
+- 08-29 | D2 | scripts/fake_sightings.py, services/api/{store,persister}.py, tests/test_d_{generator,persister}.py | 14991 rows at 49.5/s for 5 min, pending stayed 0; redelivery, poisoned message and dead-consumer reclaim covered by tests
 
 ### setup
 - 08-29 | lanes reassigned: inference→Neal006, edge+console→neevmodh, core→Priyanshu | TASK.md, knowledge_base.md, AGENTS.md | G→I seam became a Redis URL key, so the worker imports no gateway code
