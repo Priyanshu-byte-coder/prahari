@@ -132,6 +132,11 @@ _(nothing yet)_
 - 2026-08-29 — Salvage from `4d0c945` / `origin/priyanshu/platform` instead of rewriting — the gateway,
   worker, plate reader, geo file and vendored Leaflet all still exist in history.
 - 2026-08-29 — Deck quotes the portal's ₹51 lakh prize pool, not the ₹37 lakh figure in press coverage.
+- 2026-08-29 — Ticket state lives in GitHub Project `prahari`
+  (https://github.com/users/Priyanshu-byte-coder/projects/1), Status column set is
+  Todo / In Progress / In QA Review / QA Review Failed / Done. A lane owner moves a ticket to
+  In QA Review, never straight to Done; BhavyaSoneji and omvaghelaa own QA and are the only ones who
+  move it to Done or QA Review Failed — so no lane grades its own work.
 
 ## 5. Contract changes
 
