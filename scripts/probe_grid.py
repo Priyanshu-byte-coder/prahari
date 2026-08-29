@@ -42,6 +42,9 @@ BOOTSTRAP = ROOT / "data" / "catalogue" / "ingest.json.bootstrap"
 
 TRANSPORT_PORTS = {"rtsp": 8554, "hls": 80, "whep": 8889}
 
+# One Session so the Cloudflare cookieCheck cookie is set once, not per camera.
+_SESSION = requests.Session()
+
 # Bare hostname or IPv4, no scheme/path/userinfo/query -- one shape only.
 _HOSTNAME_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9\-\.]{0,253}[A-Za-z0-9])?$")
 
@@ -146,14 +149,25 @@ def port_open(hostname: str, port: int, timeout: float = 3.0) -> bool:
         return False
 
 
-def hls_reachable(url: str | None, timeout: float = 5.0) -> bool:
+def hls_reachable(url: str | None, timeout: float = 8.0) -> bool:
+    """GET, never HEAD.
+
+    The grid sits behind a Cloudflare cookie gate: the first request 302s to
+    `?cookieCheck=1` with a Set-Cookie, and only then serves the playlist.
+    HEAD against that path answers 404 (not 405), so a HEAD probe reports every
+    live camera as down. A streamed GET through a cookie-carrying Session is
+    the only probe that tells the truth here -- and we read the first bytes to
+    confirm it really is a playlist rather than an error page served as 200.
+    """
     if not url:
         return False
     try:
-        resp = requests.head(url, timeout=timeout, allow_redirects=True)
-        if resp.status_code == 405:  # some servers reject HEAD, retry GET
-            resp = requests.get(url, timeout=timeout, stream=True)
-        return resp.status_code < 400
+        resp = _SESSION.get(url, timeout=timeout, stream=True, allow_redirects=True)
+        if resp.status_code >= 400:
+            return False
+        head = next(resp.iter_content(chunk_size=64), b"") or b""
+        resp.close()
+        return head.lstrip().startswith(b"#EXTM3U")
     except requests.RequestException:
         return False
 
@@ -171,10 +185,10 @@ def _camera_resolution(cam: dict) -> str | None:
     return None
 
 
-def _build_entry(cam: dict, base: str, hostname: str) -> dict:
+def _build_entry(cam: dict, base: str, hostname: str, rtsp_port_open: bool) -> dict:
     cam_id = str(cam.get("id") or cam.get("camera_id") or cam.get("number") or "?")
     transports = _camera_transports(cam, base, hostname)
-    rtsp_ok = bool(transports["rtsp"]) and port_open(hostname, TRANSPORT_PORTS["rtsp"])
+    rtsp_ok = bool(transports["rtsp"]) and rtsp_port_open
     hls_ok = hls_reachable(transports["hls"])
     return {
         "camera_id": cam_id,
@@ -193,7 +207,12 @@ def _build_entry(cam: dict, base: str, hostname: str) -> dict:
 
 def build_seed(cams: list[dict], hostname: str) -> list[dict]:
     base = base_url(hostname)
-    return [_build_entry(cam, base, hostname) for cam in cams]
+    # Dial 8554 once at the host, not once per camera: if the port is filtered
+    # every per-camera probe burns a full timeout to learn the same fact.
+    rtsp_port_open = port_open(hostname, TRANSPORT_PORTS["rtsp"])
+    if not rtsp_port_open:
+        _log("!", f"port {TRANSPORT_PORTS['rtsp']} filtered at {hostname} -- RTSP unavailable, HLS is the path")
+    return [_build_entry(cam, base, hostname, rtsp_port_open) for cam in cams]
 
 
 def _safe_write(path: Path, text: str) -> None:

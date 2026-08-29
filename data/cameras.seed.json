@@ -15,7 +15,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "01 Chiman bhai Bridge"
   },
@@ -35,7 +35,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "02 Janpath"
   },
@@ -55,7 +55,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "03 O.N.G.C. Office"
   },
@@ -75,7 +75,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "04 Paldi Circle"
   },
@@ -95,7 +95,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "05 Visat teen Rasta"
   },
@@ -115,7 +115,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "06 Timbavadi gate-Junagadh"
   },
@@ -135,7 +135,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "07 hero-showroom-gir-somnath"
   },
@@ -155,7 +155,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "08 majewadi-gate-junagadh"
   },
@@ -175,7 +175,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "09 new-bypass-near-by-circle-junagadh-2"
   },
@@ -195,7 +195,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "10 char-chowk-road-2-junagadh"
   },
@@ -215,7 +215,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "11 dolatpara-junagadh"
   },
@@ -235,7 +235,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "12 Tri Mandir Adalaj Tollnaka"
   },
@@ -255,7 +255,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "13 CN Vidhyalaya"
   },
@@ -275,7 +275,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "14 Delight"
   },
@@ -295,7 +295,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "15 Suvidha park"
   },
@@ -315,7 +315,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "16 Visat P2"
   },
@@ -375,7 +375,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "19 KHAPARIA GRAM PANCHAYAT , TALUKA GANDEVI, DISTRICT NAVSARI"
   },
@@ -395,7 +395,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "20 Mohanpura"
   },
@@ -415,7 +415,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "23 Patan Dethali Char Rasta"
   },
@@ -455,7 +455,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "30 kheram"
   },
@@ -475,7 +475,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "33 dehgam"
   },
@@ -495,7 +495,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "34 dhanori"
   },
@@ -515,7 +515,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "35 TANKAL"
   },
@@ -535,7 +535,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "36 bilimora"
   },
@@ -555,7 +555,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "37 bilimora"
   },
@@ -575,7 +575,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "38 bilimora"
   },
@@ -595,7 +595,7 @@
     },
     "transport_probe": {
       "rtsp": false,
-      "hls": false
+      "hls": true
     },
     "location_raw": "Gandhidham Rambaugh p2"
   }
