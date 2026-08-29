@@ -1,0 +1,30 @@
+# Stack per AGENTS.md. Shared across all three lanes -- G5 owns this file.
+fastapi
+uvicorn[standard]
+pydantic-settings
+requests
+
+# lane I -- decode, detect, track, OCR
+av
+opencv-python-headless
+numpy
+ultralytics
+lap
+paddleocr
+paddlepaddle
+
+# lane D -- persistence, matching, RBAC, export
+psycopg2-binary
+redis
+minio
+pyjwt
+argon2-cffi
+python-multipart
+weasyprint
+
+# lane G -- gateway drivers
+onvif-zeep
+
+# shared
+python-ulid
+pytest
