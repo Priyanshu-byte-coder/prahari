@@ -14,9 +14,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import socket
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from urllib.parse import urlparse
 
 import requests
@@ -29,6 +30,33 @@ REPROBE_INTERVAL_S = 600  # 10 minutes
 # `?cookieCheck=1` with a Set-Cookie and only then serves. One Session so
 # that cookie is negotiated once rather than per camera.
 _SESSION = requests.Session()
+
+ALLOWED_SCHEMES = frozenset({"http", "https"})
+
+
+def allowed_hosts() -> frozenset[str]:
+    """The only hosts this process will ever make a request to.
+
+    Camera URLs arrive from the grid catalogue, which is data we do not
+    control: a tampered or mistaken record could point a probe at an internal
+    address (a metadata endpoint, an admin port). Pinning every request to the
+    configured GRID_HOST keeps that from being reachable.
+    """
+    raw = os.environ.get("GRID_HOST", "live.corp8.cloud").strip()
+    host = urlparse(raw if "//" in raw else f"//{raw}").hostname or raw
+    return frozenset({host})
+
+
+def safe_url(url: str | None) -> str | None:
+    """Return the URL only if it is http(s) and on an allowed host."""
+    if not url:
+        return None
+    parsed = urlparse(url)
+    if parsed.scheme not in ALLOWED_SCHEMES:
+        return None
+    if parsed.hostname not in allowed_hosts():
+        return None
+    return url
 
 
 @dataclass(slots=True)
@@ -95,8 +123,11 @@ def probe_hls(url: str, timeout: float = HLS_TIMEOUT_S) -> tuple[bool, str]:
     reports every live camera as down. Read the first bytes and require a real
     `#EXTM3U` header rather than trusting a 200 that might be an error page.
     """
+    target = safe_url(url)
+    if target is None:
+        return False, "hls url rejected (scheme or host not allowed)"
     try:
-        resp = _SESSION.get(url, timeout=timeout, stream=True, allow_redirects=True)
+        resp = _SESSION.get(target, timeout=timeout, stream=True, allow_redirects=True)
         if resp.status_code >= 400:
             return False, f"hls HTTP {resp.status_code}"
         head = next(resp.iter_content(chunk_size=64), b"") or b""

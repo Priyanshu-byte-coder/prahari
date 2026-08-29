@@ -149,7 +149,20 @@ def port_open(hostname: str, port: int, timeout: float = 3.0) -> bool:
         return False
 
 
-def hls_reachable(url: str | None, timeout: float = 8.0) -> bool:
+ALLOWED_SCHEMES = frozenset({"http", "https"})
+
+
+def _safe_url(url: str | None, hostname: str) -> str | None:
+    """http(s) on the expected host only -- catalogue URLs are untrusted input."""
+    if not url:
+        return None
+    parsed = urlparse(url)
+    if parsed.scheme not in ALLOWED_SCHEMES or parsed.hostname != hostname:
+        return None
+    return url
+
+
+def hls_reachable(url: str | None, hostname: str, timeout: float = 8.0) -> bool:
     """GET, never HEAD.
 
     The grid sits behind a Cloudflare cookie gate: the first request 302s to
@@ -159,10 +172,11 @@ def hls_reachable(url: str | None, timeout: float = 8.0) -> bool:
     the only probe that tells the truth here -- and we read the first bytes to
     confirm it really is a playlist rather than an error page served as 200.
     """
-    if not url:
+    target = _safe_url(url, hostname)
+    if target is None:
         return False
     try:
-        resp = _SESSION.get(url, timeout=timeout, stream=True, allow_redirects=True)
+        resp = _SESSION.get(target, timeout=timeout, stream=True, allow_redirects=True)
         if resp.status_code >= 400:
             return False
         head = next(resp.iter_content(chunk_size=64), b"") or b""
@@ -189,7 +203,7 @@ def _build_entry(cam: dict, base: str, hostname: str, rtsp_port_open: bool) -> d
     cam_id = str(cam.get("id") or cam.get("camera_id") or cam.get("number") or "?")
     transports = _camera_transports(cam, base, hostname)
     rtsp_ok = bool(transports["rtsp"]) and rtsp_port_open
-    hls_ok = hls_reachable(transports["hls"])
+    hls_ok = hls_reachable(transports["hls"], hostname)
     return {
         "camera_id": cam_id,
         "name": cam.get("name") or f"Camera {cam_id}",
@@ -215,12 +229,10 @@ def build_seed(cams: list[dict], hostname: str) -> list[dict]:
     return [_build_entry(cam, base, hostname, rtsp_port_open) for cam in cams]
 
 
-def _safe_write(path: Path, text: str) -> None:
-    resolved = path.resolve()
-    if ROOT.resolve() not in resolved.parents:
-        raise ValueError(f"refusing to write outside the project root: {resolved}")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+def _write_seed(text: str) -> None:
+    """Writes only SEED_OUT, a module constant -- no caller-supplied path."""
+    SEED_OUT.parent.mkdir(parents=True, exist_ok=True)
+    SEED_OUT.write_text(text, encoding="utf-8")
 
 
 def do_check() -> int:
@@ -270,7 +282,7 @@ def main() -> int:
         cams = load_bootstrap()
 
     seed = build_seed(cams, hostname)
-    _safe_write(SEED_OUT, json.dumps(seed, indent=2))
+    _write_seed(json.dumps(seed, indent=2))
     _log("+", f"wrote {len(seed)} cameras -> {SEED_OUT.relative_to(ROOT)}")
 
     reachable = sum(1 for c in seed if any(c["transport_probe"].values()))
