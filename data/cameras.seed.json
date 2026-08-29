@@ -1,0 +1,602 @@
+[
+  {
+    "camera_id": "1",
+    "name": "Camera 1",
+    "district_code": "AHMEDABAD",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/1",
+      "hls": "https://live.corp8.cloud/live/stream/1/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/1/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "01 Chiman bhai Bridge"
+  },
+  {
+    "camera_id": "2",
+    "name": "Camera 2",
+    "district_code": "UNKNOWN",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/2",
+      "hls": "https://live.corp8.cloud/live/stream/2/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/2/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "02 Janpath"
+  },
+  {
+    "camera_id": "3",
+    "name": "Camera 3",
+    "district_code": "UNKNOWN",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/3",
+      "hls": "https://live.corp8.cloud/live/stream/3/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/3/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "03 O.N.G.C. Office"
+  },
+  {
+    "camera_id": "4",
+    "name": "Camera 4",
+    "district_code": "AHMEDABAD",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/4",
+      "hls": "https://live.corp8.cloud/live/stream/4/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/4/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "04 Paldi Circle"
+  },
+  {
+    "camera_id": "5",
+    "name": "Camera 5",
+    "district_code": "AHMEDABAD",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/5",
+      "hls": "https://live.corp8.cloud/live/stream/5/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/5/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "05 Visat teen Rasta"
+  },
+  {
+    "camera_id": "6",
+    "name": "Camera 6",
+    "district_code": "JUNAGADH",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": "hevc",
+    "resolution": "1920x1080",
+    "fps": 25.0,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/6",
+      "hls": "https://live.corp8.cloud/live/stream/6/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/6/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "06 Timbavadi gate-Junagadh"
+  },
+  {
+    "camera_id": "7",
+    "name": "Camera 7",
+    "district_code": "GIR_SOMNATH",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/7",
+      "hls": "https://live.corp8.cloud/live/stream/7/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/7/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "07 hero-showroom-gir-somnath"
+  },
+  {
+    "camera_id": "8",
+    "name": "Camera 8",
+    "district_code": "JUNAGADH",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/8",
+      "hls": "https://live.corp8.cloud/live/stream/8/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/8/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "08 majewadi-gate-junagadh"
+  },
+  {
+    "camera_id": "9",
+    "name": "Camera 9",
+    "district_code": "JUNAGADH",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/9",
+      "hls": "https://live.corp8.cloud/live/stream/9/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/9/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "09 new-bypass-near-by-circle-junagadh-2"
+  },
+  {
+    "camera_id": "10",
+    "name": "Camera 10",
+    "district_code": "JUNAGADH",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/10",
+      "hls": "https://live.corp8.cloud/live/stream/10/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/10/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "10 char-chowk-road-2-junagadh"
+  },
+  {
+    "camera_id": "11",
+    "name": "Camera 11",
+    "district_code": "JUNAGADH",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/11",
+      "hls": "https://live.corp8.cloud/live/stream/11/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/11/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "11 dolatpara-junagadh"
+  },
+  {
+    "camera_id": "12",
+    "name": "Camera 12",
+    "district_code": "GANDHINAGAR",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/12",
+      "hls": "https://live.corp8.cloud/live/stream/12/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/12/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "12 Tri Mandir Adalaj Tollnaka"
+  },
+  {
+    "camera_id": "13",
+    "name": "Camera 13",
+    "district_code": "UNKNOWN",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": "h264",
+    "resolution": "1920x1080",
+    "fps": 12.5,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/13",
+      "hls": "https://live.corp8.cloud/live/stream/13/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/13/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "13 CN Vidhyalaya"
+  },
+  {
+    "camera_id": "14",
+    "name": "Camera 14",
+    "district_code": "UNKNOWN",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": "h264",
+    "resolution": "1920x1080",
+    "fps": 12.5,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/14",
+      "hls": "https://live.corp8.cloud/live/stream/14/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/14/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "14 Delight"
+  },
+  {
+    "camera_id": "15",
+    "name": "Camera 15",
+    "district_code": "UNKNOWN",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": "h264",
+    "resolution": "1920x1080",
+    "fps": 12.5,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/15",
+      "hls": "https://live.corp8.cloud/live/stream/15/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/15/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "15 Suvidha park"
+  },
+  {
+    "camera_id": "16",
+    "name": "Camera 16",
+    "district_code": "AHMEDABAD",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": "h264",
+    "resolution": "1920x1080",
+    "fps": 12.5,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/16",
+      "hls": "https://live.corp8.cloud/live/stream/16/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/16/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "16 Visat P2"
+  },
+  {
+    "camera_id": "17",
+    "name": "Camera 17",
+    "district_code": "RAJKOT",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": "hevc",
+    "resolution": "1920x1080",
+    "fps": 24.98,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/17",
+      "hls": "https://live.corp8.cloud/live/stream/17/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/17/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "17 Rajkot Bus Port CCTV"
+  },
+  {
+    "camera_id": "18",
+    "name": "Camera 18",
+    "district_code": "RAJKOT",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/18",
+      "hls": "https://live.corp8.cloud/live/stream/18/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/18/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "18 Rajkot CCTV"
+  },
+  {
+    "camera_id": "19",
+    "name": "Camera 19",
+    "district_code": "NAVSARI",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/19",
+      "hls": "https://live.corp8.cloud/live/stream/19/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/19/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "19 KHAPARIA GRAM PANCHAYAT , TALUKA GANDEVI, DISTRICT NAVSARI"
+  },
+  {
+    "camera_id": "20",
+    "name": "Camera 20",
+    "district_code": "UNKNOWN",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/20",
+      "hls": "https://live.corp8.cloud/live/stream/20/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/20/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "20 Mohanpura"
+  },
+  {
+    "camera_id": "21",
+    "name": "Camera 21",
+    "district_code": "PATAN",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/21",
+      "hls": "https://live.corp8.cloud/live/stream/21/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/21/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "23 Patan Dethali Char Rasta"
+  },
+  {
+    "camera_id": "22",
+    "name": "Camera 22",
+    "district_code": "UNKNOWN",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": "hevc",
+    "resolution": "1920x1080",
+    "fps": 25.0,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/22",
+      "hls": "https://live.corp8.cloud/live/stream/22/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/22/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "28 BK Mervada tran Rasta"
+  },
+  {
+    "camera_id": "23",
+    "name": "Camera 23",
+    "district_code": "UNKNOWN",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": "h264",
+    "resolution": "1280x720",
+    "fps": 25.0,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/23",
+      "hls": "https://live.corp8.cloud/live/stream/23/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/23/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "30 kheram"
+  },
+  {
+    "camera_id": "24",
+    "name": "Camera 24",
+    "district_code": "GANDHINAGAR",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/24",
+      "hls": "https://live.corp8.cloud/live/stream/24/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/24/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "33 dehgam"
+  },
+  {
+    "camera_id": "25",
+    "name": "Camera 25",
+    "district_code": "UNKNOWN",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/25",
+      "hls": "https://live.corp8.cloud/live/stream/25/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/25/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "34 dhanori"
+  },
+  {
+    "camera_id": "26",
+    "name": "Camera 26",
+    "district_code": "UNKNOWN",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": "hevc",
+    "resolution": "2560x1440",
+    "fps": 13.35,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/26",
+      "hls": "https://live.corp8.cloud/live/stream/26/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/26/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "35 TANKAL"
+  },
+  {
+    "camera_id": "27",
+    "name": "Camera 27",
+    "district_code": "NAVSARI",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": "h264",
+    "resolution": "1280x960",
+    "fps": 24.86,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/27",
+      "hls": "https://live.corp8.cloud/live/stream/27/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/27/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "36 bilimora"
+  },
+  {
+    "camera_id": "28",
+    "name": "Camera 28",
+    "district_code": "NAVSARI",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/28",
+      "hls": "https://live.corp8.cloud/live/stream/28/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/28/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "37 bilimora"
+  },
+  {
+    "camera_id": "29",
+    "name": "Camera 29",
+    "district_code": "NAVSARI",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": "h264",
+    "resolution": "1280x960",
+    "fps": 24.78,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/29",
+      "hls": "https://live.corp8.cloud/live/stream/29/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/29/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "38 bilimora"
+  },
+  {
+    "camera_id": "30",
+    "name": "Camera 30",
+    "district_code": "KUTCH",
+    "install_type": "FIX",
+    "driver": "mediamtx",
+    "codec": null,
+    "resolution": null,
+    "fps": null,
+    "transports": {
+      "rtsp": "rtsp://live.corp8.cloud:8554/stream/30",
+      "hls": "https://live.corp8.cloud/live/stream/30/index.m3u8",
+      "whep": "http://live.corp8.cloud:8889/stream/30/whep"
+    },
+    "transport_probe": {
+      "rtsp": false,
+      "hls": false
+    },
+    "location_raw": "Gandhidham Rambaugh p2"
+  }
+]
