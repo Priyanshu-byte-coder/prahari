@@ -70,10 +70,10 @@ def test_canon_collapses_every_confusion_class():
 def test_canon_fallback_matches_i5_once_it_lands():
     # The fallback map in the generator is a stand-in until common/plate.py exists. The moment
     # it does, this test starts comparing them and fails if they disagree.
-    try:
-        from common.plate import canon as real
-    except ImportError:
+    from common import plate_compat
+    if not plate_compat.USING_I5:
         import pytest
         pytest.skip("common/plate.py (I5) not written yet")
+    from common.plate import canon as real
     for s in ("GJ01AB1234", "GJ38BS9593", "MH12DQ0000", "6J01A81234"):
         assert fs.canon(s) == real(s), s

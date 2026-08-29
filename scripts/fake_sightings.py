@@ -45,20 +45,10 @@ CLASSES = ["two_wheeler", "three_wheeler", "car", "lcv", "bus", "truck", "tracto
 COLOURS = ["white", "silver", "black", "blue", "red", "grey", "yellow"]
 CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
-# [C7]'s confusion classes. common/plate.py (I5) is the one implementation everything else
-# imports; this generator falls back to the map below only so lane D is not blocked waiting
-# for I5 to land. It produces test data - it never decides a match. Delete the fallback once
-# I5 exists; tests/test_d_generator.py asserts the two agree the moment it does.
-CONFUSION = {**dict.fromkeys("0ODQ", "0"), **dict.fromkeys("1IL", "1"),
-             **dict.fromkeys("8B", "8"), **dict.fromkeys("5S", "5"),
-             **dict.fromkeys("2Z", "2"), **dict.fromkeys("6G", "6")}
-
-try:
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from common.plate import canon                      # I5, once it exists
-except ImportError:
-    def canon(s):
-        return "".join(CONFUSION.get(c, c) for c in s)
+# canon() belongs to lane I ([C7], ticket I5). common/plate_compat.py is the single place that
+# prefers the real implementation and falls back until it lands - see the note in that file.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from common.plate_compat import canon  # noqa: E402
 
 
 def ulid(when):

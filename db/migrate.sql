@@ -68,3 +68,22 @@ CREATE TABLE IF NOT EXISTS access_grants (id serial PRIMARY KEY, requester int, 
 CREATE TABLE IF NOT EXISTS audit_log (seq bigserial PRIMARY KEY, at timestamptz DEFAULT now(), user_id int,
   dept_id int, action text, object_type text, object_id text, ip inet, reason text,
   grant_id int, prev_hash bytea, hash bytea NOT NULL);
+
+-- [D2] Compression and retention. Not in [C3] - the contract describes the shape of the data,
+-- these describe how long it is kept, and they are lane D's call. schema.sql stays a verbatim
+-- copy of the contract, so it does not carry them.
+--
+-- Compressed chunks are read-only in the sense that matters here: the persister only ever
+-- inserts into the newest chunk, and 7 days is far behind it.
+ALTER TABLE sightings SET (
+  timescaledb.compress,
+  timescaledb.compress_segmentby = 'camera_id',
+  timescaledb.compress_orderby   = 'pts_first DESC');
+
+SELECT add_compression_policy('sightings', INTERVAL '7 days',  if_not_exists => TRUE);
+SELECT add_retention_policy  ('sightings', INTERVAL '90 days', if_not_exists => TRUE);
+
+-- alerts, alert_events and audit_log get no retention policy on purpose: an alert nobody can
+-- look up a year later is worth little, and the audit chain has to stay whole to be evidence.
+-- Crops expire at 30 days in MinIO's bucket lifecycle, not here - object storage is lane G's
+-- infra. Filed under TASK.md "Cross-lane requests" if it is not set by the freeze.
