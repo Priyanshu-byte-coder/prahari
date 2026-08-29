@@ -40,7 +40,7 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 
 | id | pt | wave | state | commit | note |
 |---|---|---|---|---|---|
-| G1 grid recon + cameras.seed.json | 1 | 0 | TODO | | salvage `probe_grid.py` |
+| G1 grid recon + cameras.seed.json | 1 | 0 | WIP | | seed emitted from cached survey; **grid origin 502 since 29 Aug**, re-probe live before QA |
 | G5 infra compose + env + Makefile | 1 | 0 | TODO | | other lanes need this today |
 | G2 CameraSource + transport resolution | 2 | 1 | TODO | | publishes `camera:transport:<id>` |
 | G3 health monitor | 2 | 1 | TODO | | sole producer of `camera.health` |
@@ -89,7 +89,13 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 _(nothing yet)_
 
 ### lane G
-_(nothing yet)_
+- `scripts/probe_grid.py` — G1 grid recon, emits the seed — `fetch_catalogue`, `probe_stream` (PyAV),
+  `build_live`, `build_from_cache`, `check` (the `--check` verify line), `DISTRICT_TOKENS`.
+- `data/cameras.seed.json` — [C8] seed, 30 rows, producer G1. Fields beyond [C8]:
+  `properties_source` (`catalogue` | `measured@<ts>`), `fps_source`, `stale`.
+- `data/catalogue/ingest.json` — raw catalogue snapshot, salvaged from `4d0c945`; a live probe rewrites it.
+- `data/catalogue/grid_survey.json` — 27 Aug per-camera transport survey, the `--from-cache` input.
+- `tests/test_g_seed.py` — pins the [C8] seed shape and G1's pure helpers. `pytest tests/test_g_seed.py`.
 
 ### lane D
 _(nothing yet)_
@@ -108,6 +114,17 @@ _(nothing yet)_
 - `[G]` A stalled RTSP connection does not error out — it just stops. You need a watchdog, not a try/except.
 - `[G]` District-centroid coordinates make the demo car teleport. G6 before G10, no exceptions.
 - `[G]` Judges' networks block WebRTC — the 3 s HLS fallback badge must be rehearsed on a phone hotspot.
+- `[ALL]` The grid is **statewide, not Ahmedabad**: Junagadh ×5, Navsari ×4, Rajkot ×2, Gandhinagar ×2,
+  Gir Somnath, Patan, Kutch, and 14 whose location text names no district. Inter-camera distances are
+  hundreds of km, so a route's plausibility filter cannot assume one city.
+- `[ALL]` `live.corp8.cloud` returned Cloudflare **502 `Retry-After: 60` on every path** from 29 Aug 05:30
+  UTC — origin down, not the cookie gate and not throttling. Check `curl -sI https://live.corp8.cloud/api/ingest`
+  before debugging any client code against it.
+- `[G]` No system `ffmpeg`/`ffprobe` on macOS. **Use PyAV** (`av`, pip, bundles its own ffmpeg) — it works
+  on all three laptops with no system install. Import `av` without `cv2` in the same process, or macOS
+  prints duplicate-`libavdevice` objc warnings.
+- `[G]` The seed's `fps` is the container's **nominal** rate, not delivered. This grid has served 9.92 fps
+  on a stream nominally at 25. Delivered fps is counted by the worker into `camera:fps:<id>`; G3 reads that.
 - `[D]` Timescale hypertable must be created before any row is inserted into `sightings`.
 - `[ALL]` `gh` is authed as Neal006 with scopes `gist, read:org, repo, workflow` — **no `project` scope**.
   Projects v2 needs `gh auth refresh -s project` (interactive, browser).
@@ -138,6 +155,17 @@ _(nothing yet)_
   In QA Review, never straight to Done; BhavyaSoneji and omvaghelaa own QA and are the only ones who
   move it to Done or QA Review Failed — so no lane grades its own work.
 
+- 2026-08-29 — G1 probes with PyAV, not an `ffprobe` subprocess — no system ffmpeg on macOS, and a pip
+  dependency installs identically on all three laptops. Same fields, one less thing to install.
+- 2026-08-29 — `district_code` is set only where the location text names a district outright; the other 14
+  cameras stay `UNKNOWN` rather than being guessed. G6 opens every frame to place its pin and can assign
+  them there. A wrong district on a police record is worse than an absent one.
+- 2026-08-29 — `install_type` (FIX | PTZ | RLVD) is `UNKNOWN` in the seed. It is burned into the video
+  overlay, not carried in the catalogue, so G6 is the cheapest place to read it.
+- 2026-08-29 — `probe_grid.py --from-cache` rebuilds the seed from the 27 Aug survey when the grid is down,
+  marking every row `stale: true`. The other two lanes need camera ids and URLs today and those are stable;
+  only the reachability flags age.
+
 ## 5. Contract changes
 
 `YYYY-MM-DD — [Cx] what changed — who was told`. Nothing yet. Contracts in `TASK.md §C` are frozen;
@@ -151,7 +179,9 @@ changing one without a line here breaks somebody else's lane silently.
 _(none)_
 
 ### lane G
-_(none)_
+- 08-29 | G1 | `scripts/probe_grid.py`, `data/cameras.seed.json`, `data/catalogue/*.json` | seed of 30 cameras
+  in [C8], 22 reachable over HLS / 0 over RTSP. Built `--from-cache` because the grid origin is 502; every
+  row is `stale: true` until a live re-probe. `--check` passes.
 
 ### lane D
 _(none)_
