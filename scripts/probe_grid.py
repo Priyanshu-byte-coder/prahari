@@ -16,15 +16,21 @@ the event window), falls back to the last catalogue snapshot salvaged from
 commit 4d0c945 (data/catalogue/ingest.json.bootstrap) so the rest of the
 team is never blocked on the grid being up. That fallback is logged loudly
 -- it is a bootstrap, not a substitute for a live re-probe before the demo.
+
+Security note: --host and every URL in the catalogue response are untrusted
+input. `_validated_host` rejects anything that isn't a bare hostname/IP
+before it is used to build a request URL (blocks SSRF via a crafted host
+argument), and `_resolve_camera_url` refuses any catalogue URL that does not
+point at that same host (blocks SSRF via a compromised catalogue response).
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import re
 import socket
 import sys
-import time
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -35,6 +41,9 @@ SEED_OUT = ROOT / "data" / "cameras.seed.json"
 BOOTSTRAP = ROOT / "data" / "catalogue" / "ingest.json.bootstrap"
 
 TRANSPORT_PORTS = {"rtsp": 8554, "hls": 80, "whep": 8889}
+
+# Bare hostname or IPv4, no scheme/path/userinfo/query -- one shape only.
+_HOSTNAME_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9\-\.]{0,253}[A-Za-z0-9])?$")
 
 # ponytail: location -> district_code is a keyword guess against the real
 # catalogue's free-text `location` field, confident only where the name is
@@ -70,14 +79,35 @@ def guess_district(location: str) -> str:
     return "UNKNOWN"
 
 
-def normalise_base(host: str) -> str:
-    if not host.startswith(("http://", "https://")):
-        host = "https://" + host
-    return host.rstrip("/")
+def _validated_host(raw: str) -> str:
+    """Reject anything that isn't a bare hostname/IP before it touches a URL."""
+    candidate = raw.strip()
+    if candidate.startswith(("http://", "https://")):
+        candidate = urlparse(candidate).hostname or ""
+    if not candidate or not _HOSTNAME_RE.match(candidate):
+        raise ValueError(f"refusing to probe an invalid --host value: {raw!r}")
+    return candidate
 
 
-def fetch_live_catalogue(host: str, timeout: float = 10.0) -> list[dict] | None:
-    base = normalise_base(host)
+def base_url(hostname: str) -> str:
+    return f"https://{hostname}"
+
+
+def _resolve_camera_url(raw: str | None, base: str, expected_host: str) -> str | None:
+    """Accept a catalogue URL only if it's relative or points at our own host."""
+    if not raw:
+        return None
+    if raw.startswith("/"):
+        return base + raw
+    parsed = urlparse(raw)
+    if parsed.scheme in ("http", "https") and parsed.hostname == expected_host:
+        return raw
+    _log("!", f"ignoring catalogue URL off expected host {expected_host!r}: {raw!r}")
+    return None
+
+
+def fetch_live_catalogue(hostname: str, timeout: float = 10.0) -> list[dict] | None:
+    base = base_url(hostname)
     for path in ("/api/ingest", "/api/ingest/"):
         url = base + path
         try:
@@ -108,58 +138,70 @@ def load_bootstrap() -> list[dict]:
     return cams
 
 
-def port_open(host: str, port: int, timeout: float = 3.0) -> bool:
+def port_open(hostname: str, port: int, timeout: float = 3.0) -> bool:
     try:
-        with socket.create_connection((host, port), timeout=timeout):
+        with socket.create_connection((hostname, port), timeout=timeout):
             return True
     except OSError:
         return False
 
 
-def hls_reachable(url: str, base: str, timeout: float = 5.0) -> bool:
-    full = url if url.startswith("http") else base + url
+def hls_reachable(url: str | None, timeout: float = 5.0) -> bool:
+    if not url:
+        return False
     try:
-        resp = requests.head(full, timeout=timeout, allow_redirects=True)
+        resp = requests.head(url, timeout=timeout, allow_redirects=True)
         if resp.status_code == 405:  # some servers reject HEAD, retry GET
-            resp = requests.get(full, timeout=timeout, stream=True)
+            resp = requests.get(url, timeout=timeout, stream=True)
         return resp.status_code < 400
     except requests.RequestException:
         return False
 
 
-def build_seed(cams: list[dict], host: str) -> list[dict]:
-    base = normalise_base(host)
-    hostname = urlparse(base).hostname or host
-    seed = []
-    for cam in cams:
-        cam_id = str(cam.get("id") or cam.get("camera_id") or cam.get("number") or "?")
-        rtsp_url = cam.get("rtsp_url") or cam.get("rtsp")
-        hls_raw = cam.get("hls_live_url") or cam.get("hls")
-        hls_url = hls_raw if (hls_raw or "").startswith("http") else (base + hls_raw if hls_raw else None)
-        whep_url = cam.get("webrtc_url") or cam.get("whep")
+def _camera_transports(cam: dict, base: str, hostname: str) -> dict:
+    rtsp_url = cam.get("rtsp_url") or cam.get("rtsp")
+    hls_url = _resolve_camera_url(cam.get("hls_live_url") or cam.get("hls"), base, hostname)
+    whep_url = _resolve_camera_url(cam.get("webrtc_url") or cam.get("whep"), base, hostname)
+    return {"rtsp": rtsp_url, "hls": hls_url, "whep": whep_url}
 
-        rtsp_ok = port_open(hostname, TRANSPORT_PORTS["rtsp"]) if rtsp_url else False
-        hls_ok = hls_reachable(hls_raw, base) if hls_raw else False
 
-        entry = {
-            "camera_id": cam_id,
-            "name": cam.get("name") or f"Camera {cam_id}",
-            "district_code": guess_district(cam.get("location", "")),
-            "install_type": "FIX",
-            "driver": "mediamtx",
-            "codec": cam.get("codec") or None,
-            "resolution": f"{cam['width']}x{cam['height']}" if cam.get("width") and cam.get("height") else None,
-            "fps": cam.get("fps") or None,
-            "transports": {
-                "rtsp": rtsp_url,
-                "hls": hls_url,
-                "whep": whep_url,
-            },
-            "transport_probe": {"rtsp": rtsp_ok, "hls": hls_ok},
-            "location_raw": cam.get("location"),
-        }
-        seed.append(entry)
-    return seed
+def _camera_resolution(cam: dict) -> str | None:
+    if cam.get("width") and cam.get("height"):
+        return f"{cam['width']}x{cam['height']}"
+    return None
+
+
+def _build_entry(cam: dict, base: str, hostname: str) -> dict:
+    cam_id = str(cam.get("id") or cam.get("camera_id") or cam.get("number") or "?")
+    transports = _camera_transports(cam, base, hostname)
+    rtsp_ok = bool(transports["rtsp"]) and port_open(hostname, TRANSPORT_PORTS["rtsp"])
+    hls_ok = hls_reachable(transports["hls"])
+    return {
+        "camera_id": cam_id,
+        "name": cam.get("name") or f"Camera {cam_id}",
+        "district_code": guess_district(cam.get("location", "")),
+        "install_type": "FIX",
+        "driver": "mediamtx",
+        "codec": cam.get("codec") or None,
+        "resolution": _camera_resolution(cam),
+        "fps": cam.get("fps") or None,
+        "transports": transports,
+        "transport_probe": {"rtsp": rtsp_ok, "hls": hls_ok},
+        "location_raw": cam.get("location"),
+    }
+
+
+def build_seed(cams: list[dict], hostname: str) -> list[dict]:
+    base = base_url(hostname)
+    return [_build_entry(cam, base, hostname) for cam in cams]
+
+
+def _safe_write(path: Path, text: str) -> None:
+    resolved = path.resolve()
+    if ROOT.resolve() not in resolved.parents:
+        raise ValueError(f"refusing to write outside the project root: {resolved}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
 
 
 def do_check() -> int:
@@ -197,14 +239,19 @@ def main() -> int:
     if args.check:
         return do_check()
 
-    _log("*", f"target {args.host}")
-    cams = fetch_live_catalogue(args.host)
+    try:
+        hostname = _validated_host(args.host)
+    except ValueError as exc:
+        _log("!", str(exc))
+        return 2
+
+    _log("*", f"target {hostname}")
+    cams = fetch_live_catalogue(hostname)
     if not cams:
         cams = load_bootstrap()
 
-    seed = build_seed(cams, args.host)
-    SEED_OUT.parent.mkdir(parents=True, exist_ok=True)
-    SEED_OUT.write_text(json.dumps(seed, indent=2), encoding="utf-8")
+    seed = build_seed(cams, hostname)
+    _safe_write(SEED_OUT, json.dumps(seed, indent=2))
     _log("+", f"wrote {len(seed)} cameras -> {SEED_OUT.relative_to(ROOT)}")
 
     reachable = sum(1 for c in seed if any(c["transport_probe"].values()))
