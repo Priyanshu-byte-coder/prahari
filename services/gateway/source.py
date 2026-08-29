@@ -11,7 +11,7 @@ seam; keep it that way.
 from __future__ import annotations
 
 import asyncio
-import random
+import secrets
 from dataclasses import dataclass
 from enum import Enum
 from typing import AsyncIterator, Protocol, runtime_checkable
@@ -85,4 +85,10 @@ def next_backoff(current: float | None) -> float:
 
 
 async def sleep_backoff(delay: float) -> None:
-    await asyncio.sleep(delay * (0.8 + 0.4 * random.random()))
+    """Jitter so thirty cameras losing a link together do not retry in lockstep.
+
+    `secrets` rather than `random`: the jitter is not security-sensitive, but a
+    non-cryptographic RNG here is a standing static-analysis finding and the
+    cost of the stronger one is nil at this call rate.
+    """
+    await asyncio.sleep(delay * (0.8 + 0.4 * secrets.SystemRandom().random()))
