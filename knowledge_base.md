@@ -41,7 +41,7 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 | id | pt | wave | state | commit | note |
 |---|---|---|---|---|---|
 | G1 grid recon + cameras.seed.json | 1 | 0 | DONE | 697edc5 | grid returned 502, seed built from salvaged catalogue |
-| G5 infra compose + env + Makefile | 1 | 0 | TODO | | other lanes need this today |
+| G5 infra compose + env + Makefile | 1 | 0 | WIP | | compose+env+Makefile+skeleton written; no Docker in this sandbox to confirm `make up` green -- needs a real run |
 | G2 CameraSource + transport resolution | 2 | 1 | TODO | | publishes `camera:transport:<id>` |
 | G3 health monitor | 2 | 1 | TODO | | sole producer of `camera.health` |
 | G6 coordinate ground truth | 1 | 1 | TODO | | before any route UI |
@@ -92,6 +92,9 @@ _(nothing yet)_
 - `scripts/probe_grid.py` — hits grid `/api/ingest`, probes RTSP/HLS reachability per camera, writes `data/cameras.seed.json` [C8]; falls back to salvaged catalogue if the sandbox is down. `--check` prints count + reachability.
 - `data/cameras.seed.json` — [C8] camera seed, 30 cameras, `district_code` best-effort from location text, `UNKNOWN` where ambiguous.
 - `data/catalogue/ingest.json.bootstrap` — real 30-camera catalogue salvaged from `4d0c945` (host `live.corp8.cloud`), offline fallback source for probe_grid.py.
+- `infra/docker-compose.yml` — postgres16+timescaledb+pgvector (`timescale/timescaledb-ha:pg16`), redis, minio, osrm (profile `full`, no Gujarat extract yet -- D6).
+- `.env.example` — [C9] keys verbatim. `.gitignore` — `.env`, weights, video, crops per build rules. `requirements.txt` — full stack, shared root file.
+- `Makefile` — `up` (compose up+ps), `down`, `seed` (db/schema.sql + load_registry.py, both lane D, not built yet), `check` (pytest).
 
 ### lane D
 _(nothing yet)_
@@ -107,6 +110,8 @@ _(nothing yet)_
 - `[I]` H.264 decodes every frame even at `fps=5` output — 30 cameras × 25 fps ≈ 750 fps of decode, near
   the limit of one consumer-GPU NVDEC. Watch `nvidia-smi dmon` dec%; above 90% move cameras to CPU decode.
 - `[G]` `live.corp8.cloud` (the sandbox host from the salvaged catalogue) returns HTTP 502 as of 08-29 — grid is likely only live during the event window. `probe_grid.py` falls back to `ingest.json.bootstrap` when it does; re-run for real once the grid is up.
+- `[G]` OSRM needs a preprocessed Gujarat extract (`osrm-extract` + `osrm-contract`) before `osrm-routed` can serve anything — put it behind compose profile `full` rather than crash-looping the default `make up`. D6 owns building the extract.
+- `[G]` No Docker in this dev sandbox — `infra/docker-compose.yml` is YAML-validated but `make up` giving green containers is unverified. Whoever runs it first on a real laptop should update this line.
 - `[G]` Read per-camera properties from `GET http://$GRID_HOST/api/ingest` before decoding.
 - `[G]` A stalled RTSP connection does not error out — it just stops. You need a watchdog, not a try/except.
 - `[G]` District-centroid coordinates make the demo car teleport. G6 before G10, no exceptions.
@@ -154,6 +159,7 @@ changing one without a line here breaks somebody else's lane silently.
 _(none)_
 
 ### lane G
+- 08-29 | G5 | infra/docker-compose.yml, .env.example, .gitignore, requirements.txt, Makefile, repo skeleton | compose+env+Makefile written, YAML-validated; `make up` unverified, no Docker in this sandbox
 - 08-29 | G1 | scripts/probe_grid.py, data/cameras.seed.json, data/catalogue/ingest.json.bootstrap | seed built and verified (`--check`); grid host was 502, used salvaged catalogue as bootstrap
 
 ### lane D
