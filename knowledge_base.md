@@ -57,8 +57,8 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 
 | id | pt | wave | state | commit | note |
 |---|---|---|---|---|---|
-| D1 schema + registry loader | 2 | 1 | TODO | | hypertable before first insert |
-| D2 fake_sightings + persister | 2 | 1 | TODO | | generator first, unblocks the lane |
+| D1 schema + registry loader | 2 | 1 | DONE | | applies and re-applies clean on timescaledb-ha:pg16 |
+| D2 fake_sightings + persister | 2 | 1 | WIP | | generator done; persister next |
 | D3 watchlist + CSV + feed stubs | 2 | 1 | TODO | | |
 | D4 matcher bands + alert FSM | 2 | 2 | TODO | | imports I5, no second copy |
 | D5 WebSocket fanout | 2 | 2 | TODO | | kills all polling |
@@ -95,7 +95,13 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 _(nothing yet)_
 
 ### lane D
-_(nothing yet)_
+- `db/schema.sql` — [C3] verbatim, the copy a reviewer diffs against the contract — 9 tables, hypertable, 5 sighting indexes.
+- `db/migrate.sql` — the file that actually runs: same objects, IF NOT EXISTS, named indexes, `if_not_exists => TRUE`.
+- `scripts/load_registry.py` — joins `cameras.seed.json` + `camera_geo.json` into `cameras` — `read_json`, `build_rows`, `UPSERT`.
+- `scripts/fake_sightings.py` — synthetic [C1] rows on the `sightings` stream — `ulid`, `sighting`, `route_schedule`, `ROUTE`.
+- `tests/test_d_schema.py` — schema.sql vs migrate.sql drift, index and re-runnability checks.
+- `tests/test_d_registry.py` — the seed/geo join, including every way lane G's two files disagree.
+- `tests/test_d_generator.py` — [C1] field set, ULID ordering, route hop order and gaps.
 
 ## 3. Gotchas
 
@@ -112,6 +118,9 @@ _(nothing yet)_
 - `[G]` District-centroid coordinates make the demo car teleport. G6 before G10, no exceptions.
 - `[G]` Judges' networks block WebRTC — the 3 s HLS fallback badge must be rehearsed on a phone hotspot.
 - `[D]` Timescale hypertable must be created before any row is inserted into `sightings`.
+- `[D]` `timescale/timescaledb-ha:pg16` already carries timescaledb, pgvector and pg_trgm, so
+  `db/migrate.sql` runs on it unchanged — plain `postgres:16` needs all three installed by hand.
+  Useful for G5: that image is the one lane D verified against.
 - `[ALL]` `gh` is authed as Neal006 with scopes `gist, read:org, repo, workflow` — **no `project` scope**.
   Projects v2 needs `gh auth refresh -s project` (interactive, browser).
 
@@ -164,7 +173,8 @@ changing one without a line here breaks somebody else's lane silently.
 _(none)_
 
 ### lane D
-_(none)_
+- 08-29 | D1 | db/schema.sql, db/migrate.sql, scripts/load_registry.py, tests/test_d_{schema,registry}.py | schema applies twice with no errors on a throwaway timescaledb-ha:pg16; loader upserts 3 fixture cameras, and a missing camera_geo.json no longer wipes stored coordinates
+- 08-29 | D2 (part) | scripts/fake_sightings.py, tests/test_d_generator.py | generator publishes [C1] rows at a set rate with a scripted plate crossing 5 cameras in order; persister and store still to come
 
 ### setup
 - 08-29 | lanes reassigned: inference→Neal006, edge+console→neevmodh, core→Priyanshu | TASK.md, knowledge_base.md, AGENTS.md | G→I seam became a Redis URL key, so the worker imports no gateway code
