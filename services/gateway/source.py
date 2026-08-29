@@ -1,0 +1,71 @@
+"""[G2] The CameraSource seam.
+
+`CameraSource` is exactly [C6]. Every driver implements it, so the rest of
+the gateway never knows whether a camera arrived over RTSP, HLS, ONVIF or a
+vendor VMS.
+
+The worker (lane I) imports none of this. It reads a URL string out of
+`camera:transport:<id>` [C2] and decodes it itself. That key is the whole
+seam; keep it that way.
+"""
+from __future__ import annotations
+
+import asyncio
+import random
+from dataclasses import dataclass
+from enum import Enum
+from typing import AsyncIterator, Protocol, runtime_checkable
+
+
+class Health(str, Enum):
+    LIVE = "LIVE"
+    DEGRADED = "DEGRADED"
+    DOWN = "DOWN"
+    UNKNOWN = "UNKNOWN"
+
+
+class TsSource(str, Enum):
+    """Where a frame's timestamp came from. Never `now()` -- see plan A6."""
+
+    RTSP_PTS = "rtsp_pts"
+    HLS_PDT = "hls_pdt"
+    SERVER_RECEIVE = "server_receive"
+
+
+@dataclass(slots=True)
+class Frame:
+    """One decoded frame. `pts` is stream time in seconds, not wall time."""
+
+    image: "object"  # numpy ndarray; typed loosely so this module imports without numpy
+    pts: float | None
+    wall_ts: float
+    ts_source: TsSource
+
+
+@runtime_checkable
+class CameraSource(Protocol):
+    async def open(self) -> None: ...
+    async def frames(self) -> AsyncIterator[Frame]: ...
+    async def close(self) -> None: ...
+    def health(self) -> Health: ...
+    def capabilities(self) -> set[str]: ...
+
+
+# Reconnect policy shared by every driver: 1, 2, 4, 8, 16, 30, 30... with
+# jitter so thirty cameras losing a link together do not retry in lockstep.
+BACKOFF_START_S = 1.0
+BACKOFF_MAX_S = 30.0
+
+# A stalled RTSP socket never errors on its own -- it just stops delivering.
+# Without this watchdog a dead camera looks healthy forever.
+WATCHDOG_NO_FRAME_S = 10.0
+
+
+def next_backoff(current: float | None) -> float:
+    if current is None:
+        return BACKOFF_START_S
+    return min(current * 2, BACKOFF_MAX_S)
+
+
+async def sleep_backoff(delay: float) -> None:
+    await asyncio.sleep(delay * (0.8 + 0.4 * random.random()))
