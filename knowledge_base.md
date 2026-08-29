@@ -40,7 +40,7 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 
 | id | pt | wave | state | commit | note |
 |---|---|---|---|---|---|
-| G1 grid recon + cameras.seed.json | 1 | 0 | TODO | | salvage `probe_grid.py` |
+| G1 grid recon + cameras.seed.json | 1 | 0 | DONE | 697edc5 | grid returned 502, seed built from salvaged catalogue |
 | G5 infra compose + env + Makefile | 1 | 0 | TODO | | other lanes need this today |
 | G2 CameraSource + transport resolution | 2 | 1 | TODO | | publishes `camera:transport:<id>` |
 | G3 health monitor | 2 | 1 | TODO | | sole producer of `camera.health` |
@@ -89,7 +89,9 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 _(nothing yet)_
 
 ### lane G
-_(nothing yet)_
+- `scripts/probe_grid.py` — hits grid `/api/ingest`, probes RTSP/HLS reachability per camera, writes `data/cameras.seed.json` [C8]; falls back to salvaged catalogue if the sandbox is down. `--check` prints count + reachability.
+- `data/cameras.seed.json` — [C8] camera seed, 30 cameras, `district_code` best-effort from location text, `UNKNOWN` where ambiguous.
+- `data/catalogue/ingest.json.bootstrap` — real 30-camera catalogue salvaged from `4d0c945` (host `live.corp8.cloud`), offline fallback source for probe_grid.py.
 
 ### lane D
 _(nothing yet)_
@@ -104,6 +106,7 @@ _(nothing yet)_
 - `[I]` One ByteTrack instance per camera, kept alive across frames. A fresh instance per frame resets IDs.
 - `[I]` H.264 decodes every frame even at `fps=5` output — 30 cameras × 25 fps ≈ 750 fps of decode, near
   the limit of one consumer-GPU NVDEC. Watch `nvidia-smi dmon` dec%; above 90% move cameras to CPU decode.
+- `[G]` `live.corp8.cloud` (the sandbox host from the salvaged catalogue) returns HTTP 502 as of 08-29 — grid is likely only live during the event window. `probe_grid.py` falls back to `ingest.json.bootstrap` when it does; re-run for real once the grid is up.
 - `[G]` Read per-camera properties from `GET http://$GRID_HOST/api/ingest` before decoding.
 - `[G]` A stalled RTSP connection does not error out — it just stops. You need a watchdog, not a try/except.
 - `[G]` District-centroid coordinates make the demo car teleport. G6 before G10, no exceptions.
@@ -151,7 +154,7 @@ changing one without a line here breaks somebody else's lane silently.
 _(none)_
 
 ### lane G
-_(none)_
+- 08-29 | G1 | scripts/probe_grid.py, data/cameras.seed.json, data/catalogue/ingest.json.bootstrap | seed built and verified (`--check`); grid host was 502, used salvaged catalogue as bootstrap
 
 ### lane D
 _(none)_
