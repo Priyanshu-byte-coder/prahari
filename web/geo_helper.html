@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>[G6] Camera coordinate ground truth</title>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/hls.min.js"></script>
+<style>
+  :root { --bg:#14161a; --panel:#1c2027; --line:#2b313b; --ink:#e6e9ef; --dim:#98a2b3;
+          --hi:#4ade80; --med:#fbbf24; --low:#f87171; }
+  * { box-sizing:border-box; }
+  body { margin:0; height:100vh; display:grid; grid-template-columns:320px 1fr 420px;
+         font:13px/1.45 ui-sans-serif,system-ui,sans-serif; background:var(--bg); color:var(--ink); }
+  #list { border-right:1px solid var(--line); overflow-y:auto; background:var(--panel); }
+  #side { border-left:1px solid var(--line); overflow-y:auto; background:var(--panel); padding:12px; }
+  #map { height:100vh; }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim);
+       margin:14px 12px 6px; font-weight:600; }
+  .cam { padding:8px 12px; border-bottom:1px solid var(--line); cursor:pointer; display:flex;
+         gap:8px; align-items:baseline; }
+  .cam:hover { background:#232833; }
+  .cam.sel { background:#2b3442; box-shadow:inset 3px 0 0 #60a5fa; }
+  .cam .id { font-weight:600; min-width:22px; color:var(--dim); }
+  .cam .nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dot { width:8px; height:8px; border-radius:50%; flex:none; }
+  .HIGH{background:var(--hi)} .MEDIUM{background:var(--med)} .LOW{background:var(--low)}
+  #shot { width:100%; background:#000; border-radius:6px; aspect-ratio:16/9; object-fit:contain; }
+  label { display:block; margin:10px 0 3px; color:var(--dim); font-size:11px;
+          text-transform:uppercase; letter-spacing:.06em; }
+  input,select,textarea { width:100%; background:#11141a; color:var(--ink);
+    border:1px solid var(--line); border-radius:5px; padding:6px 8px; font:inherit; }
+  button { background:#2f6fed; color:#fff; border:0; border-radius:5px; padding:8px 12px;
+           font:inherit; font-weight:600; cursor:pointer; }
+  button.ghost { background:#252b35; }
+  .row { display:flex; gap:8px; margin-top:10px; }
+  .row > * { flex:1; }
+  .hint { color:var(--dim); font-size:11px; margin-top:8px; line-height:1.5; }
+  #bearingWrap { display:flex; gap:10px; align-items:center; }
+  #dial { width:96px; height:96px; flex:none; border-radius:50%; border:1px solid var(--line);
+          background:#11141a; position:relative; cursor:crosshair; }
+  #needle { position:absolute; left:50%; top:50%; width:2px; height:42px; background:#60a5fa;
+            transform-origin:50% 100%; margin-left:-1px; margin-top:-42px; }
+  #stats { padding:10px 12px; color:var(--dim); border-bottom:1px solid var(--line); font-size:12px; }
+  kbd { background:#252b35; border:1px solid var(--line); border-radius:3px; padding:1px 5px;
+        font:11px ui-monospace,monospace; }
+</style>
+</head>
+<body>
+
+<div id="list">
+  <div id="stats"></div>
+  <div id="cams"></div>
+</div>
+
+<div id="map"></div>
+
+<div id="side">
+  <h2 style="margin-left:0">Live view <button id="refresh" class="ghost"
+      style="float:right;padding:2px 8px;font-size:11px">refresh</button></h2>
+  <img id="shot" alt="camera frame">
+  <div class="hint" id="vidnote"></div>
+
+  <h2 style="margin-left:0">Placement</h2>
+  <div id="meta" class="hint"></div>
+
+  <label>Landmark you can see in the frame</label>
+  <input id="landmark" placeholder="e.g. CG Road junction, north side">
+
+  <label>Bearing — drag the dial to where the camera looks</label>
+  <div id="bearingWrap">
+    <div id="dial"><div id="needle"></div></div>
+    <div>
+      <input id="bearing" type="number" min="0" max="359" placeholder="null">
+      <div class="hint">0 = north, clockwise. Leave empty if unsure — no wedge is better than a wrong one.</div>
+    </div>
+  </div>
+
+  <label>Confidence</label>
+  <select id="conf">
+    <option value="HIGH">HIGH — I can see the exact spot in the frame</option>
+    <option value="MEDIUM">MEDIUM — right junction, approximate metres</option>
+    <option value="LOW">LOW — could not place it</option>
+  </select>
+
+  <div class="row">
+    <button id="save">Save &amp; next →</button>
+    <button id="skip" class="ghost">Skip</button>
+  </div>
+  <div class="row">
+    <button id="export" class="ghost">Download camera_geo.json</button>
+  </div>
+
+  <div class="hint">
+    Drag the marker to place. <kbd>S</kbd> save+next · <kbd>J</kbd>/<kbd>K</kbd> next/prev.<br>
+    HIGH means <em>you matched the frame to the map</em>. Anything you did not
+    actually verify stays MEDIUM or LOW — a confident wrong pin is worse than
+    an honest uncertain one.
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let cams = [], geo = {}, idx = 0, marker = null, hls = null;
+
+const conf = id => (geo[id] && geo[id].coord_conf) || 'LOW';
+
+async function boot() {
+  cams = await (await fetch('../data/cameras.seed.json')).json();
+  geo  = await (await fetch('../data/camera_geo.json')).json();
+  renderList();
+  select(0);
+}
+
+function stats() {
+  const v = Object.values(geo);
+  const ok = v.filter(g => g.coord_conf === 'HIGH' || g.coord_conf === 'MEDIUM').length;
+  const ver = v.filter(g => g.verified).length;
+  const brg = v.filter(g => g.bearing_deg !== null && g.bearing_deg !== undefined).length;
+  $('#stats').innerHTML =
+    `<b>${ok}/${v.length}</b> HIGH+MEDIUM <span style="color:${ok>=25?'var(--hi)':'var(--low)'}">
+     (need 25)</span><br>${ver} verified · ${brg} bearings set`;
+}
+
+function renderList() {
+  $('#cams').innerHTML = cams.map((c, i) => {
+    const g = geo[c.camera_id] || {};
+    return `<div class="cam ${i===idx?'sel':''}" data-i="${i}">
+      <span class="dot ${conf(c.camera_id)}"></span>
+      <span class="id">${c.camera_id}</span>
+      <span class="nm">${g.verified ? '✓ ' : ''}${c.location_raw || c.name}</span>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.cam').forEach(el =>
+    el.onclick = () => select(+el.dataset.i));
+  stats();
+}
+
+const map = L.map('map').setView([22.6, 71.8], 7);
+// OSM standard tiles: no API key. CARTO's basemaps now return "API KEY
+// REQUIRED" watermarks, which makes the map useless for placing a pin.
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  { attribution:'© OpenStreetMap contributors', maxZoom:19 }).addTo(map);
+
+function select(i) {
+  if (i < 0 || i >= cams.length) return;
+  idx = i;
+  const c = cams[idx], g = geo[c.camera_id] || {};
+  renderList();
+
+  $('#meta').innerHTML =
+    `<b>cam ${c.camera_id}</b> — ${c.location_raw || c.name}<br>
+     district ${c.district_code} · source ${g.coord_source || '?'} ·
+     ${g.landmark ? g.landmark : 'no landmark recorded'}`;
+  $('#landmark').value = g.landmark && !g.landmark.includes('NOT placed') ? g.landmark : '';
+  $('#bearing').value  = (g.bearing_deg ?? '');
+  $('#conf').value     = g.coord_conf || 'LOW';
+  setNeedle(g.bearing_deg);
+
+  const lat = g.lat ?? 22.6, lon = g.lon ?? 71.8;
+  if (marker) map.removeLayer(marker);
+  marker = L.marker([lat, lon], { draggable:true }).addTo(map);
+  map.setView([lat, lon], 16);
+
+  playHls(c);
+}
+
+// Frames are grabbed server-side by scripts/geo_serve.py: this grid's HLS is
+// low-latency fMP4 and the vendored hls.js never paints a frame in the
+// browser, even proxied same-origin. A still is enough to match a landmark.
+function playHls(c) {
+  const img = $('#shot');
+  $('#vidnote').textContent = 'fetching a frame… (2-18 s on this grid)';
+  img.removeAttribute('src');
+  const url = `/snapshot/${c.camera_id}.jpg?t=${Date.now()}`;
+  img.onload  = () => $('#vidnote').textContent = `live frame, cam ${c.camera_id}`;
+  img.onerror = () => $('#vidnote').textContent =
+    'no frame — camera unreachable. Place from the map alone and keep confidence LOW.';
+  img.src = url;
+}
+$('#refresh').onclick = () => playHls(cams[idx]);
+
+// bearing dial
+function setNeedle(deg) {
+  $('#needle').style.transform = `rotate(${deg ?? 0}deg)`;
+  $('#needle').style.opacity = (deg === null || deg === undefined || deg === '') ? 0.25 : 1;
+}
+$('#dial').addEventListener('click', e => {
+  const r = e.currentTarget.getBoundingClientRect();
+  const dx = e.clientX - (r.left + r.width/2), dy = e.clientY - (r.top + r.height/2);
+  const deg = Math.round((Math.atan2(dx, -dy) * 180/Math.PI + 360) % 360);
+  $('#bearing').value = deg; setNeedle(deg);
+});
+$('#bearing').addEventListener('input', e => setNeedle(e.target.value === '' ? null : +e.target.value));
+
+function save() {
+  const c = cams[idx], id = c.camera_id;
+  const ll = marker.getLatLng();
+  const b = $('#bearing').value;
+  geo[id] = Object.assign(geo[id] || {}, {
+    lat: +ll.lat.toFixed(6), lon: +ll.lng.toFixed(6),
+    bearing_deg: b === '' ? null : +b,
+    fov_deg: (geo[id] && geo[id].fov_deg) ?? 70,
+    range_m: (geo[id] && geo[id].range_m) ?? 60,
+    coord_source: 'manual',          // a human moved this pin
+    coord_conf: $('#conf').value,
+    landmark: $('#landmark').value,
+    location_raw: c.location_raw,
+    verified: true,
+  });
+  renderList();
+}
+
+$('#save').onclick  = () => { save(); select(idx + 1); };
+$('#skip').onclick  = () => select(idx + 1);
+$('#export').onclick = () => {
+  const blob = new Blob([JSON.stringify(geo, null, 2)], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'camera_geo.json'; a.click();
+};
+
+document.addEventListener('keydown', e => {
+  if (/input|select|textarea/i.test(e.target.tagName)) return;
+  if (e.key === 's') { save(); select(idx + 1); }
+  if (e.key === 'j') select(idx + 1);
+  if (e.key === 'k') select(idx - 1);
+});
+
+boot();
+</script>
+</body>
+</html>

@@ -44,7 +44,7 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 | G5 infra compose + env + Makefile | 1 | 0 | WIP | | compose+env+Makefile+skeleton written; no Docker in this sandbox to confirm `make up` green -- needs a real run |
 | G2 CameraSource + transport resolution | 2 | 1 | DONE | | frame path proven live: hls_pdt, 6 fps, 26-27/30 resolve |
 | G3 health monitor | 2 | 1 | DONE | | live: LIVE 4.86fps -> DEGRADED +4s -> DOWN +16s |
-| G6 coordinate ground truth | 1 | 1 | TODO | | before any route UI |
+| G6 coordinate ground truth | 1 | 1 | WIP | | tool + honest bootstrap done; **0/30 placed by a human** — that part is manual |
 | G7 map layers 1–2 + API fixtures | 2 | 1 | TODO | | fixtures first, they unblock the lane |
 | G8 wedges + bearing editor | 2 | 2 | TODO | | |
 | G9 events layer + slider + WS client | 2 | 2 | TODO | | |
@@ -99,6 +99,9 @@ _(nothing yet)_
 - `services/gateway/probe.py` — `probe_rtsp` (socket+DESCRIBE), `probe_hls` (cookie-gated GET), `resolve_transport` → `TransportResult`, `publish` (the G→I seam), `reprobe_forever` (10 min).
 - `services/gateway/sources/rtsp.py` — `RTSPSource`, PyAV `rtsp_transport=tcp`, backoff + stall watchdog. `sources/mediamtx.py` — `MediaMTXSource` (HLS), picks `hls_pdt` vs `server_receive` from the playlist.
 - `services/gateway/selftest.py` — `--probe-all` transport table with per-camera reason; `--publish` writes Redis. `tests/test_g_probe.py` — 10 tests, no network.
+- `scripts/geo_bootstrap.py` — salvaged geocodes → [C8] `data/camera_geo.json`, honest confidence (nothing HIGH), `--report` lists what needs a human.
+- `scripts/geo_serve.py` — serves the repo, proxies `/grid/*` past the Cloudflare gate, and `/snapshot/<id>.jpg` decodes one frame via PyAV (browser HLS does not work here).
+- `web/geo_helper.html` — placement tool: camera list, OSM map, draggable pin, bearing dial, live frame, export. `web/vendor/` — leaflet + hls.js, salvaged.
 - `services/gateway/health.py` — `classify` (pure), `HealthMonitor.evaluate` (one event per change), `expected_fps` (capped at worker sampling rate), `tick`/`read_fps`/`publish` over `camera:fps:<id>` → `camera.health`. `tests/test_g_health.py` — 22 tests, time injected.
 
 ### lane D
@@ -117,6 +120,9 @@ _(nothing yet)_
 - `[G]` `live.corp8.cloud` is intermittent — it 502'd for hours on 08-29 then came back. `probe_grid.py` falls back to `ingest.json.bootstrap` when it does; always re-run once it is up.
 - `[ALL]` The grid is behind a **Cloudflare cookie gate**: first request 302s to `?cookieCheck=1` with a Set-Cookie, then serves. **HEAD answers 404, not 405** — a HEAD probe reports every live camera as down. Use a streamed GET through a cookie-carrying `requests.Session` and confirm the body starts with `#EXTM3U`. This cost a full 0/30-vs-27/30 wrong answer.
 - `[G]` Port 8554 is filtered at the grid: dial it **once at the host**, not once per camera, or 30 full timeouts buy you one fact. RTSP is 0/30; HLS is the real path (27/30 as of 08-29).
+- `[ALL]` **The burnt-in overlay names the camera AND its install type** — cam 1 reads `Chiman bhai Bridge CSITMS-32_PTZ2`. `install_type` is readable from a frame, not from the catalogue. `cameras.seed.json` currently says `FIX` for all 30 and **that is wrong**; G6 fixes it per camera. Matters to lane I: a PTZ moves, so no static ROI is ever valid on it.
+- `[ALL]` **The footage is looped recordings, not live.** Cam 1's overlay reads `13-06-2026 23:10` while the wall clock is 29-08-2026 midday, and the scene is night. So three clocks disagree: burnt-in scene time (June, fictional "now"), HLS PDT (real wall clock), and stream pts (relative, resets on loop). Sightings will be stamped with PDT while the video shows June at night — fine for a demo, but say it out loud rather than let a judge notice it.
+- `[G]` **Browser-side HLS does not work against this grid.** The Cloudflare cookie is `SameSite=None; Secure; Partitioned` with `ACAO:*`; a cross-origin page cannot use it (credentials need an echoed origin, not `*`), so `fetch`/hls.js fail with a bare "Failed to fetch". Proxy it same-origin (`scripts/geo_serve.py`). Even proxied, the vendored hls.js never paints a frame — these are low-latency fMP4 (`EXT-X-PART-INF`, `EXT-X-MAP`). **G11's video wall will hit this**; server-side snapshots (PyAV, which decodes them fine) are the reliable path.
 - `[G]` Reachability is **26–27 of 30, and varies between consecutive runs** — 17/18/22 are reliably dead (hls 500 / ReadTimeout), others flap. Not a probe bug. Never quote a single run's number as if it were fixed; the deck should say "26–27 of 30" or re-measure at demo time.
 - `[ALL]` **`EXT-X-PROGRAM-DATE-TIME` is on the VARIANT playlist, not the master.** Checking only the master (`index.m3u8`) returns False and labels every frame `server_receive`, throwing away the one real capture clock the grid gives us. Follow master → first non-comment line → variant. Confirmed present on cams 1/5/23; `ts_source=hls_pdt` after the fix.
 - `[G]` PyAV ≥ 9 has **no `av.AVError`** — the base class is `av.FFmpegError`. Catching the old name raises `AttributeError` the first time a stream drops.
@@ -174,6 +180,7 @@ changing one without a line here breaks somebody else's lane silently.
 _(none)_
 
 ### lane G
+- 08-29 | G6 | scripts/geo_bootstrap.py, scripts/geo_serve.py, web/geo_helper.html, web/vendor/, data/camera_geo.json | tool works end to end (live frame + OSM map + pin + bearing). **Placement itself is manual and not started: 0/30 verified, 0 bearings.** Found: install_type is in the frame overlay (cam 1 is PTZ, seed says FIX for all 30 = wrong); footage is looped June recordings; browser HLS is impossible against this grid.
 - 08-29 | G3 | services/gateway/health.py, tests/test_g_health.py, scripts/g3_health_check.py | live cam 1: **4.86 fps -> LIVE, +4s DEGRADED, +16s DOWN**, one event per change. Fixed a PyAV **segfault** on cross-thread container close, and an fps measurement that timed from connect (reported 0 fps for a healthy camera).
 - 08-29 | G2 | services/gateway/*, scripts/g2_frame_check.py, requirements.txt | **frame path proven on live cam 1**: 1920x1080 bgr24, 6.0 fps decoded, monotonic pts, health LIVE, `ts_source=hls_pdt`. Found+fixed: PDT lives on the variant playlist; `av.AVError` gone in PyAV≥9; missing numpy masked as a dead camera by a blanket except.
 - 08-29 | G2 | services/gateway/{source,probe,selftest}.py, sources/{rtsp,mediamtx}.py, tests/test_g_probe.py | probe order RTSP→HLS live-verified: **27/30 resolve, all HLS, rtsp 0/30**; 17/18/22 dead both ways (hls 500/ReadTimeout). 10 tests green, no network needed.
