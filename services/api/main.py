@@ -21,6 +21,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query           # noqa: E40
 
 import audit as audit_module                                          # noqa: E402
 import auth as auth_module                                            # noqa: E402
+import grants as grants_module                                        # noqa: E402
 import ws as ws_module                                                # noqa: E402
 from alerts import AlertRepo, IllegalTransition                       # noqa: E402
 from scope import DEPARTMENT_PREDICATE                                # noqa: E402
@@ -59,16 +60,23 @@ def build_router(store):
 
     router = APIRouter(prefix="/api")
     cameras = CameraRepo(store)
+    grant_repo = grants_module.GrantRepo(store)
     watchlist = WatchlistRepo(store)
     alerts = AlertRepo(store)
     requires = auth_module.requires
 
     @router.get("/cameras")
     def list_cameras(scope=Depends(requires("live"))):
-        rows = cameras.list(scope=scope)
-        audit_module.record(store, user_id=scope.user_id, dept_id=scope.dept_id,
-                            action="camera.list", object_type="camera",
-                            object_id=f"{len(rows)} row(s)")
+        # A live grant widens which departments this read covers, and is named in the audit row:
+        # access that widens without leaving a trail is what D9 exists to prevent.
+        widened, active = grants_module.widen(scope, grant_repo)
+        rows = cameras.list(scope=widened)
+        for grant in active or [None]:
+            audit_module.record(store, user_id=scope.user_id, dept_id=scope.dept_id,
+                                action="camera.list", object_type="camera",
+                                object_id=f"{len(rows)} row(s)",
+                                grant_id=grant["id"] if grant else None,
+                                reason=f"case {grant['case_no']}" if grant else None)
         return rows
 
     @router.get("/watchlist")
@@ -146,6 +154,7 @@ def create_app(store=None):
     app.include_router(auth_module.build_router(resolved))
     app.include_router(build_router(resolved))
     app.include_router(audit_module.build_router(resolved))
+    app.include_router(grants_module.build_router(resolved))
     return app
 
 

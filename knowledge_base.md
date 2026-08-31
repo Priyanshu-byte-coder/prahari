@@ -4,6 +4,7 @@ Updated: 2026-08-29 · KB v2 · cap 300 lines · patched after **every** complet
 
 ## 0. Now
 
+- 2026-08-31. **7 days to submission (7 Sep)**. Lane D is complete: D1-D10 all DONE, in PR #37.
 - 2026-08-29. **9 days to submission (7 Sep)**, 12 to the live event (10–11 Sep, i-Hub Gandhinagar).
 - `main` holds docs only — commit `416ef26 "Restart"` wiped the tree. Working code from before is at
   `4d0c945` and on `origin/priyanshu/platform`; salvage with `git show`, do not rewrite (`TASK.md §4`).
@@ -67,8 +68,8 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 | D5 WebSocket fanout | 2 | 2 | DONE | | push, scope filtering and resume backfill tested |
 | D6 route API + plausibility + export | 2 | 2 | TODO | | the graded test case |
 | D7 RBAC + audit | 3 | 3 | DONE | | scope test green, runs in GitHub Actions |
-| D8 HLD document | 2 | 3 | TODO | | mandatory deliverable |
-| D9 cross-department grants | 2 | P1 | TODO | | |
+| D8 HLD document | 2 | 3 | DONE | | docs/hld.md, 13 sections, gaps named |
+| D9 cross-department grants | 2 | P1 | DONE | | case number, 72 h cap, target-dept approval, logged |
 | D10 audit hash-chain verify | 1 | P1 | DONE | | GET /api/admin/audit/verify, tamper test green |
 
 ### Joint
@@ -126,6 +127,9 @@ _(nothing yet)_
 - `services/api/main.py` — every [C4] endpoint on one app — `create_app`, `CameraRepo`, scoped routers.
 - `tests/test_d_scope.py` — D7's verify: Transport viewer sees only Transport, across cameras, watchlist and alerts.
 - `.github/workflows/ci.yml` — pytest against timescaledb-ha + redis services on every push and PR.
+- `services/api/grants.py` — bounded cross-department access — `GrantRepo`, `widen`, `MAX_DURATION`.
+- `tests/test_d_grants.py` — request, approve, self-approval refused, expiry, the audited read.
+- `docs/hld.md` — the mandatory HLD: integration, correlation, alerts, security, privacy, scale tiers, failure table.
 - `requirements.txt` — one dependency per line, alphabetical, three lanes append to it.
 
 ## 3. Gotchas
