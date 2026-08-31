@@ -23,7 +23,7 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 
 | id | pt | wave | state | commit | note |
 |---|---|---|---|---|---|
-| I5 common/plate.py + vectors | 1 | 0 | TODO | | pure functions, D imports it |
+| I5 common/plate.py + vectors | 1 | 0 | DONE | bac680d | D's plate_compat auto-upgraded |
 | I1 decode 5fps + motion gate | 2 | 1 | TODO | | URL or local clip — no gateway needed |
 | I2 backend + detector + batching | 2 | 1 | TODO | | pretrained yolov8s |
 | I3 ByteTrack + sighting builder | 2 | 1 | TODO | | |
@@ -86,7 +86,10 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 - `sentinel-e2e-implementation-plan.md` — 745-line design reference. Grep an anchor (`^### B3`), never read whole.
 
 ### lane I
-_(nothing yet)_
+- `common/plate.py` — [C7] plate strings, pure and None-safe — `normalise` `canon` `grammar_fix`
+  `weighted_levenshtein`; one table `CLASSES` drives `TO_DIGIT`, `TO_ALPHA` and the sub cost.
+- `tests/test_i_plate.py` — I5's verify — the C7 vectors verbatim, plus null passthrough,
+  canon idempotency, 1–3 letter series lengths, BH series, malformed-length passthrough.
 
 ### lane G
 _(nothing yet)_
@@ -132,6 +135,12 @@ _(nothing yet)_
 - 2026-08-29 — Salvage from `4d0c945` / `origin/priyanshu/platform` instead of rewriting — the gateway,
   worker, plate reader, geo file and vendored Leaflet all still exist in history.
 - 2026-08-29 — Deck quotes the portal's ₹51 lakh prize pool, not the ₹37 lakh figure in press coverage.
+- 2026-08-29 — `common/plate.py` is None-safe on every function, and `weighted_levenshtein`
+  returns `inf` for a null operand — [C7] never says so, but D's persister feeds `plate_text`,
+  which is null on ~13% of reads (I7). Raising there would crash the hot path on the expected case.
+- 2026-08-29 — `tests/test_i_plate.py` carries its own `sys.path.insert(ROOT)` (lane D's existing
+  pattern) instead of a repo-root `conftest.py` — repo root is on nobody's `sys.path`, and a shared
+  root file would collide with PR #37 for no gain.
 - 2026-08-29 — Ticket state lives in GitHub Project `prahari`
   (https://github.com/users/Priyanshu-byte-coder/projects/1), Status column set is
   Todo / In Progress / In QA Review / QA Review Failed / Done. A lane owner moves a ticket to
@@ -148,7 +157,8 @@ changing one without a line here breaks somebody else's lane silently.
 `MM-DD | ticket | files | outcome` — newest at the top of **your own** lane's block.
 
 ### lane I
-_(none)_
+- 08-29 | I5 | common/plate.py, tests/test_i_plate.py | 23 tests green; D's `plate_compat.py`
+  flipped `USING_I5` True on import, so its fallback half can be deleted
 
 ### lane G
 _(none)_
