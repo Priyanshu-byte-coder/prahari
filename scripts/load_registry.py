@@ -145,9 +145,12 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="read and report, write nothing")
     ap.add_argument("--seed", type=Path, default=DEFAULT_SEED)
     ap.add_argument("--geo", type=Path, default=DEFAULT_GEO)
-    ap.add_argument("--dsn", default=os.environ.get("POSTGRES_DSN", DEFAULT_DSN))
+    # No --dsn. A connection string on the command line lands in shell history and in `ps`,
+    # and a loader that takes one from argv can be aimed at any database by whoever - or
+    # whatever - assembles the command. It comes from the environment ([C9]) or not at all.
     args = ap.parse_args()
 
+    dsn = os.environ.get("POSTGRES_DSN") or DEFAULT_DSN
     seed = read_json(args.seed, list, "cameras.seed.json")
     geo = read_json(args.geo, dict, "camera_geo.json")
     if seed is None:
@@ -166,7 +169,7 @@ def main():
         return 0
 
     import psycopg2  # imported late so --dry-run works with no driver and no database
-    with psycopg2.connect(args.dsn) as conn, conn.cursor() as cur:
+    with psycopg2.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute("SELECT count(*) FROM cameras")
         before = cur.fetchone()[0]
         cur.executemany(UPSERT, rows)

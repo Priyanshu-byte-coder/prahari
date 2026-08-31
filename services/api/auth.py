@@ -220,7 +220,7 @@ def _bootstrap(args):
     password = os.environ.get("PRAHARI_BOOTSTRAP_PASSWORD")
     if not password:
         password = getpass.getpass("password for the bootstrap admin: ")
-    store = Store(dsn=args.dsn)
+    store = Store()          # POSTGRES_DSN from the environment, never from argv
     repo = UserRepo(store)
     if repo.get(args.username):
         # Idempotent on purpose: re-running the bootstrap during a rehearsal must not fail the
@@ -242,7 +242,6 @@ def main():
     boot.add_argument("--role", default=SYSTEM_ADMIN, choices=sorted(ROLES))
     boot.add_argument("--dept-id", type=int, default=None, dest="dept_id")
     boot.add_argument("--district", default=None)
-    boot.add_argument("--dsn", default=None)
     args = ap.parse_args()
     _bootstrap(args)
     return 0
