@@ -1,6 +1,6 @@
 # knowledge_base.md — living memory
 
-Updated: 2026-08-29 · KB v2 · cap 300 lines · patched after **every** completed task (`CLAUDE.md §3`)
+Updated: 2026-09-01 · KB v2 · cap 300 lines · patched after **every** completed task (`CLAUDE.md §3`)
 
 ## 0. Now
 
@@ -24,7 +24,7 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 | id | pt | wave | state | commit | note |
 |---|---|---|---|---|---|
 | I5 common/plate.py + vectors | 1 | 0 | DONE | bac680d | D's plate_compat auto-upgraded |
-| I1 decode 5fps + motion gate | 2 | 1 | TODO | | URL or local clip — no gateway needed |
+| I1 decode 5fps + motion gate | 2 | 1 | DONE | 2992e16 | 10 cams @5.02fps, 0 drops, 10 min |
 | I2 backend + detector + batching | 2 | 1 | TODO | | pretrained yolov8s |
 | I3 ByteTrack + sighting builder | 2 | 1 | TODO | | |
 | I4 plate detect + OCR + grammar + vote | 3 | 2 | TODO | | the hard one |
@@ -90,6 +90,13 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
   `weighted_levenshtein`; one table `CLASSES` drives `TO_DIGIT`, `TO_ALPHA` and the sub cost.
 - `tests/test_i_plate.py` — I5's verify — the C7 vectors verbatim, plus null passthrough,
   canon idempotency, 1–3 letter series lengths, BH series, malformed-length passthrough.
+- `services/worker/decode.py` — [I1] camera → PTS-carrying frames — `Frame` `decode`
+  `read_frames` `resolve_source` (the [C2] G→I seam) `publish_fps` `moved` `thumbnail` `scale`
+  `bench` `synth_clip` `_floor_band`. PyAV, not an ffmpeg rawvideo pipe — see Decisions.
+- `services/worker/queues.py` — [I1] bounded per-camera frame queues, depth 2, drop-oldest —
+  `FrameQueue` (`put` never blocks, returns True when it displaced) `.stats()` for I6/metrics.
+- `tests/test_i_decode.py` — I1's unit check, 22 tests — queue drop accounting, motion gate
+  thresholds, `scale=960:-2` geometry, and the memory verdict's leak sensitivity. No ffmpeg.
 
 ### lane G
 _(nothing yet)_
@@ -105,6 +112,13 @@ _(nothing yet)_
   chrony on every machine.
 - `[I]` Grid feeds loop: scene discontinuities and inter-frame gaps are normal, not bugs. Mixed H.264/H.265.
 - `[I]` One ByteTrack instance per camera, kept alive across frames. A fresh instance per frame resets IDs.
+- `[I]` A single RSS sample is worthless as a leak signal: it lands at a random point in the
+  decode cycle (±100 MB of transient frame buffers) and Windows trims the working set on top,
+  so one sample landed *below* the process baseline. Least squares over raw samples called the
+  same code +112 MB/min (60 s run) and +7.8 MB/min (600 s run). Use per-window floors, and drop
+  the first 2–3 min — ten decoders take that long to allocate their pools.
+- `[I]` To tell a leak from allocator noise, change the work rate, not the run length: at 1.85×
+  the frame rate (`--flat-out`) memory did not grow, so nothing leaks per frame.
 - `[I]` H.264 decodes every frame even at `fps=5` output — 30 cameras × 25 fps ≈ 750 fps of decode, near
   the limit of one consumer-GPU NVDEC. Watch `nvidia-smi dmon` dec%; above 90% move cameras to CPU decode.
 - `[G]` Read per-camera properties from `GET http://$GRID_HOST/api/ingest` before decoding.
@@ -147,6 +161,15 @@ _(nothing yet)_
   In QA Review, never straight to Done; BhavyaSoneji and omvaghelaa own QA and are the only ones who
   move it to Done or QA Review Failed — so no lane grades its own work.
 
+- 2026-09-01 — I1 decodes through PyAV instead of the ticket's `-f rawvideo -pix_fmt bgr24
+  pipe:1` ffmpeg pipe — a rawvideo pipe carries no timestamps, so PTS would have to be
+  reconstructed as index/fps, which drifts silently on the grid's looping recordings. That is
+  the exact number `ts_source` records in [C1]. `--hwaccel` keeps the CUDA half of that line.
+- 2026-09-01 — I1's flat-memory verdict is a plateau **band** (peak-to-trough of per-window RSS
+  floors over the median), budget 5% per 10 min, not a slope — a slope fit runs through the
+  warm-up ramp and flaps between FLAT and DRIFTING on identical code. Catches ≥6 MB/min against
+  2.2% of measured platform noise; re-measure in the compose stack at J1 for a tighter bound.
+
 ## 5. Contract changes
 
 `YYYY-MM-DD — [Cx] what changed — who was told`. Nothing yet. Contracts in `TASK.md §C` are frozen;
@@ -157,6 +180,9 @@ changing one without a line here breaks somebody else's lane silently.
 `MM-DD | ticket | files | outcome` — newest at the top of **your own** lane's block.
 
 ### lane I
+- 09-01 | I1 | services/worker/decode.py, services/worker/queues.py, tests/test_i_decode.py |
+  10 cams × 5.02 fps for 10 min, 30153 frames, 0 drops, memory band 1.5%; the bench's own
+  memory check was the bug, not the decoder
 - 08-29 | I5 | common/plate.py, tests/test_i_plate.py | 23 tests green; D's `plate_compat.py`
   flipped `USING_I5` True on import, so its fallback half can be deleted
 
