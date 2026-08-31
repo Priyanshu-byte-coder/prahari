@@ -34,7 +34,15 @@ class TsSource(str, Enum):
 
 @dataclass(slots=True)
 class Frame:
-    """One decoded frame. `pts` is stream time in seconds, not wall time."""
+    """One decoded frame.
+
+    `pts` semantics depend on `ts_source`:
+      - RTSP_PTS / SERVER_RECEIVE: stream-relative seconds (float, from
+        frame.pts * time_base — not wall time).
+      - HLS_PDT: Unix epoch seconds (float), derived from
+        EXT-X-PROGRAM-DATE-TIME anchored to the first frame's stream pts.
+        Safe to compare across cameras for route ordering.
+    """
 
     image: "object"  # numpy ndarray; typed loosely so this module imports without numpy
     pts: float | None

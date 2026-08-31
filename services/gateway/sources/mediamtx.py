@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from datetime import datetime, timezone
 from typing import AsyncIterator
 
 import requests
@@ -51,28 +52,50 @@ class MediaMTXSource(CameraSource):
         self._last_frame_at: float | None = None
         self._backoff: float | None = None
         self._ts_source = TsSource.SERVER_RECEIVE
+        # PDT anchor: epoch of the first PDT-tagged segment, and the stream-
+        # relative pts of the first frame we decoded after that anchor. Together
+        # they let us map any subsequent pts to a wall-clock epoch float.
+        self._pdt_epoch: float | None = None
+        self._pdt_pts_offset: float | None = None
 
-    def _playlist_has_pdt(self) -> bool:
-        """Does this stream carry real capture times?
+    def _playlist_pdt(self) -> datetime | None:
+        """Return the first EXT-X-PROGRAM-DATE-TIME value found in this stream.
 
-        The master playlist never does -- `EXT-X-PROGRAM-DATE-TIME` lives one
-        level down, in the variant. Checking only the master labels every frame
-        `server_receive` and silently throws away the one honest clock this
-        grid gives us, which is exactly what route ordering depends on.
+        The master playlist never carries PDT — it lives one level down in the
+        variant. We check the master body first (fast path, unusual) then fetch
+        the first variant and look there.  Returns None if the stream has no
+        PDT or is unreachable.
         """
         try:
             body = self._fetch_playlist(self.url)
             if body is None:
-                return False
-            if "EXT-X-PROGRAM-DATE-TIME" in body:
-                return True
+                return None
+            dt = self._parse_pdt_from_body(body)
+            if dt is not None:
+                return dt
             variant = self._first_variant_url(self.url, body)
             if variant is None:
-                return False
+                return None
             child = self._fetch_playlist(variant)
-            return child is not None and "EXT-X-PROGRAM-DATE-TIME" in child
+            if child is None:
+                return None
+            return self._parse_pdt_from_body(child)
         except requests.RequestException:
-            return False
+            return None
+
+    @staticmethod
+    def _parse_pdt_from_body(body: str) -> datetime | None:
+        """Extract and parse the first #EXT-X-PROGRAM-DATE-TIME line."""
+        for line in body.splitlines():
+            if line.startswith("#EXT-X-PROGRAM-DATE-TIME:"):
+                raw = line.split(":", 1)[1].strip()
+                try:
+                    # datetime.fromisoformat handles most ISO-8601 variants
+                    # but not the trailing 'Z' until Python 3.11; normalise it.
+                    return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                except ValueError:
+                    return None
+        return None
 
     @staticmethod
     def _fetch_playlist(url: str) -> str | None:
@@ -96,8 +119,10 @@ class MediaMTXSource(CameraSource):
     async def open(self) -> None:
         if av is None:
             raise RuntimeError("PyAV not installed; `pip install av`")
-        has_pdt = await asyncio.to_thread(self._playlist_has_pdt)
-        self._ts_source = TsSource.HLS_PDT if has_pdt else TsSource.SERVER_RECEIVE
+        pdt = await asyncio.to_thread(self._playlist_pdt)
+        self._ts_source = TsSource.HLS_PDT if pdt is not None else TsSource.SERVER_RECEIVE
+        self._pdt_epoch = pdt.timestamp() if pdt is not None else None
+        self._pdt_pts_offset = None  # reset: will be anchored on the first frame
         self._container = await asyncio.to_thread(av.open, self.url, timeout=15)
         self._health = Health.LIVE
         self._last_frame_at = time.time()
@@ -121,7 +146,21 @@ class MediaMTXSource(CameraSource):
                     for frame in packet.decode():
                         self._last_frame_at = time.time()
                         self._health = Health.LIVE
-                        pts = float(frame.pts) * time_base if (frame.pts is not None and time_base) else None
+                        stream_pts = float(frame.pts) * time_base if (frame.pts is not None and time_base) else None
+                        if (
+                            self._ts_source is TsSource.HLS_PDT
+                            and self._pdt_epoch is not None
+                            and stream_pts is not None
+                        ):
+                            # Anchor the PDT epoch to the first frame's stream
+                            # pts, then offset every subsequent frame from there.
+                            # This maps stream-relative pts to wall-clock epoch
+                            # without calling now() on each frame.
+                            if self._pdt_pts_offset is None:
+                                self._pdt_pts_offset = stream_pts
+                            pts = self._pdt_epoch + (stream_pts - self._pdt_pts_offset)
+                        else:
+                            pts = stream_pts
                         yield Frame(
                             image=frame.to_ndarray(format="bgr24"),
                             pts=pts,
