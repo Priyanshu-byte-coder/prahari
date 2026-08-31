@@ -17,8 +17,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from common.plate_compat import canon, is_valid_plate, normalise  # noqa: E402
+from scope import DEPARTMENT_PREDICATE  # noqa: E402
 
 KINDS = {"plate", "face", "description"}
 CATEGORIES = {"stolen vehicle", "wanted person", "missing person",
@@ -130,6 +132,7 @@ WHERE (%(owner_dept_id)s::int IS NULL OR owner_dept_id = %(owner_dept_id)s)
   AND (%(active_at)s::timestamptz IS NULL
        OR ((valid_from IS NULL OR valid_from <= %(active_at)s)
        AND (valid_until IS NULL OR valid_until > %(active_at)s)))
+  AND """ + DEPARTMENT_PREDICATE + """
 ORDER BY id
 """
 
@@ -146,14 +149,21 @@ class WatchlistRepo:
             cur.execute(INSERT, params)
             return cur.fetchone()[0]
 
-    def list(self, owner_dept_id=None, active_at=None):
-        """Entries, optionally narrowed to a department and to a moment they are valid at.
+    def list(self, owner_dept_id=None, active_at=None, scope=None):
+        """Entries, narrowed to the caller's scope, optionally to a department, and
+        optionally to a moment they are valid at.
 
         The validity window is not decoration: an expired entry that still matches produces an
         alert an officer has to dismiss, which is how a watchlist stops being trusted.
+
+        scope=None means "no user asked for this" - the matcher and the persister run as the
+        system, not as a person. Every path that serves a request passes a real Scope.
         """
+        params = {"owner_dept_id": owner_dept_id, "active_at": active_at}
+        params.update(scope.department_filter() if scope is not None
+                      else {"all_departments": True, "departments": []})
         with self.store.conn as conn, conn.cursor() as cur:
-            cur.execute(SELECT, {"owner_dept_id": owner_dept_id, "active_at": active_at})
+            cur.execute(SELECT, params)
             cols = [c.name for c in cur.description]
             return [dict(zip(cols, r)) for r in cur.fetchall()]
 

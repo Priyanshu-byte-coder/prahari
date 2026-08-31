@@ -4,6 +4,7 @@
 # Lane D (api, db, scripts) needs everything below. Lane I adds the CV stack (opencv-python, av,
 # ultralytics, easyocr, lap); lane G adds whatever the gateway needs. Salvage the old list with
 # `git show origin/priyanshu/platform:requirements.txt` rather than guessing.
+argon2-cffi
 boto3
 fastapi
 psycopg2-binary

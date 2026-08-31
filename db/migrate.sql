@@ -87,3 +87,31 @@ SELECT add_retention_policy  ('sightings', INTERVAL '90 days', if_not_exists => 
 -- look up a year later is worth little, and the audit chain has to stay whole to be evidence.
 -- Crops expire at 30 days in MinIO's bucket lifecycle, not here - object storage is lane G's
 -- infra. Filed under TASK.md "Cross-lane requests" if it is not set by the freeze.
+
+-- [D7] Row-level security: the backstop behind the application's scope predicate.
+--
+-- The primary control is in the SQL the API writes ([C10] via services/api/scope.py). This is
+-- what catches the query somebody forgets to scope: a read that reaches Postgres without the
+-- session variables set to a statewide role can only see the departments it named.
+--
+-- ponytail: the policies treat "prahari.dept_ids not set" as a maintenance connection and allow
+-- the row, because the migration, the persister and the matcher all connect without a user. A
+-- production deployment gives the API its own non-owner role with the GUC always set, and drops
+-- that first branch. The ceiling here is "defence in depth for API bugs", not "defence against a
+-- database superuser".
+ALTER TABLE cameras   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cameras   FORCE  ROW LEVEL SECURITY;
+ALTER TABLE watchlist ENABLE ROW LEVEL SECURITY;
+ALTER TABLE watchlist FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS cameras_department_scope ON cameras;
+CREATE POLICY cameras_department_scope ON cameras USING (
+  coalesce(current_setting('prahari.statewide', true), '') = 'on'
+  OR coalesce(current_setting('prahari.dept_ids', true), '') = ''
+  OR owner_dept_id = ANY (string_to_array(current_setting('prahari.dept_ids', true), ',')::int[]));
+
+DROP POLICY IF EXISTS watchlist_department_scope ON watchlist;
+CREATE POLICY watchlist_department_scope ON watchlist USING (
+  coalesce(current_setting('prahari.statewide', true), '') = 'on'
+  OR coalesce(current_setting('prahari.dept_ids', true), '') = ''
+  OR owner_dept_id = ANY (string_to_array(current_setting('prahari.dept_ids', true), ',')::int[]));

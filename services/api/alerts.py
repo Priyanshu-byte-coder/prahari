@@ -16,9 +16,14 @@ started here (each row hashes the previous row's hash); D10 walks it to find a b
 D7 puts the real user identity behind it.
 """
 
-import hashlib
 import json
 import logging
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from audit import append_audit  # noqa: E402  the one chain, owned by audit.py
 
 log = logging.getLogger(__name__)
 
@@ -48,32 +53,6 @@ class IllegalTransition(Exception):
 
 def next_states(state):
     return sorted(TRANSITIONS.get(state, set()))
-
-
-def append_audit(cur, *, user_id=None, dept_id=None, action, object_type, object_id,
-                 reason=None, ip=None, grant_id=None):
-    """Append one link to the audit chain. Returns the new hash.
-
-    The chain is what makes the log tamper-evident: altering a row means recomputing every hash
-    after it, and D10's verify walks the chain to find the first link that does not match. It
-    lives at module level because alerts are not the only thing that has to be accounted for -
-    D6's exports append here too, on the same chain, in the same order.
-    """
-    cur.execute("SELECT hash FROM audit_log ORDER BY seq DESC LIMIT 1")
-    row = cur.fetchone()
-    prev_hash = row[0] if row else None
-    payload = json.dumps({
-        "user_id": user_id, "dept_id": dept_id, "action": action,
-        "object_type": object_type, "object_id": str(object_id), "reason": reason,
-    }, sort_keys=True).encode()
-    digest = hashlib.sha256((bytes(prev_hash) if prev_hash else b"") + payload).digest()
-    cur.execute(
-        """INSERT INTO audit_log (user_id, dept_id, action, object_type, object_id, ip,
-                                  reason, grant_id, prev_hash, hash)
-           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-        (user_id, dept_id, action, object_type, str(object_id), ip, reason, grant_id,
-         prev_hash, digest))
-    return digest
 
 
 class AlertRepo:
@@ -148,15 +127,27 @@ class AlertRepo:
                 return None
             return dict(zip([c.name for c in cur.description], row))
 
-    def list(self, state=None, limit=100):
-        # One static statement with an optional predicate, rather than SQL assembled from
-        # strings: nothing here can grow into an injection when the next filter is added.
+    def list(self, state=None, limit=100, scope=None):
+        """Alerts the caller is allowed to see.
+
+        An alert belongs to the department that owns the camera it fired on, so the scope
+        predicate joins through cameras rather than trusting a column on alerts.
+
+        scope=None means no user asked - the fanout and the tests run as the system.
+        """
+        params = {"state": state, "limit": limit}
+        params.update(scope.department_filter() if scope is not None
+                      else {"all_departments": True, "departments": []})
         with self.store.conn as conn, conn.cursor() as cur:
-            cur.execute("""SELECT id, watchlist_id, sighting_id, camera_id, pts, band, state,
-                                  count, created_at FROM alerts
-                           WHERE (%(state)s::text IS NULL OR state = %(state)s)
-                           ORDER BY created_at DESC LIMIT %(limit)s""",
-                        {"state": state, "limit": limit})
+            cur.execute("""SELECT a.id, a.watchlist_id, a.sighting_id, a.camera_id, a.pts,
+                                  a.band, a.state, a.count, a.created_at
+                           FROM alerts a
+                           LEFT JOIN cameras c ON c.camera_id = a.camera_id
+                           WHERE (%(state)s::text IS NULL OR a.state = %(state)s)
+                             AND (%(all_departments)s
+                                  OR c.owner_dept_id = ANY(%(departments)s))
+                           ORDER BY a.created_at DESC LIMIT %(limit)s""",
+                        params)
             cols = [c.name for c in cur.description]
             return [dict(zip(cols, r)) for r in cur.fetchall()]
 

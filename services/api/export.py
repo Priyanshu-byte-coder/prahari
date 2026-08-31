@@ -143,7 +143,7 @@ def record_export(store, route, fmt, user_id=None, dept_id=None, ip=None):
     Deliberately not optional and not best-effort: if the audit write fails, the export fails.
     An export nobody can account for afterwards is the thing an inquiry looks for.
     """
-    from alerts import append_audit
+    from audit import append_audit
 
     with store.conn as conn, conn.cursor() as cur:
         return append_audit(

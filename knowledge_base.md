@@ -66,10 +66,10 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 | D4 matcher bands + alert FSM | 2 | 2 | DONE | | band table + FSM green against I5 from PR #38 |
 | D5 WebSocket fanout | 2 | 2 | DONE | | push, scope filtering and resume backfill tested |
 | D6 route API + plausibility + export | 2 | 2 | TODO | | the graded test case |
-| D7 RBAC + audit | 3 | 3 | TODO | | scope test must run in CI |
+| D7 RBAC + audit | 3 | 3 | DONE | | scope test green, runs in GitHub Actions |
 | D8 HLD document | 2 | 3 | TODO | | mandatory deliverable |
 | D9 cross-department grants | 2 | P1 | TODO | | |
-| D10 audit hash-chain verify | 1 | P1 | TODO | | |
+| D10 audit hash-chain verify | 1 | P1 | DONE | | GET /api/admin/audit/verify, tamper test green |
 
 ### Joint
 
@@ -120,6 +120,12 @@ _(nothing yet)_
 - `services/api/route.py` — [C4] `/api/route` + export — `RouteBuilder`, `collapse`, `flag_implausible`, `snap`, `haversine_km`.
 - `services/api/export.py` — CSV and reportlab PDF, every export audited — `to_csv`, `to_pdf`, `render`, `record_export`.
 - `tests/test_d_route.py` — five ordered hops with one flagged, fuzzy fallback, exports, HTTP surface.
+- `services/api/scope.py` — [C10] in one table — `Scope`, `CAPABILITIES`, `DEPARTMENT_PREDICATE`, `apply_session_scope`.
+- `services/api/auth.py` — argon2 + JWT (15 min / 8 h), login/refresh, bootstrap CLI — `UserRepo`, `issue_tokens`, `requires`.
+- `services/api/audit.py` — the one hash chain — `append_audit`, `record`, `AuditLog.verify` (D10).
+- `services/api/main.py` — every [C4] endpoint on one app — `create_app`, `CameraRepo`, scoped routers.
+- `tests/test_d_scope.py` — D7's verify: Transport viewer sees only Transport, across cameras, watchlist and alerts.
+- `.github/workflows/ci.yml` — pytest against timescaledb-ha + redis services on every push and PR.
 - `requirements.txt` — one dependency per line, alphabetical, three lanes append to it.
 
 ## 3. Gotchas
@@ -214,6 +220,16 @@ _(nothing yet)_
 - 2026-08-31 — `RouteResponse` carries an extra `snapped` boolean alongside [C4]'s
   `snapped_geometry`. Additive, so no consumer breaks, and without it a straight line between
   cameras is indistinguishable from a road path.
+
+- 2026-08-31 — audit rows hash `int(user_id)`, not the JWT's `sub` string. Postgres stores an
+  integer; hashing the string made verify() report tampering on rows nobody touched.
+- 2026-08-31 — RLS policies treat an unset `prahari.dept_ids` as a maintenance connection and
+  allow the row, because the migration, the persister and the matcher connect without a user.
+  The application predicate stays the primary control; RLS is the backstop for a query somebody
+  forgets to scope. Marked `# ponytail:` in db/migrate.sql.
+- 2026-08-31 — `services/api/main.py` exists although D7's file list stops at auth/scope/audit.
+  The scope test has to go through HTTP with a real token, and that needs an app with the [C4]
+  endpoints on it; D3 and D4 deliberately stopped at the repository layer.
 
 ## 5. Contract changes
 
