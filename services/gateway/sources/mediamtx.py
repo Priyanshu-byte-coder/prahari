@@ -121,13 +121,19 @@ class MediaMTXSource(CameraSource):
                     for frame in packet.decode():
                         self._last_frame_at = time.time()
                         self._health = Health.LIVE
-                        pts = float(frame.pts) * time_base if (frame.pts and time_base) else None
+                        pts = float(frame.pts) * time_base if (frame.pts is not None and time_base) else None
                         yield Frame(
                             image=frame.to_ndarray(format="bgr24"),
                             pts=pts,
                             wall_ts=self._last_frame_at,
                             ts_source=self._ts_source,
                         )
+                # demux() exhausted normally (EOF / looping clip). Close and
+                # reconnect so we don't spin on a dead iterator with health LIVE.
+                await self.close()
+                self._health = Health.DOWN
+                self._backoff = next_backoff(self._backoff)
+                await sleep_backoff(self._backoff)
             except STREAM_ERRORS:
                 await self.close()
                 self._health = Health.DOWN

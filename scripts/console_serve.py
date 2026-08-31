@@ -35,6 +35,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from services.gateway.wall import Wall  # noqa: E402
+from services.gateway.probe import safe_url  # noqa: E402
 
 GRID_BASE = "https://live.corp8.cloud"
 SEED = ROOT / "data" / "cameras.seed.json"
@@ -127,7 +128,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(data)
 
     def _proxy(self, path: str):
-        target = urljoin(GRID_BASE + "/", path[len("/grid/"):])
+        target = safe_url(urljoin(GRID_BASE + "/", path[len("/grid/"):]))
+        if target is None:
+            self.send_error(400, "proxy target not on allowed host")
+            return
         try:
             upstream = _SESSION.get(target, stream=True, timeout=20, allow_redirects=True)
         except requests.RequestException as exc:

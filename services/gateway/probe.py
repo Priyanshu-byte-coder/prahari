@@ -88,6 +88,8 @@ def probe_rtsp(url: str, timeout: float = RTSP_CONNECT_TIMEOUT_S) -> tuple[bool,
     host, port = parsed.hostname, parsed.port or 554
     if not host:
         return False, "unparseable rtsp url"
+    if host not in allowed_hosts():
+        return False, f"rtsp host {host!r} not in allowed_hosts (SSRF guard)"
     try:
         with socket.create_connection((host, port), timeout=timeout) as sock:
             sock.settimeout(timeout)

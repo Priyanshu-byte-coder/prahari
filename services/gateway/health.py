@@ -165,6 +165,18 @@ def read_fps(redis_client, camera_id: str) -> float | None:
         return None
 
 
+def read_transport(redis_client, camera_id: str) -> str | None:
+    """Read the transport driver from the G->I seam key."""
+    raw = redis_client.get(f"camera:transport:{camera_id}")
+    if raw is None:
+        return None
+    try:
+        data = json.loads(raw)
+        return data.get("transport")
+    except (ValueError, TypeError):
+        return None
+
+
 def publish(events: list[dict], redis_client) -> None:
     """[C2]: one field `data`, a JSON string, on stream `camera.health`."""
     for event in events:
@@ -175,6 +187,10 @@ def tick(monitor: HealthMonitor, redis_client, now: float | None = None) -> list
     """One pass: read the seam, evaluate, publish only what changed."""
     for camera_id in monitor.cameras:
         monitor.observe_fps(camera_id, read_fps(redis_client, camera_id), now=now)
+        transport = read_transport(redis_client, camera_id)
+        cam = monitor.cameras[camera_id]
+        if transport is not None:
+            cam.transport_in_use = transport
     events = monitor.evaluate(now=now)
     if events and redis_client is not None:
         publish(events, redis_client)
