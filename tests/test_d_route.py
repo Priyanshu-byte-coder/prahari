@@ -362,3 +362,11 @@ def test_a_malformed_window_is_a_400_not_a_traceback(rig):
     response = api_client(store).get("/api/route",
                                      params={"plate": ROUTE_PLATE, "from": "last tuesday"})
     assert response.status_code == 400
+
+
+def test_a_non_http_osrm_url_is_refused_rather_than_opened():
+    # urlopen will fetch file:// happily. A routing URL that can be pointed at the local
+    # filesystem is a file-read primitive wearing a map's clothes.
+    hops = [{"lat": 23.0, "lon": 72.5}, {"lat": 23.1, "lon": 72.6}]
+    geometry, snapped = snap(hops, osrm_url="file:///etc/passwd")
+    assert snapped is False and geometry["type"] == "LineString"

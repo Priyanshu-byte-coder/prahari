@@ -158,13 +158,24 @@ def snap(hops, osrm_url=None, timeout=OSRM_TIMEOUT_S):
     base = osrm_url or os.environ.get("OSRM_URL")
     if not base:
         return plain, False
+
+    # The base comes from configuration, so the scheme is checked before it is opened rather
+    # than trusted: urlopen will happily fetch file:// and ftp://, and a routing URL that can be
+    # pointed at the local filesystem is a file-read primitive wearing a map's clothes.
+    import urllib.parse
+    import urllib.request
+
+    parsed = urllib.parse.urlparse(base)
+    if parsed.scheme not in ("http", "https"):
+        log.warning("OSRM_URL must be http or https, got %r - returning the unsnapped line",
+                    parsed.scheme)
+        return plain, False
+
     coords = ";".join(f"{lon},{lat}" for lon, lat in points)
-    url = f"{base.rstrip('/')}/route/v1/driving/{coords}"
+    query = urllib.parse.urlencode({"overview": "full", "geometries": "geojson"})
+    url = f"{base.rstrip('/')}/route/v1/driving/{coords}?{query}"
     try:
-        import urllib.parse
-        import urllib.request
-        query = urllib.parse.urlencode({"overview": "full", "geometries": "geojson"})
-        with urllib.request.urlopen(f"{url}?{query}", timeout=timeout) as response:  # noqa: S310
+        with urllib.request.urlopen(url, timeout=timeout) as response:  # noqa: S310
             payload = json.load(response)
         geometry = payload["routes"][0]["geometry"]
         return geometry, True
