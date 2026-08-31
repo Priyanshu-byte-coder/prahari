@@ -192,8 +192,14 @@ class MediaMTXSource(CameraSource):
             container, self._container = self._container, None
             try:
                 container.close()
-            except Exception:
-                pass
+            except STREAM_ERRORS as exc:
+                # PyAV occasionally raises on close after a broken stream;
+                # the container is already unusable at this point so the
+                # exception is informational only.
+                import logging
+                logging.getLogger(__name__).debug(
+                    "mediamtx close(%s): %s", self.camera_id, exc
+                )
 
     def health(self) -> Health:
         return self._health

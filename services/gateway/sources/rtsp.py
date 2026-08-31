@@ -111,8 +111,14 @@ class RTSPSource(CameraSource):
             container, self._container = self._container, None
             try:
                 container.close()
-            except Exception:
-                pass
+            except STREAM_ERRORS as exc:
+                # PyAV occasionally raises on close after a broken stream;
+                # the container is already unusable at this point so the
+                # exception is informational only.
+                import logging
+                logging.getLogger(__name__).debug(
+                    "rtsp close(%s): %s", self.camera_id, exc
+                )
 
     def health(self) -> Health:
         if self._health is Health.LIVE and self._stalled():
