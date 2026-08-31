@@ -159,6 +159,12 @@ _(nothing yet)_
   `tests/test_d_ws.py`. Cost: an hour.
 - `[D]` A `@dataclass` in a `set()` needs `eq=False`, or it is unhashable and every subscribe
   raises `TypeError: unhashable type`.
+- `[ALL]` SonarCloud findings are readable without a SonarCloud login:
+  `gh api repos/OWNER/REPO/commits/<sha>/check-runs` for the id, then
+  `gh api repos/OWNER/REPO/check-runs/<id>/annotations`. The web UI 404s on a private project
+  unless you are signed in, and the PR comment only prints the ratings. Cost: 40 minutes.
+- `[ALL]` A Security Hotspot cannot be cleared from code - somebody marks it reviewed in the
+  SonarCloud UI. Chasing one with code changes is wasted time.
 - `[D]` pg_trgm `similarity()` on ten-character plates: one edit scores 0.57, two 0.47. A 0.7
   floor returns nothing — fine for D6's user-facing fuzzy search, dead code as D4's retrieval
   step. D4 retrieves at 0.4 and lets weighted_levenshtein decide.
