@@ -239,6 +239,11 @@ def create_app(store=None, hub=None):
     app.state.store = resolved_store
     app.state.hub = resolved_hub
 
+    # D6's REST endpoints ride on the same app: one process, one port, one place for the console
+    # to point at. ws.py owns the app only because it needed one first.
+    from route import build_router
+    app.include_router(build_router(resolved_store))
+
     @app.websocket("/ws")
     async def ws(websocket: WebSocket):
         await websocket.accept()

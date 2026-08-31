@@ -13,5 +13,6 @@ pytest
 pytest-timeout
 python-dotenv
 redis
+reportlab
 uvicorn[standard]
 websockets

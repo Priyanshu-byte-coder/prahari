@@ -120,7 +120,8 @@ def main():
     ap.add_argument("--redis", default=os.environ.get("REDIS_URL", DEFAULT_REDIS))
     ap.add_argument("--stream", default=STREAM)
     ap.add_argument("--seed", type=int, default=None, help="fix the RNG for a repeatable run")
-    ap.add_argument("--route-plate", default=ROUTE_PLATE)
+    ap.add_argument("--route", "--route-plate", dest="route_plate", default=ROUTE_PLATE,
+                    help="the plate that crosses all five cameras in order")
     ap.add_argument("--no-route", action="store_true", help="background noise only")
     ap.add_argument("--route-gap-scale", type=float, default=1.0,
                     help="compress the travel gaps, so a short run still crosses all five")

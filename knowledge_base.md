@@ -117,6 +117,9 @@ _(nothing yet)_
 - `services/api/ws.py` — `/ws` fanout, scope at connect, resume backfill — `Hub`, `Scope`, `Subscriber`, `create_app`, `issue_token`.
 - `tests/test_d_alerts.py` — the D4 band table and every illegal transition.
 - `tests/test_d_ws.py` — push, scope filtering, resume, heartbeat, slow-console drop.
+- `services/api/route.py` — [C4] `/api/route` + export — `RouteBuilder`, `collapse`, `flag_implausible`, `snap`, `haversine_km`.
+- `services/api/export.py` — CSV and reportlab PDF, every export audited — `to_csv`, `to_pdf`, `render`, `record_export`.
+- `tests/test_d_route.py` — five ordered hops with one flagged, fuzzy fallback, exports, HTTP surface.
 - `requirements.txt` — one dependency per line, alphabetical, three lanes append to it.
 
 ## 3. Gotchas
@@ -201,6 +204,16 @@ _(nothing yet)_
 - 2026-08-31 — with `JWT_SECRET` unset, `ws.py` signs with a random per-process key rather than
   accepting unsigned tokens. Until D7 issues real ones, a dev run still works and a forged
   token still fails; "no secret configured" must never mean "open socket".
+
+- 2026-08-31 — D6 renders the PDF with reportlab, not WeasyPrint as the ticket says. WeasyPrint
+  needs GTK libraries on the machine; reportlab is a pure wheel, and the layout was salvageable
+  from `origin/priyanshu/platform:services/api/route_report.py`.
+- 2026-08-31 — the route PDF's picture is a schematic of the hop coordinates, not a basemap. There
+  is no tile source we can ship offline, and calling an unreferenced polyline a map would be a lie
+  on a document an officer signs.
+- 2026-08-31 — `RouteResponse` carries an extra `snapped` boolean alongside [C4]'s
+  `snapped_geometry`. Additive, so no consumer breaks, and without it a straight line between
+  cameras is indistinguishable from a road path.
 
 ## 5. Contract changes
 

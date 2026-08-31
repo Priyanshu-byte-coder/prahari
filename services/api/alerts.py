@@ -50,34 +50,40 @@ def next_states(state):
     return sorted(TRANSITIONS.get(state, set()))
 
 
+def append_audit(cur, *, user_id=None, dept_id=None, action, object_type, object_id,
+                 reason=None, ip=None, grant_id=None):
+    """Append one link to the audit chain. Returns the new hash.
+
+    The chain is what makes the log tamper-evident: altering a row means recomputing every hash
+    after it, and D10's verify walks the chain to find the first link that does not match. It
+    lives at module level because alerts are not the only thing that has to be accounted for -
+    D6's exports append here too, on the same chain, in the same order.
+    """
+    cur.execute("SELECT hash FROM audit_log ORDER BY seq DESC LIMIT 1")
+    row = cur.fetchone()
+    prev_hash = row[0] if row else None
+    payload = json.dumps({
+        "user_id": user_id, "dept_id": dept_id, "action": action,
+        "object_type": object_type, "object_id": str(object_id), "reason": reason,
+    }, sort_keys=True).encode()
+    digest = hashlib.sha256((bytes(prev_hash) if prev_hash else b"") + payload).digest()
+    cur.execute(
+        """INSERT INTO audit_log (user_id, dept_id, action, object_type, object_id, ip,
+                                  reason, grant_id, prev_hash, hash)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+        (user_id, dept_id, action, object_type, str(object_id), ip, reason, grant_id,
+         prev_hash, digest))
+    return digest
+
+
 class AlertRepo:
     def __init__(self, store):
         self.store = store
 
     # -- audit ---------------------------------------------------------------------------
 
-    def _write_audit(self, cur, *, user_id, dept_id, action, object_type, object_id,
-                     reason=None, ip=None, grant_id=None):
-        """Append one link to the audit chain. Returns the new hash.
-
-        The chain is what makes the log tamper-evident: changing a row means recomputing every
-        hash after it, and D10's verify walks the chain to find the first link that does not.
-        """
-        cur.execute("SELECT hash FROM audit_log ORDER BY seq DESC LIMIT 1")
-        row = cur.fetchone()
-        prev_hash = row[0] if row else None
-        payload = json.dumps({
-            "user_id": user_id, "dept_id": dept_id, "action": action,
-            "object_type": object_type, "object_id": str(object_id), "reason": reason,
-        }, sort_keys=True).encode()
-        digest = hashlib.sha256((bytes(prev_hash) if prev_hash else b"") + payload).digest()
-        cur.execute(
-            """INSERT INTO audit_log (user_id, dept_id, action, object_type, object_id, ip,
-                                      reason, grant_id, prev_hash, hash)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-            (user_id, dept_id, action, object_type, str(object_id), ip, reason, grant_id,
-             prev_hash, digest))
-        return digest
+    def _write_audit(self, cur, **fields):
+        return append_audit(cur, **fields)
 
     # -- creation ------------------------------------------------------------------------
 
