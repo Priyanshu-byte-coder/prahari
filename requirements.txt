@@ -8,7 +8,10 @@ boto3
 fastapi
 psycopg2-binary
 pydantic-settings
+pyjwt
 pytest
+pytest-timeout
 python-dotenv
 redis
 uvicorn[standard]
+websockets

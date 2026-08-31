@@ -14,6 +14,8 @@ Updated: 2026-08-29 · KB v2 · cap 300 lines · patched after **every** complet
   three are collaborators). Title prefix is the ticket id — `[I3] …`, `[G7] …`, `[D5] …`. Bodies are
   generated from `TASK.md`, so **edit the ticket in `TASK.md`, not in the issue**.
   Filter your own work: `gh issue list --repo Priyanshu-byte-coder/prahari --assignee @me --label wave:1`
+- Open PRs, none merged: **#37** lane D wave 1+2 (D1-D5) · **#38** I5 `common/plate.py` ·
+  **#40** lane G wave 0+1 (G1, G5, G2, G3). The merge queue is the bottleneck, not the code.
 - Nothing is running yet. First green light we want: a sighting row on Redis from a live grid camera.
 
 ## 1. Ticket board
@@ -61,8 +63,8 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 | D1 schema + registry loader | 2 | 1 | DONE | | applies and re-applies clean on timescaledb-ha:pg16 |
 | D2 fake_sightings + persister | 2 | 1 | DONE | | soak: 14991 rows at 49.5/s, pending stayed 0 |
 | D3 watchlist + CSV + feed stubs | 2 | 1 | DONE | | repo + feeds; HTTP routes land with the app |
-| D4 matcher bands + alert FSM | 2 | 2 | TODO | | imports I5, no second copy |
-| D5 WebSocket fanout | 2 | 2 | TODO | | kills all polling |
+| D4 matcher bands + alert FSM | 2 | 2 | DONE | | band table + FSM green against I5 from PR #38 |
+| D5 WebSocket fanout | 2 | 2 | DONE | | push, scope filtering and resume backfill tested |
 | D6 route API + plausibility + export | 2 | 2 | TODO | | the graded test case |
 | D7 RBAC + audit | 3 | 3 | TODO | | scope test must run in CI |
 | D8 HLD document | 2 | 3 | TODO | | mandatory deliverable |
@@ -110,6 +112,11 @@ _(nothing yet)_
 - `services/api/feeds.py` — [C6] feeds — `ManualFeed`, `CSVFeed` live; `VahanFeed`, `EGujCopFeed` labelled STUB; `pull_all`.
 - `tests/test_d_persister.py` — redelivery, poisoned message, dead-consumer reclaim. Needs a live Redis and Postgres.
 - `tests/test_d_watchlist.py` — the D3 verify (2 bad rows, nothing written) plus the feed protocol checks.
+- `services/api/alerts.py` — dedup, the NEW->ACK->ACTIONED|DISMISSED machine, audit chain — `AlertRepo`, `IllegalTransition`, `TRANSITIONS`.
+- `services/api/matcher.py` — consumer group `matcher`, canon index + trigram fallback — `band_for`, `best_match`, `WatchlistIndex`, `Matcher`.
+- `services/api/ws.py` — `/ws` fanout, scope at connect, resume backfill — `Hub`, `Scope`, `Subscriber`, `create_app`, `issue_token`.
+- `tests/test_d_alerts.py` — the D4 band table and every illegal transition.
+- `tests/test_d_ws.py` — push, scope filtering, resume, heartbeat, slow-console drop.
 - `requirements.txt` — one dependency per line, alphabetical, three lanes append to it.
 
 ## 3. Gotchas
@@ -133,6 +140,15 @@ _(nothing yet)_
   the normal path. `ON CONFLICT (pts_first, sighting_id) DO NOTHING` is what absorbs it.
 - `[D]` A consumer that dies leaves its messages pending and invisible to `>` forever. XAUTOCLAIM
   on the idle path is the only thing that gets them back — J1's chaos drill tests exactly this.
+- `[D]` Starlette's `TestClient` cannot test a server-pushed WebSocket frame: a client thread
+  parked in `receive()` starves the app's own background task, so only heartbeats arrive. Run
+  uvicorn in a thread on port 0 and connect with `websockets.sync.client` — see `serving()` in
+  `tests/test_d_ws.py`. Cost: an hour.
+- `[D]` A `@dataclass` in a `set()` needs `eq=False`, or it is unhashable and every subscribe
+  raises `TypeError: unhashable type`.
+- `[D]` pg_trgm `similarity()` on ten-character plates: one edit scores 0.57, two 0.47. A 0.7
+  floor returns nothing — fine for D6's user-facing fuzzy search, dead code as D4's retrieval
+  step. D4 retrieves at 0.4 and lets weighted_levenshtein decide.
 - `[D]` `timescale/timescaledb-ha:pg16` already carries timescaledb, pgvector and pg_trgm, so
   `db/migrate.sql` runs on it unchanged — plain `postgres:16` needs all three installed by hand.
   Useful for G5: that image is the one lane D verified against.
@@ -170,6 +186,21 @@ _(nothing yet)_
   Todo / In Progress / In QA Review / QA Review Failed / Done. A lane owner moves a ticket to
   In QA Review, never straight to Done; BhavyaSoneji and omvaghelaa own QA and are the only ones who
   move it to Done or QA Review Failed — so no lane grades its own work.
+
+- 2026-08-31 — D4's band comes from [C7]'s weighted cost alone: 0 exact, 0.5 one confusion edit
+  (PROBABLE), 1.0-2.0 anything else within two edits (POSSIBLE), above 2.0 no alert. A plain
+  edit and two confusion edits both cost 1.0 and D4 calls both POSSIBLE, so the collision is
+  harmless and no second distance function is needed.
+- 2026-08-31 — an exact string match on a sighting whose own band is not CONFIRMED is raised as
+  PROBABLE, never CONFIRMED. A POSSIBLE read that happens to spell a watched plate is exactly
+  the case that must not put CONFIRMED in front of an officer.
+- 2026-08-31 — D5 reads the Redis streams with XREAD, not the `ws-fanout` consumer group named
+  in [C2]. A group splits messages between members, so with two API replicas half the alerts
+  would reach half the consoles. Fanout is broadcast; every process reads the whole stream.
+  Not a contract change — [C2] names the consumer, and D still owns both ends of it.
+- 2026-08-31 — with `JWT_SECRET` unset, `ws.py` signs with a random per-process key rather than
+  accepting unsigned tokens. Until D7 issues real ones, a dev run still works and a forged
+  token still fails; "no secret configured" must never mean "open socket".
 
 ## 5. Contract changes
 
