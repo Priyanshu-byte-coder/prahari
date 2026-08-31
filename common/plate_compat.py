@@ -6,8 +6,9 @@ copies to reconcile later. So: every D module imports from here, this module pre
 implementation the moment it exists, and the fallback below is deleted with this file.
 
 The fallback is deliberately the minimum D needs - canon() and the grammar regexes. It does not
-implement weighted_levenshtein: D4 is the ticket that needs it, D4 is in wave 2, and by then I5
-is expected. If it is not, that is a blocker to raise, not a function to quietly reimplement.
+implement weighted_levenshtein: that function decides whether two plates are the same vehicle,
+and a second implementation of it would eventually disagree with the one lane I ships. Asking
+for it without I5 raises, naming the ticket, instead of guessing.
 """
 
 import re
@@ -25,9 +26,16 @@ BHARAT = re.compile(r"^[0-9]{2}BH[0-9]{4}[A-Z]{1,2}$")
 USING_I5 = False
 
 try:
-    from common.plate import canon, normalise           # noqa: F401  (I5, once it exists)
+    from common.plate import canon, normalise, weighted_levenshtein  # noqa: F401  (I5)
     USING_I5 = True
 except ImportError:
+    def weighted_levenshtein(a, b):
+        raise RuntimeError(
+            "weighted_levenshtein lives in common/plate.py, which lane I owns (ticket I5). "
+            "It is not merged yet - see PR #38. [C7] says D imports it; D does not reimplement "
+            "it, because two edit-distance functions disagreeing is a wrong plate shown to an "
+            "officer.")
+
     def normalise(s):
         """Upper-case, strip separators and a leading IND."""
         if s is None:
