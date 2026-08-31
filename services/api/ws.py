@@ -205,10 +205,10 @@ class Hub:
         self._stop.set()
         if self._task:
             self._task.cancel()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass                               # cancelling is how we stop it
+            # gather(return_exceptions=True) collects the cancellation without catching and
+            # discarding it: swallowing CancelledError in a handler is how a task that should
+            # have died keeps running, and how a shutdown hangs waiting for it.
+            await asyncio.gather(self._task, return_exceptions=True)
 
 
 async def _pump(websocket, subscriber):

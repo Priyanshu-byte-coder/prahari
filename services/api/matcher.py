@@ -61,16 +61,23 @@ TRIGRAM_FLOOR = 0.4
 INDEX_TTL = 30.0                # seconds before the watchlist index is reloaded
 
 
+# [C7] costs come in half steps - 0, 0.5, 1.0, 1.5, 2.0 - so the bands are ranges rather than
+# equalities. Comparing a float to 0.5 with == is a bug waiting for the first cost that arrives
+# as 0.4999999999999999, and the boundaries below are where no real cost ever lands.
+EXACT_BELOW = 0.25          # only a cost of 0 falls here
+ONE_CONFUSION_EDIT_BELOW = 0.75   # only a cost of 0.5 falls here
+
+
 def band_for(cost, sighting_band):
     """The [D4] band table, in one place so the test can walk it row by row."""
     if cost is None or cost > MAX_COST:
         return None
-    if cost == 0:
+    if cost < EXACT_BELOW:
         # An exact string match is only CONFIRMED if the read itself was confident. A POSSIBLE
         # read that happens to spell a watched plate is exactly the case that should not put
         # CONFIRMED in front of an officer.
         return CONFIRMED if sighting_band == CONFIRMED else PROBABLE
-    if cost == 0.5:
+    if cost < ONE_CONFUSION_EDIT_BELOW:
         return PROBABLE
     return POSSIBLE
 

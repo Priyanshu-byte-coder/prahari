@@ -63,8 +63,29 @@ ON CONFLICT (camera_id) DO UPDATE SET
 """
 
 
+def safe_path(path, label):
+    """Resolve a path from the command line, or return None with the reason printed.
+
+    The two inputs are file paths taken from argv, and this script is run by scripts and by
+    agents as well as by people. Resolving first collapses `..` and symlinks, so what is checked
+    is what is opened; requiring a regular .json file keeps a mistyped argument from turning a
+    loader into a reader of whatever it was pointed at.
+    """
+    resolved = Path(path).expanduser().resolve()
+    if resolved.suffix.lower() != ".json":
+        print(f"warning: {label} must be a .json file, got {resolved.name}")
+        return None
+    if resolved.is_dir():
+        print(f"warning: {label} is a directory, not a file: {resolved}")
+        return None
+    return resolved
+
+
 def read_json(path, expected, label):
     """Return the parsed file, or None with a reason printed. Never raises on a bad file."""
+    path = safe_path(path, label)
+    if path is None:
+        return None
     if not path.exists():
         print(f"warning: {label} not found at {path} - lane G has not produced it yet")
         return None

@@ -214,6 +214,7 @@ def requires(capability):
 
 
 def _bootstrap(args):
+    """Create the first administrator. Raises on failure; the caller decides the exit code."""
     from store import Store
 
     password = os.environ.get("PRAHARI_BOOTSTRAP_PASSWORD")
@@ -222,14 +223,15 @@ def _bootstrap(args):
     store = Store(dsn=args.dsn)
     repo = UserRepo(store)
     if repo.get(args.username):
+        # Idempotent on purpose: re-running the bootstrap during a rehearsal must not fail the
+        # script that calls it.
         print(f"user {args.username} already exists - nothing to do")
-        return 0
+        return
     user_id = repo.create(args.username, password, args.role,
                           dept_id=args.dept_id, district_code=args.district)
     print(f"created {args.role} {args.username} (id {user_id})")
     if args.role.upper() == SYSTEM_ADMIN:
         print("note: per [C10] this account administers the system and cannot view video")
-    return 0
 
 
 def main():
@@ -242,7 +244,8 @@ def main():
     boot.add_argument("--district", default=None)
     boot.add_argument("--dsn", default=None)
     args = ap.parse_args()
-    return _bootstrap(args)
+    _bootstrap(args)
+    return 0
 
 
 if __name__ == "__main__":
