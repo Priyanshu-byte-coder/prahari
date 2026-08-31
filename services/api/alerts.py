@@ -143,11 +143,14 @@ class AlertRepo:
             return dict(zip([c.name for c in cur.description], row))
 
     def list(self, state=None, limit=100):
-        clause, params = ("WHERE state = %s", [state]) if state else ("", [])
+        # One static statement with an optional predicate, rather than SQL assembled from
+        # strings: nothing here can grow into an injection when the next filter is added.
         with self.store.conn as conn, conn.cursor() as cur:
-            cur.execute(f"""SELECT id, watchlist_id, sighting_id, camera_id, pts, band, state,
-                                   count, created_at FROM alerts {clause}
-                            ORDER BY created_at DESC LIMIT %s""", params + [limit])
+            cur.execute("""SELECT id, watchlist_id, sighting_id, camera_id, pts, band, state,
+                                  count, created_at FROM alerts
+                           WHERE (%(state)s::text IS NULL OR state = %(state)s)
+                           ORDER BY created_at DESC LIMIT %(limit)s""",
+                        {"state": state, "limit": limit})
             cols = [c.name for c in cur.description]
             return [dict(zip(cols, r)) for r in cur.fetchall()]
 

@@ -22,6 +22,12 @@ RECENT_CACHE_SIZE = 50           # [D2] last 50 sighting ids per plate
 RECENT_CACHE_TTL = 24 * 3600
 CROP_URL_TTL = 300               # 5 minutes: long enough to look at, short enough to leak safely
 
+# No credentials in source. A DSN with a password in it belongs in .env ([C9]); a default
+# that happens to work on a laptop is how one ends up in a container image.
+DEFAULT_DSN = "postgresql://localhost:5432/sentinel"
+DEFAULT_REDIS_URL = "redis://localhost:6379/0"
+DEFAULT_MINIO_ENDPOINT = "http://localhost:9000"
+
 INSERT = """
 INSERT INTO sightings (sighting_id, camera_id, track_id, pts_first, pts_last, ts_source,
                        plate_text, plate_norm, plate_canon, plate_conf, plate_band,
@@ -43,9 +49,8 @@ def allow_until_d7(_context):
 
 class Store:
     def __init__(self, dsn=None, redis_url=None, scope_check=allow_until_d7, s3=None):
-        self.dsn = dsn or os.environ.get("POSTGRES_DSN",
-                                         "postgresql://sentinel:sentinel@localhost:5432/sentinel")
-        self.redis_url = redis_url or os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+        self.dsn = dsn or os.environ.get("POSTGRES_DSN") or DEFAULT_DSN
+        self.redis_url = redis_url or os.environ.get("REDIS_URL") or DEFAULT_REDIS_URL
         self.scope_check = scope_check
         self._conn = None
         self._redis = None
@@ -122,11 +127,18 @@ class Store:
             from botocore.config import Config
             # MinIO only accepts SigV4. boto3 falls back to SigV2 when it cannot infer a
             # region, and a SigV2 URL carries Expires as an epoch - MinIO rejects it outright.
+            access_key = os.environ.get("MINIO_ACCESS_KEY")
+            secret_key = os.environ.get("MINIO_SECRET_KEY")
+            if not (access_key and secret_key):
+                # Refusing beats defaulting: object-storage keys that ship in source get
+                # deployed unchanged, and the crop bucket holds vehicles and faces.
+                raise RuntimeError("MINIO_ACCESS_KEY and MINIO_SECRET_KEY must be set "
+                                   "(see .env.example, [C9]) before a crop can be signed")
             self._s3 = boto3.client(
                 "s3",
-                endpoint_url=os.environ.get("MINIO_ENDPOINT", "http://localhost:9000"),
-                aws_access_key_id=os.environ.get("MINIO_ACCESS_KEY", "minioadmin"),
-                aws_secret_access_key=os.environ.get("MINIO_SECRET_KEY", "minioadmin"),
+                endpoint_url=os.environ.get("MINIO_ENDPOINT") or DEFAULT_MINIO_ENDPOINT,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
                 region_name=os.environ.get("MINIO_REGION", "us-east-1"),
                 config=Config(signature_version="s3v4"))
         return self._s3
@@ -144,6 +156,8 @@ class Store:
             return None
         if not crop_uri.startswith("s3://"):
             raise ValueError(f"crop_uri is not an s3:// URI: {crop_uri!r}")
+        # Signed only after the check above: the URL is a bearer token for that image for
+        # five minutes, and anyone holding it can fetch the crop without logging in.
         bucket, _, key = crop_uri[len("s3://"):].partition("/")
         return self.s3.generate_presigned_url("get_object",
                                               Params={"Bucket": bucket, "Key": key},

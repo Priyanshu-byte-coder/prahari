@@ -207,8 +207,8 @@ class Hub:
             self._task.cancel()
             try:
                 await self._task
-            except (asyncio.CancelledError, Exception):
-                pass
+            except asyncio.CancelledError:
+                pass                               # cancelling is how we stop it
 
 
 async def _pump(websocket, subscriber):

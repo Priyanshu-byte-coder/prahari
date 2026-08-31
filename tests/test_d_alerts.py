@@ -29,7 +29,7 @@ from watchlist import WatchlistRepo, validate_row                              #
 
 DSN = os.environ.get("TEST_POSTGRES_DSN",
                      os.environ.get("POSTGRES_DSN",
-                                    "postgresql://sentinel:sentinel@localhost:5432/sentinel"))
+                                    "postgresql://localhost:5432/sentinel"))
 REDIS_URL = os.environ.get("TEST_REDIS_URL",
                            os.environ.get("REDIS_URL", "redis://localhost:6379/0"))
 

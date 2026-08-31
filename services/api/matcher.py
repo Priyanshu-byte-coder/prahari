@@ -176,10 +176,11 @@ class Matcher:
         return self.store.redis
 
     def ensure_group(self):
+        from redis.exceptions import ResponseError
         try:
             self.redis.xgroup_create(self.stream, self.group, id="0", mkstream=True)
-        except Exception as exc:
-            if "BUSYGROUP" not in str(exc):
+        except ResponseError as exc:
+            if "BUSYGROUP" not in str(exc):            # already created by a sibling
                 raise
 
     def check(self, sighting):

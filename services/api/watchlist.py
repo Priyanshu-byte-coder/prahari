@@ -62,8 +62,8 @@ def _parse_ts(value, label):
         return None
     try:
         return datetime.fromisoformat(value.strip())
-    except ValueError:
-        raise ValueError(f"{label} is not an ISO timestamp: {value!r}")
+    except ValueError as exc:
+        raise ValueError(f"{label} is not an ISO timestamp: {value!r}") from exc
 
 
 def validate_row(row):
@@ -120,10 +120,17 @@ VALUES (%(kind)s, %(plate_norm)s, %(plate_canon)s, %(description)s, %(category)s
 RETURNING id
 """
 
+# Static SQL with optional predicates. Both filters are parameters, so the statement never
+# changes shape and there is no string building to get wrong later.
 SELECT = """
 SELECT id, kind, plate_norm, plate_canon, description, category, reason, severity,
        owner_dept_id, classification, added_by, valid_from, valid_until, source
 FROM watchlist
+WHERE (%(owner_dept_id)s::int IS NULL OR owner_dept_id = %(owner_dept_id)s)
+  AND (%(active_at)s::timestamptz IS NULL
+       OR ((valid_from IS NULL OR valid_from <= %(active_at)s)
+       AND (valid_until IS NULL OR valid_until > %(active_at)s)))
+ORDER BY id
 """
 
 
@@ -145,17 +152,8 @@ class WatchlistRepo:
         The validity window is not decoration: an expired entry that still matches produces an
         alert an officer has to dismiss, which is how a watchlist stops being trusted.
         """
-        clauses, params = [], []
-        if owner_dept_id is not None:
-            clauses.append("owner_dept_id = %s")
-            params.append(owner_dept_id)
-        if active_at is not None:
-            clauses.append("(valid_from IS NULL OR valid_from <= %s)")
-            clauses.append("(valid_until IS NULL OR valid_until > %s)")
-            params += [active_at, active_at]
-        sql = SELECT + ("WHERE " + " AND ".join(clauses) if clauses else "")
         with self.store.conn as conn, conn.cursor() as cur:
-            cur.execute(sql, params)
+            cur.execute(SELECT, {"owner_dept_id": owner_dept_id, "active_at": active_at})
             cols = [c.name for c in cur.description]
             return [dict(zip(cols, r)) for r in cur.fetchall()]
 

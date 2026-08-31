@@ -22,7 +22,7 @@ from watchlist import ImportRejected, WatchlistRepo, validate_row            # n
 
 DSN = os.environ.get("TEST_POSTGRES_DSN",
                      os.environ.get("POSTGRES_DSN",
-                                    "postgresql://sentinel:sentinel@localhost:5432/sentinel"))
+                                    "postgresql://localhost:5432/sentinel"))
 
 GOOD = ("kind,plate,description,category,reason,severity\n"
         "plate,GJ01AB1234,,stolen vehicle,FIR 0123/2026,HIGH\n"

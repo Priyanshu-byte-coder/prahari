@@ -31,7 +31,7 @@ import fake_sightings as fs                          # noqa: E402
 REDIS_URL = os.environ.get("TEST_REDIS_URL", os.environ.get("REDIS_URL", "redis://localhost:6379/0"))
 DSN = os.environ.get("TEST_POSTGRES_DSN",
                      os.environ.get("POSTGRES_DSN",
-                                    "postgresql://sentinel:sentinel@localhost:5432/sentinel"))
+                                    "postgresql://localhost:5432/sentinel"))
 
 
 @pytest.fixture(scope="module")
@@ -135,12 +135,32 @@ def test_recent_plate_cache_is_newest_first_and_capped(store, rig):
     store.redis.delete(f"plate:{plate}")
 
 
-def test_crop_url_is_not_signed_when_the_scope_check_says_no():
+CROP = "s3://crops/GJ-AHD-0001/2026/09/14/01J6.jpg"
+
+
+@pytest.fixture
+def object_store_keys(monkeypatch):
+    """Keys come from the environment ([C9]); the test supplies its own throwaway pair."""
+    monkeypatch.setenv("MINIO_ACCESS_KEY", "test-access-key")
+    monkeypatch.setenv("MINIO_SECRET_KEY", "test-secret-key")
+
+
+def test_crop_url_is_not_signed_when_the_scope_check_says_no(object_store_keys):
     denied = Store(dsn=DSN, redis_url=REDIS_URL, scope_check=lambda ctx: False)
-    assert denied.crop_url("s3://crops/GJ-AHD-0001/2026/09/14/01J6.jpg") is None
+    assert denied.crop_url(CROP) is None
 
 
-def test_crop_url_expires_in_five_minutes():
+def test_crop_url_expires_in_five_minutes(object_store_keys):
     allowed = Store(dsn=DSN, redis_url=REDIS_URL, scope_check=lambda ctx: True)
-    url = allowed.crop_url("s3://crops/GJ-AHD-0001/2026/09/14/01J6.jpg")
+    url = allowed.crop_url(CROP)
     assert "X-Amz-Expires=300" in url and "01J6.jpg" in url
+
+
+def test_signing_without_object_store_keys_refuses_rather_than_defaulting(monkeypatch):
+    # A default key pair in source gets deployed unchanged, and the crop bucket holds
+    # vehicles and faces. Refusing is the safe failure.
+    monkeypatch.delenv("MINIO_ACCESS_KEY", raising=False)
+    monkeypatch.delenv("MINIO_SECRET_KEY", raising=False)
+    store = Store(dsn=DSN, redis_url=REDIS_URL, scope_check=lambda ctx: True)
+    with pytest.raises(RuntimeError, match="MINIO_ACCESS_KEY"):
+        store.crop_url(CROP)

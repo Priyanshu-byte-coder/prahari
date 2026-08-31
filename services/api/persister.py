@@ -58,10 +58,11 @@ class Persister:
 
     def ensure_group(self):
         """Create the group, tolerating the usual race of several persisters starting at once."""
+        from redis.exceptions import ResponseError
         try:
             self.redis.xgroup_create(self.stream, self.group, id="0", mkstream=True)
-        except Exception as exc:                       # redis.exceptions.ResponseError
-            if "BUSYGROUP" not in str(exc):
+        except ResponseError as exc:
+            if "BUSYGROUP" not in str(exc):            # anything else is a real failure
                 raise
 
     def _handle(self, entries):

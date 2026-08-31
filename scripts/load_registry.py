@@ -30,7 +30,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_SEED = REPO / "data" / "cameras.seed.json"
 DEFAULT_GEO = REPO / "data" / "camera_geo.json"
-DEFAULT_DSN = "postgresql://sentinel:sentinel@localhost:5432/sentinel"
+# Credentials come from POSTGRES_DSN in .env ([C9]), never from this file.
+DEFAULT_DSN = "postgresql://localhost:5432/sentinel"
 
 UPSERT = """
 INSERT INTO cameras (camera_id, name, owner_dept_id, district_code, install_type,

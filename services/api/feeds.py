@@ -195,7 +195,9 @@ def pull_all(feeds, since=None):
     for feed in feeds:
         try:
             entries.extend(feed.pull(since))
-        except Exception as exc:                        # a feed being down is not our outage
+        except (OSError, ValueError, RuntimeError) as exc:
+            # A state system being down, slow or returning nonsense is their outage, not
+            # ours: name it, carry on with the feeds that answered.
             log.error("feed %s failed: %s", getattr(feed, "name", feed), exc)
             failures.append((getattr(feed, "name", str(feed)), str(exc)))
     return entries, failures
