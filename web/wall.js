@@ -143,11 +143,23 @@ const WallView = (() => {
   async function tryWhep(id, whepUrl) {
     return new Promise(resolve => {
       let settled = false;
-      const settle = (ok) => { if (!settled) { settled = true; resolve(ok); } };
+      // cleanupPc: close the RTCPeerConnection and cancel the timeout so no
+      // further settle() calls can fire after the promise is already resolved.
+      // Called by every settle(false) path to prevent PC leaks.
+      const cleanupPc = () => {
+        clearTimeout(timeout);
+        if (pcs[id]) { try { pcs[id].close(); } catch (_) {} delete pcs[id]; }
+      };
+      const settle = (ok) => {
+        if (!settled) {
+          settled = true;
+          if (!ok) cleanupPc();
+          resolve(ok);
+        }
+      };
 
       const timeout = setTimeout(() => {
         settle(false);
-        if (pcs[id]) { pcs[id].close(); delete pcs[id]; }
         setBadge(id, 'hls');
       }, WHEP_TIMEOUT_MS);
 
@@ -173,8 +185,8 @@ const WallView = (() => {
 
         pc.onconnectionstatechange = () => {
           if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-            settle(false);
             setBadge(id, 'hls');
+            settle(false);
           }
         };
 

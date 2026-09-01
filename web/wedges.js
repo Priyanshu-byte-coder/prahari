@@ -78,19 +78,25 @@ const WedgeLayer = (() => {
     }).addTo(mapRef);
     wedges[c.camera_id] = poly;
 
-    // Drag handle at tip
+    // Drag handle at tip.
+    // L.circleMarker is NOT draggable in core Leaflet (no dragging handler).
+    // Use L.marker with a DivIcon styled as a circle — L.marker supports drag
+    // natively without any extra plugin.
     const tip = tipLatLon(c);
     if (!tip) return;
-    const handle = L.circleMarker(tip, {
-      radius:      6,
-      color:       HANDLE_COLOR,
-      weight:      2,
-      fillColor:   HANDLE_COLOR,
-      fillOpacity: 0.85,
-      draggable:   true,
+    const handle = L.marker(tip, {
+      icon: L.divIcon({
+        className: '',
+        html: `<div style="
+          width:12px;height:12px;border-radius:50%;
+          background:${HANDLE_COLOR};border:2px solid #2563eb;
+          margin:-6px 0 0 -6px;cursor:grab;"></div>`,
+        iconSize:   [0, 0],
+        iconAnchor: [0, 0],
+      }),
+      draggable: true,
+      autoPan:   false,
     }).addTo(mapRef);
-    handle.options.draggable = true;
-    handle.dragging && handle.dragging.enable();
 
     handle.on('drag', e => {
       const ll   = e.latlng;

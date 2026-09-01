@@ -114,7 +114,7 @@ def fetch_live_catalogue(hostname: str, timeout: float = 10.0) -> list[dict] | N
     for path in ("/api/ingest", "/api/ingest/"):
         url = base + path
         try:
-            resp = requests.get(url, timeout=timeout)
+            resp = _SESSION.get(url, timeout=timeout)
         except requests.RequestException as exc:
             _log("!", f"{url} -> {type(exc).__name__}: {exc}")
             continue

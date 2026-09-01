@@ -70,7 +70,9 @@ const WsClient = (() => {
     });
 
     ws.addEventListener('close',  () => { clearPingTimer(); schedule(); });
-    ws.addEventListener('error',  () => { clearPingTimer(); ws && ws.close(); });
+    // On error, mark the socket dead so the close handler's schedule() runs instead
+    // of a second connect() call racing with it.
+    ws.addEventListener('error',  () => { clearPingTimer(); });
   }
 
   function dispatch(msg) {
@@ -82,9 +84,10 @@ const WsClient = (() => {
   function resetPingTimer() {
     clearPingTimer();
     pingTimer = setTimeout(() => {
-      // Server went quiet — reconnect
+      // Server went quiet — close the socket and let the 'close' handler
+      // call schedule().  Do NOT call connect() here: the 'close' event fires
+      // immediately after ws.close() and would create a second connect().
       ws && ws.close();
-      connect();
     }, PING_TIMEOUT_MS);
   }
 

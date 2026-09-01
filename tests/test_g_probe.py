@@ -102,6 +102,8 @@ def test_probe_rtsp_reads_the_describe_reply(monkeypatch, reply, expected):
         def sendall(self, *a): pass
         def recv(self, *a): return reply
 
+    # Allow the test hostname through the SSRF guard so the mock socket is reached.
+    monkeypatch.setattr(probe_mod, "allowed_hosts", lambda: frozenset({"grid.example"}))
     monkeypatch.setattr(probe_mod.socket, "create_connection", lambda *a, **k: FakeSock())
     ok, _ = probe_mod.probe_rtsp("rtsp://grid.example:8554/stream/7")
     assert ok is expected
