@@ -18,7 +18,7 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import AsyncIterator
 
 from ..source import CameraSource, Frame, Health, TsSource
@@ -116,7 +116,7 @@ class VMSSource(CameraSource):
             event_id="VMS-EVT-000",
             camera_id=camera_ids[0] if camera_ids else "VMS-001",
             event_type="motion",
-            at=datetime.utcnow(),
+            at=datetime.now(timezone.utc),
             payload={"zone": "entrance", "confidence": 0.92},
         )
         while True:

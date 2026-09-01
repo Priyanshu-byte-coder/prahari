@@ -177,6 +177,9 @@ kbd{background:var(--panel2);border:1px solid var(--line);border-radius:3px;padd
 const $  = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
+/** Escape text before inserting into innerHTML. */
+const esc = s => { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; };
+
 let cams = [], wall = {cameras:[]}, sel = null, view = 'map';
 let markers = {}, wedges = {}, tileTimers = {};
 
@@ -255,14 +258,14 @@ function drawWall(){
   const shown = filtered();
   $('#wall').innerHTML = shown.map(c => {
     const st = wallOf(c.camera_id);
-    return `<div class="tile ${sel&&sel.camera_id===c.camera_id?'sel':''} ${st.stale?'stale':''}" data-id="${c.camera_id}">
+    return `<div class="tile ${sel&&sel.camera_id===c.camera_id?'sel':''} ${st.stale?'stale':''}" data-id="${esc(c.camera_id)}">
       <span class="staletag">stale</span>
-      <div class="ph" id="ph-${c.camera_id}">${st.has_frame?'':phText(st)}</div>
-      <img id="im-${c.camera_id}" alt="" style="display:${st.has_frame?'block':'none'}">
+      <div class="ph" id="ph-${esc(c.camera_id)}">${st.has_frame?'':phText(st)}</div>
+      <img id="im-${esc(c.camera_id)}" alt="" style="display:${st.has_frame?'block':'none'}">
       <div class="bar">
         <span class="dot ${st.status}"></span>
-        <span class="nm">${c.camera_id} · ${c.location_raw || c.name}</span>
-        <span class="age" id="ag-${c.camera_id}"></span>
+        <span class="nm">${esc(c.camera_id)} · ${esc(c.location_raw || c.name)}</span>
+        <span class="age" id="ag-${esc(c.camera_id)}"></span>
       </div>
     </div>`;
   }).join('');
@@ -310,11 +313,11 @@ function drawList(){
   const shown = filtered();
   $('#list').innerHTML = shown.map(c => {
     const st = wallOf(c.camera_id), g = geoOf(c);
-    return `<div class="row ${sel&&sel.camera_id===c.camera_id?'sel':''}" data-id="${c.camera_id}">
+    return `<div class="row ${sel&&sel.camera_id===c.camera_id?'sel':''}" data-id="${esc(c.camera_id)}">
       <span class="dot ${st.status}"></span>
-      <span class="cid">${c.camera_id}</span>
-      <span class="nm">${placed(c)?'✓ ':''}${c.location_raw || c.name}</span>
-      <span class="chip ${g.coord_conf||''}">${g.coord_conf || '—'}</span>
+      <span class="cid">${esc(c.camera_id)}</span>
+      <span class="nm">${placed(c)?'✓ ':''}${esc(c.location_raw || c.name)}</span>
+      <span class="chip ${g.coord_conf||''}">${esc(g.coord_conf || '—')}</span>
     </div>`;
   }).join('');
   $$('#list .row').forEach(r => r.onclick = () => select(r.dataset.id));
@@ -334,35 +337,35 @@ function renderDetail(){
   if (!sel){ $('#detail').innerHTML=''; return; }
   const c = sel, g = geoOf(c), st = wallOf(c.camera_id);
   $('#detail').innerHTML = `
-    <h3>Camera ${c.camera_id}</h3>
-    <div class="sub">${c.location_raw || c.name}</div>
-    <img id="dImg" src="/tile/${c.camera_id}.jpg?t=${Date.now()}" alt="">
+    <h3>Camera ${esc(c.camera_id)}</h3>
+    <div class="sub">${esc(c.location_raw || c.name)}</div>
+    <img id="dImg" src="/tile/${esc(c.camera_id)}.jpg?t=${Date.now()}" alt="">
     <div class="hint" id="dNote">${st.has_frame ? 'cached frame' : phText(st)}</div>
     <div class="row" style="border:0;padding:8px 0;gap:8px">
-      <button class="btn go"   style="flex:1" onclick="one('start','${c.camera_id}')">▶ Start</button>
-      <button class="btn stop" style="flex:1" onclick="one('stop','${c.camera_id}')">■ Stop</button>
+      <button class="btn go"   style="flex:1" onclick="one('start',${JSON.stringify(String(c.camera_id))})">▶ Start</button>
+      <button class="btn stop" style="flex:1" onclick="one('stop',${JSON.stringify(String(c.camera_id))})">■ Stop</button>
     </div>
     <h4>Status</h4>
     <dl class="kv">
-      <dt>wall</dt><dd>${st.status}${st.detail?` — ${st.detail}`:''}</dd>
-      <dt>frames</dt><dd>${st.frames ?? 0}</dd>
-      <dt>frame age</dt><dd>${st.age_s ?? '—'}${st.age_s!=null?' s':''}</dd>
+      <dt>wall</dt><dd>${esc(st.status)}${st.detail?` — ${esc(st.detail)}`:''}</dd>
+      <dt>frames</dt><dd>${esc(st.frames ?? 0)}</dd>
+      <dt>frame age</dt><dd>${esc(st.age_s ?? '—')}${st.age_s!=null?' s':''}</dd>
     </dl>
     <h4>Placement</h4>
     <dl class="kv">
-      <dt>lat, lon</dt><dd>${g.lat ?? '—'}, ${g.lon ?? '—'}</dd>
-      <dt>confidence</dt><dd><span class="chip ${g.coord_conf||''}">${g.coord_conf||'—'}</span></dd>
-      <dt>source</dt><dd>${g.coord_source || '—'}</dd>
-      <dt>bearing</dt><dd>${g.bearing_deg ?? '— (no wedge drawn)'}</dd>
+      <dt>lat, lon</dt><dd>${esc(g.lat ?? '—')}, ${esc(g.lon ?? '—')}</dd>
+      <dt>confidence</dt><dd><span class="chip ${g.coord_conf||''}">${esc(g.coord_conf||'—')}</span></dd>
+      <dt>source</dt><dd>${esc(g.coord_source || '—')}</dd>
+      <dt>bearing</dt><dd>${esc(g.bearing_deg ?? '— (no wedge drawn)')}</dd>
       <dt>verified</dt><dd>${g.verified ? 'yes' : 'no — geocoded, not checked against the frame'}</dd>
-      <dt>landmark</dt><dd>${g.landmark || '—'}</dd>
+      <dt>landmark</dt><dd>${esc(g.landmark || '—')}</dd>
     </dl>
     <h4>Transport</h4>
     <dl class="kv">
-      <dt>district</dt><dd>${c.district_code}</dd>
-      <dt>install</dt><dd>${c.install_type} <span class="hint">(seed says FIX for all — overlay shows otherwise)</span></dd>
-      <dt>hls</dt><dd>${(c.transports||{}).hls || '—'}</dd>
-      <dt>rtsp</dt><dd>${(c.transports||{}).rtsp || '—'} <span class="hint">8554 filtered</span></dd>
+      <dt>district</dt><dd>${esc(c.district_code)}</dd>
+      <dt>install</dt><dd>${esc(c.install_type)} <span class="hint">(seed says FIX for all — overlay shows otherwise)</span></dd>
+      <dt>hls</dt><dd>${esc((c.transports||{}).hls || '—')}</dd>
+      <dt>rtsp</dt><dd>${esc((c.transports||{}).rtsp || '—')} <span class="hint">8554 filtered</span></dd>
     </dl>
     <div class="hint">Shift-click a wall tile to enlarge. <kbd>/</kbd> search · <kbd>Esc</kbd> close.</div>`;
 }
@@ -420,7 +423,7 @@ async function boot(){
   $('#s-placed').textContent = cams.filter(placed).length;
   const ds = [...new Set(cams.map(c => c.district_code).filter(Boolean))].sort();
   $('#fDistrict').innerHTML = '<option value="">All districts</option>' +
-    ds.map(d => `<option>${d}</option>`).join('');
+    ds.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
   await poll();
   drawList(); drawMap(); drawWall();
   setInterval(poll, 2000);

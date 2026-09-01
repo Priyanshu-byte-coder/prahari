@@ -105,6 +105,13 @@ let cams = [], geo = {}, idx = 0, marker = null, hls = null;
 
 const conf = id => (geo[id] && geo[id].coord_conf) || 'LOW';
 
+/** Escape text for safe innerHTML insertion. */
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = String(s ?? '');
+  return d.innerHTML;
+}
+
 async function boot() {
   cams = await (await fetch('../data/cameras.seed.json')).json();
   geo  = await (await fetch('../data/camera_geo.json')).json();
@@ -118,8 +125,8 @@ function stats() {
   const ver = v.filter(g => g.verified).length;
   const brg = v.filter(g => g.bearing_deg !== null && g.bearing_deg !== undefined).length;
   $('#stats').innerHTML =
-    `<b>${ok}/${v.length}</b> HIGH+MEDIUM <span style="color:${ok>=25?'var(--hi)':'var(--low)'}">
-     (need 25)</span><br>${ver} verified · ${brg} bearings set`;
+    `<b>${esc(ok)}/${esc(v.length)}</b> HIGH+MEDIUM <span style="color:${ok>=25?'var(--hi)':'var(--low)'}">
+     (need 25)</span><br>${esc(ver)} verified · ${esc(brg)} bearings set`;
 }
 
 function renderList() {
@@ -127,8 +134,8 @@ function renderList() {
     const g = geo[c.camera_id] || {};
     return `<div class="cam ${i===idx?'sel':''}" data-i="${i}">
       <span class="dot ${conf(c.camera_id)}"></span>
-      <span class="id">${c.camera_id}</span>
-      <span class="nm">${g.verified ? '✓ ' : ''}${c.location_raw || c.name}</span>
+      <span class="id">${esc(c.camera_id)}</span>
+      <span class="nm">${g.verified ? '✓ ' : ''}${esc(c.location_raw || c.name)}</span>
     </div>`;
   }).join('');
   document.querySelectorAll('.cam').forEach(el =>
@@ -149,9 +156,9 @@ function select(i) {
   renderList();
 
   $('#meta').innerHTML =
-    `<b>cam ${c.camera_id}</b> — ${c.location_raw || c.name}<br>
-     district ${c.district_code} · source ${g.coord_source || '?'} ·
-     ${g.landmark ? g.landmark : 'no landmark recorded'}`;
+    `<b>cam ${esc(c.camera_id)}</b> — ${esc(c.location_raw || c.name)}<br>
+     district ${esc(c.district_code)} · source ${esc(g.coord_source || '?')} ·
+     ${g.landmark ? esc(g.landmark) : 'no landmark recorded'}`;
   $('#landmark').value = g.landmark && !g.landmark.includes('NOT placed') ? g.landmark : '';
   $('#bearing').value  = (g.bearing_deg ?? '');
   $('#conf').value     = g.coord_conf || 'LOW';

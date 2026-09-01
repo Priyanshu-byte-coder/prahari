@@ -7,6 +7,8 @@
  */
 
 const AdminView = (() => {
+  /** Escape text before inserting into innerHTML. */
+  const esc = s => { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; };
   function init() {}
 
   async function activate() {
@@ -44,9 +46,9 @@ const AdminView = (() => {
         : `<span class="status-badge status-stub">STUB — interface complete</span>`;
       return `
         <div class="driver-card">
-          <h3>${badge} <span style="font-family:ui-monospace,monospace">${d.driver}</span></h3>
-          <div style="color:var(--dim);font-size:12px;margin-bottom:4px">${d.note}</div>
-          <div style="font-size:12px">Cameras: <b>${d.cameras}</b></div>
+          <h3>${badge} <span style="font-family:ui-monospace,monospace">${esc(d.driver)}</span></h3>
+          <div style="color:var(--dim);font-size:12px;margin-bottom:4px">${esc(d.note)}</div>
+          <div style="font-size:12px">Cameras: <b>${esc(d.cameras)}</b></div>
         </div>`;
     }).join('');
   }
@@ -69,12 +71,12 @@ const AdminView = (() => {
                 : '';
             return `
               <tr>
-                <td>${c.camera_id}</td>
-                <td>${c.name}</td>
-                <td>${c.district_code || '—'}</td>
-                <td><code>${c.transport_in_use || '—'}</code></td>
-                <td>${c.driver || '—'}</td>
-                <td><span class="hdot ${hcls}"></span> ${c.health || 'UNKNOWN'}</td>
+                <td>${esc(c.camera_id)}</td>
+                <td>${esc(c.name)}</td>
+                <td>${esc(c.district_code || '—')}</td>
+                <td><code>${esc(c.transport_in_use || '—')}</code></td>
+                <td>${esc(c.driver || '—')}</td>
+                <td><span class="hdot ${hcls}"></span> ${esc(c.health || 'UNKNOWN')}</td>
                 <td>${noRtsp}</td>
               </tr>`;
           }).join('')}

@@ -17,6 +17,8 @@
 
 const WallView = (() => {
   const WHEP_TIMEOUT_MS = 3000;
+  /** Escape text before inserting into innerHTML. */
+  const esc = s => { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; };
   const PROXY_BASE      = '';   // same-origin proxy via console_serve.py
 
   let cameras    = [];
@@ -62,15 +64,15 @@ const WallView = (() => {
 
     const shown = cameras.filter(c => c.lat != null || true); // show all
     grid.innerHTML = shown.map(c => `
-      <div class="wall-tile" id="wt-${c.camera_id}" data-id="${c.camera_id}">
-        <video id="wv-${c.camera_id}" autoplay muted playsinline
+      <div class="wall-tile" id="wt-${esc(c.camera_id)}" data-id="${esc(c.camera_id)}">
+        <video id="wv-${esc(c.camera_id)}" autoplay muted playsinline
                style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none"></video>
-        <img   id="wi-${c.camera_id}" alt=""
+        <img   id="wi-${esc(c.camera_id)}" alt=""
                style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none">
         <div class="tile-bar">
-          <span class="hdot h-${(c.health||'unknown').toLowerCase()}" id="wdot-${c.camera_id}"></span>
-          <span class="tnm">${c.camera_id} · ${c.name}</span>
-          <span class="whep-badge" id="wbadge-${c.camera_id}"></span>
+          <span class="hdot h-${(c.health||'unknown').toLowerCase()}" id="wdot-${esc(c.camera_id)}"></span>
+          <span class="tnm">${esc(c.camera_id)} · ${esc(c.name)}</span>
+          <span class="whep-badge" id="wbadge-${esc(c.camera_id)}"></span>
         </div>
       </div>`).join('');
 

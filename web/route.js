@@ -18,6 +18,8 @@ const RouteView = (() => {
   const PIN_PROBABLE  = '#fbbf24';
   const LINE_CONFIRMED = '#3b82f6';
   const LINE_PROBABLE  = '#a78bfa';
+  /** Escape text before inserting into innerHTML. */
+  const esc = s => { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; };
   const PIN_IMPLAUSIBLE = '#f87171';
 
   let routeMap = null, routeData = null;
@@ -188,11 +190,11 @@ const RouteView = (() => {
         ? `<img src="${hop.crop_url}" style="max-width:120px;border-radius:4px;margin-top:4px" onerror="this.style.display='none'">`
         : '';
       pin.bindPopup(`
-        <b>${hop.n}. ${hop.name}</b><br>
-        ${new Date(hop.pts).toLocaleString()}<br>
-        Band: <b>${hop.band}</b>${hop.kind === 'PROBABLE' ? ' (Re-ID hop, dashed)' : ''}<br>
-        ${hop.implied_speed_kmh ? `Speed: ${hop.implied_speed_kmh.toFixed(0)} km/h` : ''}
-        ${hop.flag ? `<br><span style="color:#f87171">⚡ ${hop.flag}</span>` : ''}
+        <b>${esc(hop.n)}. ${esc(hop.name)}</b><br>
+        ${esc(new Date(hop.pts).toLocaleString())}<br>
+        Band: <b>${esc(hop.band)}</b>${hop.kind === 'PROBABLE' ? ' (Re-ID hop, dashed)' : ''}<br>
+        ${hop.implied_speed_kmh ? `Speed: ${esc(hop.implied_speed_kmh.toFixed(0))} km/h` : ''}
+        ${hop.flag ? `<br><span style="color:#f87171">⚡ ${esc(hop.flag)}</span>` : ''}
         ${cropHtml}`, { maxWidth: 200 });
       pinLayers.push(pin);
     });
@@ -229,12 +231,12 @@ const RouteView = (() => {
         <tbody>
           ${data.hops.map(h => `
           <tr>
-            <td>${h.n}</td>
-            <td>${h.name}<br><span style="color:var(--faint)">${h.camera_id}</span></td>
-            <td>${new Date(h.pts).toLocaleTimeString()}</td>
-            <td><span class="chip" style="${h.kind==='PROBABLE'?'color:var(--deg)':'color:var(--live)'}">${h.kind}</span></td>
-            <td>${h.implied_speed_kmh ? h.implied_speed_kmh.toFixed(0) + ' km/h' : '—'}</td>
-            <td>${h.flag ? `<span style="color:var(--down)">⚡ ${h.flag}</span>` : '—'}</td>
+            <td>${esc(h.n)}</td>
+            <td>${esc(h.name)}<br><span style="color:var(--faint)">${esc(h.camera_id)}</span></td>
+            <td>${esc(new Date(h.pts).toLocaleTimeString())}</td>
+            <td><span class="chip" style="${h.kind==='PROBABLE'?'color:var(--deg)':'color:var(--live)'}">${esc(h.kind)}</span></td>
+            <td>${h.implied_speed_kmh ? esc(h.implied_speed_kmh.toFixed(0)) + ' km/h' : '—'}</td>
+            <td>${h.flag ? `<span style="color:var(--down)">⚡ ${esc(h.flag)}</span>` : '—'}</td>
           </tr>`).join('')}
         </tbody>
       </table>`;

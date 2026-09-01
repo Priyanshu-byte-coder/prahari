@@ -6,6 +6,8 @@
  */
 
 const MapView = (() => {
+  /** Escape text before inserting into innerHTML/tooltips. */
+  const esc = s => { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; };
   const HEALTH_COLOR = {
     LIVE:     '#34d399',
     DEGRADED: '#fbbf24',
@@ -85,7 +87,7 @@ const MapView = (() => {
     const placed = cams.filter(c => c.lat != null && c.lon != null);
     placed.forEach(c => {
       const m = L.marker([c.lat, c.lon], { icon: makeIcon(c), _health: c.health || 'UNKNOWN' });
-      m.bindTooltip(`${c.camera_id} · ${c.name}`, { direction: 'top', opacity: 0.9 });
+      m.bindTooltip(`${esc(c.camera_id)} · ${esc(c.name)}`, { direction: 'top', opacity: 0.9 });
       m.on('click', () => window.selectCamera && window.selectCamera(c.camera_id));
       markers[c.camera_id] = m;
       cluster.addLayer(m);
@@ -127,8 +129,8 @@ const MapView = (() => {
       cameras.forEach(c => {
         fakes.push(Object.assign({}, c, {
           camera_id: `${c.camera_id}_${i}`,
-          lat: c.lat + (Math.random() - .5) * 4,
-          lon: c.lon + (Math.random() - .5) * 4,
+          lat: c.lat + (crypto.getRandomValues(new Uint32Array(1))[0] / 0xFFFFFFFF - .5) * 4,
+          lon: c.lon + (crypto.getRandomValues(new Uint32Array(1))[0] / 0xFFFFFFFF - .5) * 4,
         }));
       });
     }

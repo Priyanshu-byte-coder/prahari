@@ -93,6 +93,9 @@
 // Bootstrap: load fixtures (works with API down) or live API
 const API = window.API_BASE || '';
 
+/** Escape text before inserting into innerHTML. */
+const esc = s => { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; };
+
 async function apiFetch(path, fallback) {
   try {
     const r = await fetch(API + path);
@@ -158,11 +161,11 @@ function renderList(cameras) {
   });
   const list = document.getElementById('list');
   list.innerHTML = shown.map(c => `
-    <div class="row" data-id="${c.camera_id}">
+    <div class="row" data-id="${esc(c.camera_id)}">
       <span class="hdot h-${(c.health||'UNKNOWN').toLowerCase()}"></span>
-      <span class="cid">${c.camera_id}</span>
-      <span class="nm">${c.name}</span>
-      <span class="chip cc-${(c.coord_conf||'').toLowerCase()}">${c.coord_conf || '—'}</span>
+      <span class="cid">${esc(c.camera_id)}</span>
+      <span class="nm">${esc(c.name)}</span>
+      <span class="chip cc-${(c.coord_conf||'').toLowerCase()}">${esc(c.coord_conf || '—')}</span>
     </div>`).join('');
   list.querySelectorAll('.row').forEach(r =>
     r.addEventListener('click', () => selectCamera(r.dataset.id)));
@@ -186,29 +189,29 @@ function showDetail(c) {
   const snapUrl = API ? `${API}/api/cameras/${c.camera_id}/snapshot` : null;
   d.innerHTML = `
     <button class="detail-close" onclick="document.getElementById('main').classList.remove('detail');document.getElementById('detail').innerHTML=''">×</button>
-    <h3>Camera ${c.camera_id}</h3>
-    <div class="sub">${c.name}</div>
-    ${snapUrl ? `<img class="snap" src="${snapUrl}" alt="" onerror="this.style.display='none'">` : '<div class="snap-placeholder">snapshot requires live API</div>'}
+    <h3>Camera ${esc(c.camera_id)}</h3>
+    <div class="sub">${esc(c.name)}</div>
+    ${snapUrl ? `<img class="snap" src="${esc(snapUrl)}" alt="" onerror="this.style.display='none'">` : '<div class="snap-placeholder">snapshot requires live API</div>'}
     <h4>Health</h4>
     <dl class="kv">
-      <dt>status</dt><dd><span class="hdot h-${(c.health||'UNKNOWN').toLowerCase()}"></span> ${c.health||'UNKNOWN'}</dd>
-      <dt>updated</dt><dd>${c.health_at ? new Date(c.health_at).toLocaleTimeString() : '—'}</dd>
+      <dt>status</dt><dd><span class="hdot h-${(c.health||'UNKNOWN').toLowerCase()}"></span> ${esc(c.health||'UNKNOWN')}</dd>
+      <dt>updated</dt><dd>${c.health_at ? esc(new Date(c.health_at).toLocaleTimeString()) : '—'}</dd>
     </dl>
     <h4>Location</h4>
     <dl class="kv">
-      <dt>district</dt><dd>${c.district_code||'—'}</dd>
-      <dt>lat, lon</dt><dd>${c.lat != null ? c.lat.toFixed(5) : '—'}, ${c.lon != null ? c.lon.toFixed(5) : '—'}</dd>
-      <dt>confidence</dt><dd><span class="chip cc-${(c.coord_conf||'').toLowerCase()}">${c.coord_conf||'—'}</span></dd>
-      <dt>bearing</dt><dd>${c.bearing_deg != null ? c.bearing_deg + '°' : '— (no wedge)'}</dd>
+      <dt>district</dt><dd>${esc(c.district_code||'—')}</dd>
+      <dt>lat, lon</dt><dd>${c.lat != null ? esc(c.lat.toFixed(5)) : '—'}, ${c.lon != null ? esc(c.lon.toFixed(5)) : '—'}</dd>
+      <dt>confidence</dt><dd><span class="chip cc-${(c.coord_conf||'').toLowerCase()}">${esc(c.coord_conf||'—')}</span></dd>
+      <dt>bearing</dt><dd>${c.bearing_deg != null ? esc(c.bearing_deg + '°') : '— (no wedge)'}</dd>
     </dl>
     <h4>Transport</h4>
     <dl class="kv">
-      <dt>in use</dt><dd>${c.transport_in_use||'—'}</dd>
-      <dt>driver</dt><dd>${c.driver||'—'}</dd>
+      <dt>in use</dt><dd>${esc(c.transport_in_use||'—')}</dd>
+      <dt>driver</dt><dd>${esc(c.driver||'—')}</dd>
     </dl>
     <div style="display:flex;gap:8px;margin-top:12px">
-      <button class="btn go" onclick="WallView.openOne('${c.camera_id}');switchView('wall')">▶ Open in wall</button>
-      <button class="btn" onclick="RouteView.openSearch('${c.camera_id}');switchView('route')">Route</button>
+      <button class="btn go" onclick="WallView.openOne(${JSON.stringify(String(c.camera_id))});switchView('wall')">▶ Open in wall</button>
+      <button class="btn" onclick="RouteView.openSearch(${JSON.stringify(String(c.camera_id))});switchView('route')">Route</button>
     </div>
     <div class="hint" style="margin-top:10px">Shift-click a wall tile to enlarge. <kbd>Esc</kbd> close panel.</div>`;
   // Refresh snapshot every 5 s

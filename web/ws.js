@@ -96,7 +96,10 @@ const WsClient = (() => {
   }
 
   function schedule() {
-    const delay = backoff + Math.random() * backoff * 0.3;
+    // crypto.getRandomValues instead of Math.random: not security-sensitive
+    // but avoids the S2245 hotspot at zero cost.
+    const r = crypto.getRandomValues(new Uint32Array(1))[0] / 0xFFFFFFFF;
+    const delay = backoff + r * backoff * 0.3;
     backoff = Math.min(backoff * 2, BACKOFF_MAX_MS);
     setTimeout(connect, delay);
   }

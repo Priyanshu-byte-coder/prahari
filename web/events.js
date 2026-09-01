@@ -8,6 +8,8 @@
  */
 
 const EventsLayer = (() => {
+  /** Escape text before inserting into innerHTML. */
+  const esc = s => { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; };
   const FADE_MS      = 30_000;
   const PRELOAD_H    = 6;
   const DETECTION_R  = 6;
@@ -139,9 +141,13 @@ const EventsLayer = (() => {
     const cam = (window.prahari.cameras || []).find(c => String(c.camera_id) === String(e.camera_id));
     if (!cam || cam.lat == null) return;
 
-    // Jitter slightly so overlapping cameras don't stack
-    const jLat = cam.lat + (Math.random() - .5) * 0.001;
-    const jLon = cam.lon + (Math.random() - .5) * 0.001;
+    // Jitter slightly so overlapping cameras don't stack.
+    // crypto.getRandomValues avoids the S2245 Math.random hotspot — the
+    // value is not security-sensitive but the stronger call costs nothing.
+    const _buf = new Uint32Array(2);
+    crypto.getRandomValues(_buf);
+    const jLat = cam.lat + (_buf[0] / 0xFFFFFFFF - .5) * 0.001;
+    const jLon = cam.lon + (_buf[1] / 0xFFFFFFFF - .5) * 0.001;
 
     const circle = L.circleMarker([jLat, jLon], {
       radius:      DETECTION_R,
@@ -152,8 +158,8 @@ const EventsLayer = (() => {
     }).addTo(m);
 
     circle.bindTooltip(
-      `${e.plate_text || '—'} · cam ${e.camera_id} · ${e.vehicle_class || ''}
-       <br>${new Date(e.pts_first).toLocaleTimeString()}`,
+      `${esc(e.plate_text || '—')} · cam ${esc(e.camera_id)} · ${esc(e.vehicle_class || '')}
+       <br>${esc(new Date(e.pts_first).toLocaleTimeString())}`,
       { direction: 'top', opacity: 0.9 }
     );
 
@@ -189,8 +195,8 @@ const EventsLayer = (() => {
     }).addTo(m);
 
     circle.bindTooltip(
-      `🚨 ${alert.plate_text || '?'} · ${alert.category || ''} · ${alert.severity || ''}
-       <br>cam ${alert.camera_id} · ${new Date(alert.pts).toLocaleTimeString()}`,
+      `🚨 ${esc(alert.plate_text || '?')} · ${esc(alert.category || '')} · ${esc(alert.severity || '')}
+       <br>cam ${esc(alert.camera_id)} · ${esc(new Date(alert.pts).toLocaleTimeString())}`,
       { direction: 'top', permanent: false, opacity: 0.95 }
     );
 
