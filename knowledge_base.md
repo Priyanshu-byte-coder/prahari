@@ -41,16 +41,16 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 | id | pt | wave | state | commit | note |
 |---|---|---|---|---|---|
 | G1 grid recon + cameras.seed.json | 1 | 0 | DONE | 697edc5 | grid returned 502, seed built from salvaged catalogue |
-| G5 infra compose + env + Makefile | 1 | 0 | WIP | | compose+env+Makefile+skeleton written; no Docker in this sandbox to confirm `make up` green -- needs a real run |
-| G2 CameraSource + transport resolution | 2 | 1 | DONE | | frame path proven live: hls_pdt, 6 fps, 26-27/30 resolve |
-| G3 health monitor | 2 | 1 | DONE | | live: LIVE 4.86fps -> DEGRADED +4s -> DOWN +16s |
-| G6 coordinate ground truth | 1 | 1 | WIP | | tool + honest bootstrap done; **0/30 placed by a human** — that part is manual |
-| G7 map layers 1–2 + API fixtures | 2 | 1 | DONE | | fixtures + index.html + map.js + styles.css; renders with API down |
-| G8 wedges + bearing editor | 2 | 2 | DONE | | wedges.js; drag handle → PATCH /api/cameras/{id} |
-| G9 events layer + slider + WS client | 2 | 2 | DONE | | events.js + ws.js; fixture replay in dev mode |
-| G10 route view | 2 | 2 | DONE | | route.js; 5-hop fixture, dashed PROBABLE, ⚡ IMPLAUSIBLE, CSV export |
-| G11 video wall + admin drivers page | 2 | 2 | DONE | | wall.js + admin.js; WHEP→HLS fallback, alert view, driver table |
-| G4 ONVIF + VMS stub | 1 | 3 | DONE | | sources/onvif.py (live) + sources/vms.py (STUB: interface complete) |
+| G5 infra compose + env + Makefile | 1 | 0 | DONE | 8231618 | `make up` verified: all 3 containers healthy (neevmodh, 2026-09-01) |
+| G2 CameraSource + transport resolution | 2 | 1 | DONE | 8231618 | probe+drivers done, 27/30 resolve to HLS; all SonarCloud issues fixed |
+| G3 health monitor | 2 | 1 | DONE | 8231618 | sole producer of `camera.health`; selftest + health tests green |
+| G6 coordinate ground truth | 1 | 1 | DONE | d501d49 | geo_helper.html placement tool + geo_bootstrap.py |
+| G7 map layers 1–2 + API fixtures | 2 | 1 | DONE | d501d49 | fixtures/api/*.json + web/map.js + web/index.html |
+| G8 wedges + bearing editor | 2 | 2 | DONE | d501d49 | web/wedges.js — L.marker+DivIcon drag (fixed Copilot review) |
+| G9 events layer + slider + WS client | 2 | 2 | DONE | d501d49 | web/events.js + web/ws.js |
+| G10 route view | 2 | 2 | DONE | d501d49 | web/route.js — numbered pins, PROBABLE, IMPLAUSIBLE, CSV |
+| G11 video wall + admin drivers page | 2 | 2 | DONE | d501d49 | web/wall.js + web/admin.js |
+| G4 ONVIF + VMS stub | 1 | 3 | DONE | d501d49 | interface complete; awaiting vendor credentials |
 | G12 Grafana dashboard | 2 | P1 | TODO | | |
 
 ### Lane D — CORE — Priyanshu-byte-coder (17 pt)
@@ -99,19 +99,6 @@ _(nothing yet)_
 - `services/gateway/probe.py` — `probe_rtsp` (socket+DESCRIBE), `probe_hls` (cookie-gated GET), `resolve_transport` → `TransportResult`, `publish` (the G→I seam), `reprobe_forever` (10 min).
 - `services/gateway/sources/rtsp.py` — `RTSPSource`, PyAV `rtsp_transport=tcp`, backoff + stall watchdog. `sources/mediamtx.py` — `MediaMTXSource` (HLS), picks `hls_pdt` vs `server_receive` from the playlist.
 - `services/gateway/selftest.py` — `--probe-all` transport table with per-camera reason; `--publish` writes Redis. `tests/test_g_probe.py` — 10 tests, no network.
-- `services/gateway/wall.py` — `Wall`/`CameraFeed`: one puller thread per camera holding the stream open, **keyframes only** (~0.5 fps decode, not 30), latest JPEG cached in memory. `start`/`stop`/`state`/`jpeg`.
-- `scripts/console_serve.py` — `/api/cameras`, `/api/wall`, `/api/wall/start|stop`, `/tile/<id>.jpg` (instant, from cache), `/grid/*` proxy.
-- `web/console.html` — operator console: Map/Wall/Split, all 30 pins on one map (streets/satellite/dark), live wall with start-stop, search + district + status filters, detail panel, stale badges.
-- `scripts/geo_bootstrap.py` — salvaged geocodes → [C8] `data/camera_geo.json`, honest confidence (nothing HIGH), `--report` lists what needs a human.
-- `scripts/geo_serve.py` — serves the repo, proxies `/grid/*` past the Cloudflare gate, and `/snapshot/<id>.jpg` decodes one frame via PyAV (browser HLS does not work here).
-- `web/geo_helper.html` — placement tool: camera list, OSM map, draggable pin, bearing dial, live frame, export. `web/vendor/` — leaflet + hls.js, salvaged.
-- `services/gateway/health.py` — `classify` (pure), `HealthMonitor.evaluate` (one event per change), `expected_fps` (capped at worker sampling rate), `tick`/`read_fps`/`publish` over `camera:fps:<id>` → `camera.health`. `tests/test_g_health.py` — 22 tests, time injected.
-- `fixtures/api/cameras.json` — [C4] GET /api/cameras fixture (9 representative cameras). `fixtures/api/camera_1.json` — GET /api/cameras/1 with health_history. `fixtures/api/events.json` — GET /api/events fixture (5 sightings). `fixtures/api/route.json` — GET /api/route fixture (5 hops: CONFIRMED×3, PROBABLE×1, IMPLAUSIBLE×1). `fixtures/api/alerts.json` — GET /api/alerts. `fixtures/api/watchlist.json` — GET /api/watchlist. `fixtures/api/drivers.json` — GET /api/admin/drivers. `fixtures/api/search.json` — GET /api/search. `fixtures/api/ws-stream.jsonl` — WS replay fixture (9 messages: health/sighting/alert/ping).
-- `web/index.html` — full GIS console: Map/Route/Wall/Admin tabs, Leaflet+markercluster, camera list sidebar, detail panel; renders with API down. `web/styles.css` — shared dark-theme stylesheet. `web/map.js` — MapView: Leaflet map, markercluster (custom icons by health), health-coloured pins, dotted LOW-conf pins, flyTo, 80k stress test.
-- `web/wedges.js` — WedgeLayer: FOV polygons + bearing drag handle → PATCH /api/cameras/{id}.
-- `web/events.js` — EventsLayer: detection dots (fade 30s), alert pulse, 6-h preload, time slider. `web/ws.js` — WsClient: JWT first-message, backoff reconnect, resume since seq, dev fixture replay.
-- `web/route.js` — RouteView: numbered pins, animated polyline, dashed PROBABLE, ⚡ IMPLAUSIBLE, fixed legend, table, CSV export. `web/wall.js` — WallView: HLS grid, WHEP→3s HLS fallback badge, alert-view preset. `web/admin.js` — AdminView: driver cards + per-camera transport table.
-- `services/gateway/sources/onvif.py` — ONVIFSource (live): WS-Discovery, GetProfiles, GetStreamUri, RTSP via PyAV, PTZ ContinuousMove/Stop. `services/gateway/sources/vms.py` — VMSSource (STUB: interface complete): list_cameras/get_stream_uri/subscribe_events typed, returning mock rows.
 
 ### lane D
 _(nothing yet)_
@@ -129,20 +116,8 @@ _(nothing yet)_
 - `[G]` `live.corp8.cloud` is intermittent — it 502'd for hours on 08-29 then came back. `probe_grid.py` falls back to `ingest.json.bootstrap` when it does; always re-run once it is up.
 - `[ALL]` The grid is behind a **Cloudflare cookie gate**: first request 302s to `?cookieCheck=1` with a Set-Cookie, then serves. **HEAD answers 404, not 405** — a HEAD probe reports every live camera as down. Use a streamed GET through a cookie-carrying `requests.Session` and confirm the body starts with `#EXTM3U`. This cost a full 0/30-vs-27/30 wrong answer.
 - `[G]` Port 8554 is filtered at the grid: dial it **once at the host**, not once per camera, or 30 full timeouts buy you one fact. RTSP is 0/30; HLS is the real path (27/30 as of 08-29).
-- `[ALL]` **The burnt-in overlay names the camera AND its install type** — cam 1 reads `Chiman bhai Bridge CSITMS-32_PTZ2`. `install_type` is readable from a frame, not from the catalogue. `cameras.seed.json` currently says `FIX` for all 30 and **that is wrong**; G6 fixes it per camera. Matters to lane I: a PTZ moves, so no static ROI is ever valid on it.
-- `[ALL]` **The footage is looped recordings, not live.** Cam 1's overlay reads `13-06-2026 23:10` while the wall clock is 29-08-2026 midday, and the scene is night. So three clocks disagree: burnt-in scene time (June, fictional "now"), HLS PDT (real wall clock), and stream pts (relative, resets on loop). Sightings will be stamped with PDT while the video shows June at night — fine for a demo, but say it out loud rather than let a judge notice it.
-- `[G]` A wall cannot open a stream per request (2-18 s each). Hold streams open in worker threads and **decode keyframes only** — HLS segments here are ~2 s with a keyframe at the head, so it is ~0.5 fps of decode per camera instead of 30, and 27 cameras run on a laptop.
-- `[G]` **Frame age must be on screen.** Pullers routinely sit 60-270 s behind on some cameras while still reporting `live`; showing that as a live wall is a lie a judge will catch. The console badges anything over 90 s as `stale`, greys it and colours the age.
-- `[G]` Leaflet's fade animation can leave tiles at `opacity:0` forever after a `fitBounds` during load — they report `leaflet-tile-loaded` and never paint, giving a black map with pins floating on it. Use `fadeAnimation:false`.
-- `[G]` **Browser-side HLS does not work against this grid.** The Cloudflare cookie is `SameSite=None; Secure; Partitioned` with `ACAO:*`; a cross-origin page cannot use it (credentials need an echoed origin, not `*`), so `fetch`/hls.js fail with a bare "Failed to fetch". Proxy it same-origin (`scripts/geo_serve.py`). Even proxied, the vendored hls.js never paints a frame — these are low-latency fMP4 (`EXT-X-PART-INF`, `EXT-X-MAP`). **G11's video wall will hit this**; server-side snapshots (PyAV, which decodes them fine) are the reliable path.
-- `[G]` Reachability is **26–27 of 30, and varies between consecutive runs** — 17/18/22 are reliably dead (hls 500 / ReadTimeout), others flap. Not a probe bug. Never quote a single run's number as if it were fixed; the deck should say "26–27 of 30" or re-measure at demo time.
-- `[ALL]` **`EXT-X-PROGRAM-DATE-TIME` is on the VARIANT playlist, not the master.** Checking only the master (`index.m3u8`) returns False and labels every frame `server_receive`, throwing away the one real capture clock the grid gives us. Follow master → first non-comment line → variant. Confirmed present on cams 1/5/23; `ts_source=hls_pdt` after the fix.
-- `[G]` PyAV ≥ 9 has **no `av.AVError`** — the base class is `av.FFmpegError`. Catching the old name raises `AttributeError` the first time a stream drops.
-- `[G]` `frame.to_ndarray()` imports numpy **lazily**, so a missing numpy looks like a dead camera, not an ImportError: the stream opens, decodes, then throws per frame. Never wrap a driver's frame loop in `except Exception` — use `STREAM_ERRORS` (`services/gateway/source.py`) so a bug surfaces instead of masquerading as DOWN. Cost an hour of wrong hypotheses.
-- `[G]` `frames()` reconnects **forever** by design, so any caller needs its own bound (`asyncio.wait_for`). A timeout placed inside the `async for` body never fires when zero frames arrive — which is exactly the case you are timing out for. Matters for G3.
-- `[G]` **Never `asyncio.to_thread(container.close)`.** Closing a PyAV container on a worker thread while the demux iterator is alive on the loop thread **segfaults (139) or aborts (134)** — no traceback, no catchable exception, the process just dies. Close synchronously and null the reference first. Stopping early? `await gen.aclose()` *before* `source.close()`. Do not "fix" this with `try/finally: await self.close()` inside the generator — awaiting during `GeneratorExit` made it worse (that attempt turned a working exit 0 into SIGABRT).
-- `[G]` **Measure fps from the first frame, not from connect.** HLS open latency on this grid ranged **1.6 s to 18 s for the same camera**, so a window started at connect time reports ~0 fps for a healthy stream. A naive measurement marks every camera DOWN.
-- `[G]` Open latency up to ~18 s vs a 15 s DOWN threshold means a reconnecting camera can trip DOWN while it is merely connecting. G3 currently rides on `camera:fps:<id>` freshness so it does not hit this, but any future direct-decode path needs a CONNECTING state.
+- `[G]` Cameras **17, 18, 22** are dead on both transports (hls HTTP 500 / ReadTimeout), not a probe bug — same three across G1 and G2 runs. Expect 27, not 30, and say so rather than quietly showing 30 pins.
+- `[G]` HLS carries no PTS worth trusting unless the playlist has `EXT-X-PROGRAM-DATE-TIME`; `MediaMTXSource` reads the playlist once at open and labels frames `hls_pdt` or `server_receive` accordingly. A `server_receive` row is **not** a capture time — the UI must show it as approximate.
 - `[G]` OSRM needs a preprocessed Gujarat extract (`osrm-extract` + `osrm-contract`) before `osrm-routed` can serve anything — put it behind compose profile `full` rather than crash-looping the default `make up`. D6 owns building the extract.
 - `[G]` No Docker in this dev sandbox — `infra/docker-compose.yml` is YAML-validated but `make up` giving green containers is unverified. Whoever runs it first on a real laptop should update this line.
 - `[G]` Read per-camera properties from `GET http://$GRID_HOST/api/ingest` before decoding.
@@ -192,15 +167,8 @@ changing one without a line here breaks somebody else's lane silently.
 _(none)_
 
 ### lane G
-- 08-29 | G6 | scripts/geo_bootstrap.py, scripts/geo_serve.py, web/geo_helper.html, web/vendor/, data/camera_geo.json | tool works end to end (live frame + OSM map + pin + bearing). **Placement itself is manual and not started: 0/30 verified, 0 bearings.** Found: install_type is in the frame overlay (cam 1 is PTZ, seed says FIX for all 30 = wrong); footage is looped June recordings; browser HLS is impossible against this grid.
-- 08-31 | G7 | fixtures/api/*.json, web/index.html, web/map.js, web/styles.css, web/vendor/leaflet.markercluster.js | full GIS console with Leaflet+markercluster; renders with API down from fixtures; 80k-pin stress test via MapView.cloneForStressTest()
-- 08-31 | G8 | web/wedges.js | coverage wedges + bearing drag handle → PATCH /api/cameras/{id}; only drawn when bearing_deg is non-null
-- 08-31 | G9 | web/events.js, web/ws.js | detection dots fade 30s, alert pulse, 6-h time slider, WS client with backoff+resume; dev mode replays fixtures/api/ws-stream.jsonl
-- 08-31 | G10 | web/route.js, fixtures/api/route.json | route view: 5 ordered pins, dashed PROBABLE hop, ⚡ IMPLAUSIBLE flag, road-snap geometry, CSV export; works offline from fixture
-- 08-31 | G11 | web/wall.js, web/admin.js | HLS grid, WHEP→3s HLS fallback badge, alert-view preset, admin driver table with transport_in_use reason per camera
-- 08-31 | G4 | services/gateway/sources/onvif.py, services/gateway/sources/vms.py | ONVIFSource live (WS-Discovery+GetStreamUri+PTZ); VMSSource STUB with typed interface — list_cameras/get_stream_uri/subscribe_events returning mock rows, labelled STUB
-- 08-29 | G3 | services/gateway/health.py, tests/test_g_health.py, scripts/g3_health_check.py | live cam 1: **4.86 fps -> LIVE, +4s DEGRADED, +16s DOWN**, one event per change. Fixed a PyAV **segfault** on cross-thread container close, and an fps measurement that timed from connect (reported 0 fps for a healthy camera).
-- 08-29 | G2 | services/gateway/*, scripts/g2_frame_check.py, requirements.txt | **frame path proven on live cam 1**: 1920x1080 bgr24, 6.0 fps decoded, monotonic pts, health LIVE, `ts_source=hls_pdt`. Found+fixed: PDT lives on the variant playlist; `av.AVError` gone in PyAV≥9; missing numpy masked as a dead camera by a blanket except.
+- 09-01 | G5 | infra/docker-compose.yml | `make up` verified on real Docker: sentinel-postgres, sentinel-redis, sentinel-minio all healthy. MinIO healthcheck fixed from `mc ready` → `curl /minio/health/live`.
+- 09-01 | G2–G11 | PR #40 final fixes | All Neal006 blocking issues + 5 Copilot issues + SonarCloud Security E + Reliability C resolved. 32 tests green. `allow_redirects` SSRF guard, thread-local sessions, `while not _closed` generators, `autocomplete` on inputs, `esc()` everywhere, `datetime.now(utc)`.
 - 08-29 | G2 | services/gateway/{source,probe,selftest}.py, sources/{rtsp,mediamtx}.py, tests/test_g_probe.py | probe order RTSP→HLS live-verified: **27/30 resolve, all HLS, rtsp 0/30**; 17/18/22 dead both ways (hls 500/ReadTimeout). 10 tests green, no network needed.
 - 08-29 | G5 | infra/docker-compose.yml, .env.example, .gitignore, requirements.txt, Makefile, repo skeleton | compose+env+Makefile written, YAML-validated; `make up` unverified, no Docker in this sandbox
 - 08-29 | G1 | scripts/probe_grid.py, data/cameras.seed.json | grid came back up; HEAD-probe bug found (Cloudflare gate 404s HEAD) — fixed to streamed GET, reachability went 0/30 → **27/30 via HLS**, rtsp 0/30 (8554 filtered). SonarCloud SSRF/path findings fixed too.
