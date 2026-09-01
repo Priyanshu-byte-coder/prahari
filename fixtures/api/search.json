@@ -1,0 +1,29 @@
+{
+  "rows": [
+    {
+      "sighting_id": "01J6XMABCD000001",
+      "camera_id": "1", "track_id": 4821,
+      "pts_first": "2026-08-31T10:29:55+05:30",
+      "pts_last":  "2026-08-31T10:29:58+05:30",
+      "ts_source": "hls_pdt",
+      "plate_text": "GJ01AB1234", "plate_norm": "GJ01AB1234", "plate_canon": "6J01A81234",
+      "plate_conf": 0.91, "plate_band": "CONFIRMED",
+      "vehicle_class": "car", "colour": "white",
+      "bbox": [412, 220, 688, 410], "reid_vec": null,
+      "crop_uri": "s3://crops/1/2026/08/31/01J6XMABCD000001.jpg"
+    },
+    {
+      "sighting_id": "01J6XMABCD000002",
+      "camera_id": "4", "track_id": 1203,
+      "pts_first": "2026-08-31T10:28:12+05:30",
+      "pts_last":  "2026-08-31T10:28:16+05:30",
+      "ts_source": "hls_pdt",
+      "plate_text": "GJ01AB1234", "plate_norm": "GJ01AB1234", "plate_canon": "6J01A81234",
+      "plate_conf": 0.88, "plate_band": "CONFIRMED",
+      "vehicle_class": "car", "colour": "white",
+      "bbox": [320, 180, 590, 360], "reid_vec": null,
+      "crop_uri": "s3://crops/4/2026/08/31/01J6XMABCD000002.jpg"
+    }
+  ],
+  "fuzzy": false
+}

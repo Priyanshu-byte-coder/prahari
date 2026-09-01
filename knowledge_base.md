@@ -45,12 +45,12 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 | G2 CameraSource + transport resolution | 2 | 1 | DONE | | frame path proven live: hls_pdt, 6 fps, 26-27/30 resolve |
 | G3 health monitor | 2 | 1 | DONE | | live: LIVE 4.86fps -> DEGRADED +4s -> DOWN +16s |
 | G6 coordinate ground truth | 1 | 1 | WIP | | tool + honest bootstrap done; **0/30 placed by a human** — that part is manual |
-| G7 map layers 1–2 + API fixtures | 2 | 1 | TODO | | fixtures first, they unblock the lane |
-| G8 wedges + bearing editor | 2 | 2 | TODO | | |
-| G9 events layer + slider + WS client | 2 | 2 | TODO | | |
-| G10 route view | 2 | 2 | TODO | | the graded test case |
-| G11 video wall + admin drivers page | 2 | 2 | TODO | | |
-| G4 ONVIF + VMS stub | 1 | 3 | TODO | | hybrid bonus; drop to P1 if late |
+| G7 map layers 1–2 + API fixtures | 2 | 1 | DONE | | fixtures + index.html + map.js + styles.css; renders with API down |
+| G8 wedges + bearing editor | 2 | 2 | DONE | | wedges.js; drag handle → PATCH /api/cameras/{id} |
+| G9 events layer + slider + WS client | 2 | 2 | DONE | | events.js + ws.js; fixture replay in dev mode |
+| G10 route view | 2 | 2 | DONE | | route.js; 5-hop fixture, dashed PROBABLE, ⚡ IMPLAUSIBLE, CSV export |
+| G11 video wall + admin drivers page | 2 | 2 | DONE | | wall.js + admin.js; WHEP→HLS fallback, alert view, driver table |
+| G4 ONVIF + VMS stub | 1 | 3 | DONE | | sources/onvif.py (live) + sources/vms.py (STUB: interface complete) |
 | G12 Grafana dashboard | 2 | P1 | TODO | | |
 
 ### Lane D — CORE — Priyanshu-byte-coder (17 pt)
@@ -106,6 +106,12 @@ _(nothing yet)_
 - `scripts/geo_serve.py` — serves the repo, proxies `/grid/*` past the Cloudflare gate, and `/snapshot/<id>.jpg` decodes one frame via PyAV (browser HLS does not work here).
 - `web/geo_helper.html` — placement tool: camera list, OSM map, draggable pin, bearing dial, live frame, export. `web/vendor/` — leaflet + hls.js, salvaged.
 - `services/gateway/health.py` — `classify` (pure), `HealthMonitor.evaluate` (one event per change), `expected_fps` (capped at worker sampling rate), `tick`/`read_fps`/`publish` over `camera:fps:<id>` → `camera.health`. `tests/test_g_health.py` — 22 tests, time injected.
+- `fixtures/api/cameras.json` — [C4] GET /api/cameras fixture (9 representative cameras). `fixtures/api/camera_1.json` — GET /api/cameras/1 with health_history. `fixtures/api/events.json` — GET /api/events fixture (5 sightings). `fixtures/api/route.json` — GET /api/route fixture (5 hops: CONFIRMED×3, PROBABLE×1, IMPLAUSIBLE×1). `fixtures/api/alerts.json` — GET /api/alerts. `fixtures/api/watchlist.json` — GET /api/watchlist. `fixtures/api/drivers.json` — GET /api/admin/drivers. `fixtures/api/search.json` — GET /api/search. `fixtures/api/ws-stream.jsonl` — WS replay fixture (9 messages: health/sighting/alert/ping).
+- `web/index.html` — full GIS console: Map/Route/Wall/Admin tabs, Leaflet+markercluster, camera list sidebar, detail panel; renders with API down. `web/styles.css` — shared dark-theme stylesheet. `web/map.js` — MapView: Leaflet map, markercluster (custom icons by health), health-coloured pins, dotted LOW-conf pins, flyTo, 80k stress test.
+- `web/wedges.js` — WedgeLayer: FOV polygons + bearing drag handle → PATCH /api/cameras/{id}.
+- `web/events.js` — EventsLayer: detection dots (fade 30s), alert pulse, 6-h preload, time slider. `web/ws.js` — WsClient: JWT first-message, backoff reconnect, resume since seq, dev fixture replay.
+- `web/route.js` — RouteView: numbered pins, animated polyline, dashed PROBABLE, ⚡ IMPLAUSIBLE, fixed legend, table, CSV export. `web/wall.js` — WallView: HLS grid, WHEP→3s HLS fallback badge, alert-view preset. `web/admin.js` — AdminView: driver cards + per-camera transport table.
+- `services/gateway/sources/onvif.py` — ONVIFSource (live): WS-Discovery, GetProfiles, GetStreamUri, RTSP via PyAV, PTZ ContinuousMove/Stop. `services/gateway/sources/vms.py` — VMSSource (STUB: interface complete): list_cameras/get_stream_uri/subscribe_events typed, returning mock rows.
 
 ### lane D
 _(nothing yet)_
@@ -187,6 +193,12 @@ _(none)_
 
 ### lane G
 - 08-29 | G6 | scripts/geo_bootstrap.py, scripts/geo_serve.py, web/geo_helper.html, web/vendor/, data/camera_geo.json | tool works end to end (live frame + OSM map + pin + bearing). **Placement itself is manual and not started: 0/30 verified, 0 bearings.** Found: install_type is in the frame overlay (cam 1 is PTZ, seed says FIX for all 30 = wrong); footage is looped June recordings; browser HLS is impossible against this grid.
+- 08-31 | G7 | fixtures/api/*.json, web/index.html, web/map.js, web/styles.css, web/vendor/leaflet.markercluster.js | full GIS console with Leaflet+markercluster; renders with API down from fixtures; 80k-pin stress test via MapView.cloneForStressTest()
+- 08-31 | G8 | web/wedges.js | coverage wedges + bearing drag handle → PATCH /api/cameras/{id}; only drawn when bearing_deg is non-null
+- 08-31 | G9 | web/events.js, web/ws.js | detection dots fade 30s, alert pulse, 6-h time slider, WS client with backoff+resume; dev mode replays fixtures/api/ws-stream.jsonl
+- 08-31 | G10 | web/route.js, fixtures/api/route.json | route view: 5 ordered pins, dashed PROBABLE hop, ⚡ IMPLAUSIBLE flag, road-snap geometry, CSV export; works offline from fixture
+- 08-31 | G11 | web/wall.js, web/admin.js | HLS grid, WHEP→3s HLS fallback badge, alert-view preset, admin driver table with transport_in_use reason per camera
+- 08-31 | G4 | services/gateway/sources/onvif.py, services/gateway/sources/vms.py | ONVIFSource live (WS-Discovery+GetStreamUri+PTZ); VMSSource STUB with typed interface — list_cameras/get_stream_uri/subscribe_events returning mock rows, labelled STUB
 - 08-29 | G3 | services/gateway/health.py, tests/test_g_health.py, scripts/g3_health_check.py | live cam 1: **4.86 fps -> LIVE, +4s DEGRADED, +16s DOWN**, one event per change. Fixed a PyAV **segfault** on cross-thread container close, and an fps measurement that timed from connect (reported 0 fps for a healthy camera).
 - 08-29 | G2 | services/gateway/*, scripts/g2_frame_check.py, requirements.txt | **frame path proven on live cam 1**: 1920x1080 bgr24, 6.0 fps decoded, monotonic pts, health LIVE, `ts_source=hls_pdt`. Found+fixed: PDT lives on the variant playlist; `av.AVError` gone in PyAV≥9; missing numpy masked as a dead camera by a blanket except.
 - 08-29 | G2 | services/gateway/{source,probe,selftest}.py, sources/{rtsp,mediamtx}.py, tests/test_g_probe.py | probe order RTSP→HLS live-verified: **27/30 resolve, all HLS, rtsp 0/30**; 17/18/22 dead both ways (hls 500/ReadTimeout). 10 tests green, no network needed.

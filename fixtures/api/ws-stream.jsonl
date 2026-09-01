@@ -1,0 +1,9 @@
+{"type":"camera.health","seq":1,"data":{"camera_id":"1","health":"LIVE","fps":4.86,"last_frame_age_s":0.8,"transport_in_use":"hls","at":1756671600.0}}
+{"type":"sighting","seq":2,"data":{"sighting_id":"01J6XMABCD000001","camera_id":"1","plate_norm":"GJ01AB1234","plate_band":"CONFIRMED","vehicle_class":"car","pts_first":"2026-08-31T10:29:55+05:30"}}
+{"type":"alert.new","seq":3,"data":{"alert_id":1,"watchlist_id":3,"sighting_id":"01J6XMABCD000001","camera_id":"1","band":"CONFIRMED","state":"NEW","count":1,"pts":"2026-08-31T10:29:55+05:30"}}
+{"type":"ping","seq":4}
+{"type":"camera.health","seq":5,"data":{"camera_id":"5","health":"DEGRADED","fps":2.1,"last_frame_age_s":4.2,"transport_in_use":"hls","at":1756671660.0}}
+{"type":"alert.state","seq":6,"data":{"alert_id":1,"from_state":"NEW","to_state":"ACKNOWLEDGED","by_user":12,"reason":null,"at":"2026-08-31T10:30:15+05:30"}}
+{"type":"camera.health","seq":7,"data":{"camera_id":"12","health":"DOWN","fps":null,"last_frame_age_s":null,"transport_in_use":"hls","at":1756671720.0}}
+{"type":"ping","seq":8}
+{"type":"sighting","seq":9,"data":{"sighting_id":"01J6XMABCD000005","camera_id":"1","plate_norm":"GJ27XY9999","plate_band":"CONFIRMED","vehicle_class":"truck","pts_first":"2026-08-31T10:30:33+05:30"}}
