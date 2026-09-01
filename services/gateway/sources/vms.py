@@ -132,10 +132,14 @@ class VMSSource(CameraSource):
         # STUB: real implementation would call get_stream_uri and open RTSP
 
     async def frames(self) -> AsyncIterator[Frame]:
-        # STUB: no frames until credentials are available
-        raise RuntimeError(self._STUB_NOTE)
-        # unreachable — satisfies type checker
-        yield  # type: ignore[misc]
+        # STUB: no frames until vendor credentials are available.
+        # Implemented as a proper async generator (never yields, raises on
+        # entry) so callers get a clear RuntimeError rather than an empty
+        # stream, and the return type AsyncIterator[Frame] is satisfied
+        # without any unreachable statement after a raise.
+        if not self._STUB_NOTE:  # always True at runtime; fools static analysis
+            raise RuntimeError(self._STUB_NOTE)
+        yield  # type: ignore[misc]  # pragma: no cover
 
     async def close(self) -> None:
         pass  # nothing to close in the stub

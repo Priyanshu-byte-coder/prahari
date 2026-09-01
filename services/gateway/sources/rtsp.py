@@ -48,6 +48,7 @@ class RTSPSource(CameraSource):
         self._health = Health.UNKNOWN
         self._last_frame_at: float | None = None
         self._backoff: float | None = None
+        self._closed = False  # set by close(); stops the frames() generator
 
     async def open(self) -> None:
         if av is None:
@@ -60,8 +61,8 @@ class RTSPSource(CameraSource):
         self._backoff = None
 
     async def frames(self) -> AsyncIterator[Frame]:
-        """Reconnects forever. The caller consumes frames and never sees a gap."""
-        while True:
+        """Reconnects until close() is called. The caller never sees a gap."""
+        while not self._closed:
             if self._container is None:
                 try:
                     await self.open()
@@ -107,6 +108,7 @@ class RTSPSource(CameraSource):
 
     async def close(self) -> None:
         """Close in *this* thread, not a worker thread. See mediamtx.py."""
+        self._closed = True
         if self._container is not None:
             container, self._container = self._container, None
             try:

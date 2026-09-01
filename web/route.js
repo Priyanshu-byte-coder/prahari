@@ -36,11 +36,11 @@ const RouteView = (() => {
       <div class="section-title">Route Search</div>
       <div style="display:grid;gap:8px">
         <label style="color:var(--dim);font-size:11px">Plate number</label>
-        <input id="routePlate" placeholder="GJ01AB1234" style="font-family:ui-monospace,monospace">
+        <input id="routePlate" placeholder="GJ01AB1234" style="font-family:ui-monospace,monospace" autocomplete="off">
         <label style="color:var(--dim);font-size:11px">From</label>
-        <input id="routeFrom" type="datetime-local">
+        <input id="routeFrom" type="datetime-local" autocomplete="off">
         <label style="color:var(--dim);font-size:11px">To</label>
-        <input id="routeTo"   type="datetime-local">
+        <input id="routeTo"   type="datetime-local" autocomplete="off">
         <button class="btn go" id="routeSearch">Search route</button>
       </div>
       <div id="routeStatus" class="hint"></div>

@@ -51,6 +51,7 @@ class MediaMTXSource(CameraSource):
         self._health = Health.UNKNOWN
         self._last_frame_at: float | None = None
         self._backoff: float | None = None
+        self._closed = False  # set by close(); stops the frames() generator
         self._ts_source = TsSource.SERVER_RECEIVE
         # PDT anchor: epoch of the first PDT-tagged segment, and the stream-
         # relative pts of the first frame we decoded after that anchor. Together
@@ -129,7 +130,7 @@ class MediaMTXSource(CameraSource):
         self._backoff = None
 
     async def frames(self) -> AsyncIterator[Frame]:
-        while True:
+        while not self._closed:
             if self._container is None:
                 try:
                     await self.open()
@@ -188,6 +189,7 @@ class MediaMTXSource(CameraSource):
         cheap; it does not need a thread. Callers that stop iterating early
         should `aclose()` the generator before calling this.
         """
+        self._closed = True
         if self._container is not None:
             container, self._container = self._container, None
             try:

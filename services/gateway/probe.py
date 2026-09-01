@@ -29,7 +29,20 @@ REPROBE_INTERVAL_S = 600  # 10 minutes
 # The grid sits behind a Cloudflare cookie gate: the first request 302s to
 # `?cookieCheck=1` with a Set-Cookie and only then serves. One Session so
 # that cookie is negotiated once rather than per camera.
-_SESSION = requests.Session()
+#
+# Thread safety: requests.Session is NOT thread-safe. selftest.py probes
+# cameras in a ThreadPoolExecutor, so we use thread-local storage so each
+# worker thread gets its own Session (and its own cookie negotiation).
+import threading as _threading
+_SESSION_LOCAL = _threading.local()
+
+
+def _session() -> requests.Session:
+    """Return the Session for the current thread, creating it if needed."""
+    s = getattr(_SESSION_LOCAL, "session", None)
+    if s is None:
+        s = _SESSION_LOCAL.session = requests.Session()
+    return s
 
 ALLOWED_SCHEMES = frozenset({"http", "https"})
 
@@ -124,12 +137,28 @@ def probe_hls(url: str, timeout: float = HLS_TIMEOUT_S) -> tuple[bool, str]:
     HEAD against the cookie-gated path answers 404, not 405, so a HEAD probe
     reports every live camera as down. Read the first bytes and require a real
     `#EXTM3U` header rather than trusting a 200 that might be an error page.
+
+    Redirects are followed only when they stay on the same allowed host
+    (the Cloudflare cookieCheck 302 always does). Off-host redirects are
+    rejected to prevent SSRF via a compromised upstream.
     """
     target = safe_url(url)
     if target is None:
         return False, "hls url rejected (scheme or host not allowed)"
     try:
-        resp = _SESSION.get(target, timeout=timeout, stream=True, allow_redirects=True)
+        sess = _session()
+        resp = sess.get(target, timeout=timeout, stream=True, allow_redirects=False)
+        # Follow at most 3 same-host redirects (Cloudflare cookieCheck is 1 hop)
+        hops = 0
+        while resp.is_redirect and hops < 3:
+            location = resp.headers.get("Location", "")
+            next_url = safe_url(location if location.startswith("http") else
+                                urlparse(target)._replace(path=location).geturl())
+            if not next_url:
+                return False, "hls redirect to off-host URL rejected"
+            resp.close()
+            resp = sess.get(next_url, timeout=timeout, stream=True, allow_redirects=False)
+            hops += 1
         if resp.status_code >= 400:
             return False, f"hls HTTP {resp.status_code}"
         head = next(resp.iter_content(chunk_size=64), b"") or b""

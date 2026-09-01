@@ -114,7 +114,20 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_error(400, "proxy target not on allowed host")
             return
         try:
-            upstream = _SESSION.get(target, stream=True, timeout=20, allow_redirects=True)
+            upstream = _SESSION.get(target, stream=True, timeout=20, allow_redirects=False)
+            # Follow same-host redirects only (Cloudflare cookieCheck is 1 hop)
+            hops = 0
+            while upstream.is_redirect and hops < 3:
+                location = upstream.headers.get("Location", "")
+                next_url = safe_url(
+                    location if location.startswith("http") else urljoin(GRID_BASE + "/", location)
+                )
+                if not next_url:
+                    self.send_error(502, "redirect to off-grid host rejected")
+                    return
+                upstream.close()
+                upstream = _SESSION.get(next_url, stream=True, timeout=20, allow_redirects=False)
+                hops += 1
         except requests.RequestException as exc:
             self.send_error(502, f"grid unreachable: {type(exc).__name__}")
             return

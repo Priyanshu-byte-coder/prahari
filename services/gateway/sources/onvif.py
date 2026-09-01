@@ -84,6 +84,7 @@ class ONVIFSource(CameraSource):
         self._health    = Health.UNKNOWN
         self._last_frame_at: float | None = None
         self._backoff: float | None = None
+        self._closed    = False  # set by close(); stops the frames() generator
 
     # ── Discovery (class-level helper) ────────────────────────────────────
 
@@ -171,7 +172,7 @@ class ONVIFSource(CameraSource):
         return best or ""
 
     async def frames(self) -> AsyncIterator[Frame]:
-        while True:
+        while not self._closed:
             if self._container is None:
                 try:
                     await self.open()
@@ -211,6 +212,7 @@ class ONVIFSource(CameraSource):
                 await sleep_backoff(self._backoff)
 
     async def close(self) -> None:
+        self._closed = True
         if self._container is not None:
             container, self._container = self._container, None
             try:

@@ -130,41 +130,34 @@ class Wall:
     def _pull(self, feed: CameraFeed) -> None:
         backoff = BACKOFF_START_S
         while not feed._stop.is_set():
-            container = None
             try:
                 feed.status = "connecting"
-                container = av.open(feed.url, timeout=OPEN_TIMEOUT_S)
-                stream = container.streams.video[0]
-                stream.thread_type = "AUTO"
-                feed.status = "live"
-                feed.detail = ""
-                backoff = BACKOFF_START_S
-                last_emit = 0.0
+                with av.open(feed.url, timeout=OPEN_TIMEOUT_S) as container:
+                    stream = container.streams.video[0]
+                    stream.thread_type = "AUTO"
+                    feed.status = "live"
+                    feed.detail = ""
+                    backoff = BACKOFF_START_S
+                    last_emit = 0.0
 
-                for packet in container.demux(stream):
-                    if feed._stop.is_set():
-                        break
-                    # Keyframes only: ~0.5 fps of decode instead of 30.
-                    if not packet.is_keyframe:
-                        continue
-                    now = time.time()
-                    if now - last_emit < self.interval:
-                        continue
-                    for frame in packet.decode():
-                        feed.jpeg = _encode(frame)
-                        feed.updated_at = time.time()
-                        feed.frames += 1
-                        last_emit = now
-                        break
+                    for packet in container.demux(stream):
+                        if feed._stop.is_set():
+                            break
+                        # Keyframes only: ~0.5 fps of decode instead of 30.
+                        if not packet.is_keyframe:
+                            continue
+                        now = time.time()
+                        if now - last_emit < self.interval:
+                            continue
+                        for frame in packet.decode():
+                            feed.jpeg = _encode(frame)
+                            feed.updated_at = time.time()
+                            feed.frames += 1
+                            last_emit = now
+                            break
             except Exception as exc:
                 feed.status = "retrying"
                 feed.detail = f"{type(exc).__name__}: {exc}"[:160]
-            finally:
-                if container is not None:
-                    try:
-                        container.close()
-                    except Exception:
-                        pass
             if feed._stop.is_set():
                 break
             # Wait, but stay interruptible so Stop is immediate.

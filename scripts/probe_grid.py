@@ -176,7 +176,20 @@ def hls_reachable(url: str | None, hostname: str, timeout: float = 8.0) -> bool:
     if target is None:
         return False
     try:
-        resp = _SESSION.get(target, timeout=timeout, stream=True, allow_redirects=True)
+        resp = _SESSION.get(target, timeout=timeout, stream=True, allow_redirects=False)
+        # Follow same-host redirects only (Cloudflare cookieCheck is 1 hop)
+        hops = 0
+        while resp.is_redirect and hops < 3:
+            location = resp.headers.get("Location", "")
+            next_url = _safe_url(
+                location if location.startswith("http") else f"https://{hostname}{location}",
+                hostname,
+            )
+            if not next_url:
+                return False
+            resp.close()
+            resp = _SESSION.get(next_url, timeout=timeout, stream=True, allow_redirects=False)
+            hops += 1
         if resp.status_code >= 400:
             return False
         head = next(resp.iter_content(chunk_size=64), b"") or b""

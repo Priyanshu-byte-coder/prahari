@@ -41,7 +41,19 @@ GRID_BASE = "https://live.corp8.cloud"
 SEED = ROOT / "data" / "cameras.seed.json"
 GEO = ROOT / "data" / "camera_geo.json"
 
-_SESSION = requests.Session()
+# Thread-local session: requests.Session is not thread-safe and
+# http.server.ThreadingHTTPServer spawns one thread per request.
+import threading as _threading
+_SESSION_LOCAL = _threading.local()
+
+
+def _session() -> requests.Session:
+    s = getattr(_SESSION_LOCAL, "session", None)
+    if s is None:
+        s = _SESSION_LOCAL.session = requests.Session()
+    return s
+
+
 CHUNK = 64 * 1024
 HOP_BY_HOP = {"connection", "keep-alive", "transfer-encoding", "upgrade",
               "content-encoding", "content-length"}
@@ -133,7 +145,22 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_error(400, "proxy target not on allowed host")
             return
         try:
-            upstream = _SESSION.get(target, stream=True, timeout=20, allow_redirects=True)
+            sess = _session()
+            upstream = sess.get(target, stream=True, timeout=20, allow_redirects=False)
+            # Follow same-host redirects only (Cloudflare cookieCheck is 1 hop)
+            hops = 0
+            while upstream.is_redirect and hops < 3:
+                location = upstream.headers.get("Location", "")
+                next_url = safe_url(
+                    location if location.startswith("http")
+                    else urljoin(GRID_BASE + "/", location)
+                )
+                if not next_url:
+                    self.send_error(502, "redirect to off-grid host rejected")
+                    return
+                upstream.close()
+                upstream = sess.get(next_url, stream=True, timeout=20, allow_redirects=False)
+                hops += 1
         except requests.RequestException as exc:
             return self.send_error(502, f"grid unreachable: {type(exc).__name__}")
         self.send_response(upstream.status_code)

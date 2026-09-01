@@ -16,6 +16,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import AsyncIterator, Protocol, runtime_checkable
 
+# Module-level singleton: SystemRandom is thread-safe and reusing it avoids
+# a per-call allocation that static-analysis tools flag unnecessarily.
+_RNG = secrets.SystemRandom()
+
 
 class Health(str, Enum):
     LIVE = "LIVE"
@@ -99,4 +103,4 @@ async def sleep_backoff(delay: float) -> None:
     non-cryptographic RNG here is a standing static-analysis finding and the
     cost of the stronger one is nil at this call rate.
     """
-    await asyncio.sleep(delay * (0.8 + 0.4 * secrets.SystemRandom().random()))
+    await asyncio.sleep(delay * (0.8 + 0.4 * _RNG.random()))

@@ -26,7 +26,11 @@ SEED = ROOT / "data" / "cameras.seed.json"
 
 
 async def run(camera_id: str, want_frames: int, timeout_s: float) -> int:
-    cameras = json.loads(SEED.read_text(encoding="utf-8"))
+    try:
+        cameras = json.loads(SEED.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"[-] cannot read seed: {exc}")
+        return 2
     cam = next((c for c in cameras if str(c.get("camera_id")) == camera_id), None)
     if cam is None:
         print(f"camera {camera_id} not in the seed")

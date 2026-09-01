@@ -65,19 +65,19 @@
   <div id="meta" class="hint"></div>
 
   <label>Landmark you can see in the frame</label>
-  <input id="landmark" placeholder="e.g. CG Road junction, north side">
+  <input id="landmark" placeholder="e.g. CG Road junction, north side" autocomplete="off">
 
   <label>Bearing — drag the dial to where the camera looks</label>
   <div id="bearingWrap">
     <div id="dial"><div id="needle"></div></div>
     <div>
-      <input id="bearing" type="number" min="0" max="359" placeholder="null">
+      <input id="bearing" type="number" min="0" max="359" placeholder="null" autocomplete="off">
       <div class="hint">0 = north, clockwise. Leave empty if unsure — no wedge is better than a wrong one.</div>
     </div>
   </div>
 
   <label>Confidence</label>
-  <select id="conf">
+  <select id="conf" autocomplete="off">
     <option value="HIGH">HIGH — I can see the exact spot in the frame</option>
     <option value="MEDIUM">MEDIUM — right junction, approximate metres</option>
     <option value="LOW">LOW — could not place it</option>
