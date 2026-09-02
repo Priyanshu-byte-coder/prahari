@@ -8,7 +8,9 @@ services:
       POSTGRES_PASSWORD: sentinel
       POSTGRES_DB: sentinel
     ports:
-      - "5432:5432"
+      # Overridable: a laptop with its own Postgres already holds 5432, and Docker publishes
+      # behind it, so the local server answers and auth fails with the compose credentials.
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/home/postgres/pgdata/data
     healthcheck:
@@ -22,7 +24,7 @@ services:
     container_name: sentinel-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -62,7 +64,7 @@ services:
     # container up but route snapping (D6) has nothing to query.
     command: osrm-routed --algorithm mld /data/gujarat.osrm
     ports:
-      - "5000:5000"
+      - "${OSRM_PORT:-5000}:5000"
     volumes:
       - ../data/osrm:/data
     profiles:
