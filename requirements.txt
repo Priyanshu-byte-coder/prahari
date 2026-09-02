@@ -31,3 +31,12 @@ numpy
 # shared
 python-ulid
 pytest
+
+# lane D -- added when lane D merged: object storage client, PDF, the API test client
+# and the socket client the WebSocket tests drive a real server with.
+boto3
+httpx2
+pytest-timeout
+python-dotenv
+reportlab
+websockets
