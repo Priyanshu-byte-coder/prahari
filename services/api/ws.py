@@ -55,26 +55,23 @@ ALL_DEPARTMENTS = {"INVESTIGATOR", "SYSTEM_ADMIN"}   # [C10]: statewide roles
 NO_LIVE_DATA = {"SYSTEM_ADMIN"}                      # config and audit only
 
 
-def _secret():
-    """JWT signing key. Falling back to a process-local random key is deliberate.
-
-    D7 issues real tokens. Until then an unset JWT_SECRET must not mean "accept anything" - a
-    socket that trusts an unsigned token is an open door to every camera in the state. A random
-    per-process key means only tokens this process issued work, which is what a dev run needs.
-    """
-    configured = os.environ.get("JWT_SECRET")
-    if configured:
-        return configured
-    if not hasattr(_secret, "_dev"):
-        _secret._dev = secrets.token_urlsafe(32)
-        log.warning("JWT_SECRET is unset - using a random per-process key (dev only)")
-    return _secret._dev
+# The signing key comes from auth.py, not from a second copy here. When JWT_SECRET is unset
+# both modules used to invent their own random per-process key, so a token minted for the socket
+# could not be verified by the REST side and vice versa - the two halves of one API disagreeing
+# about their own tokens, which only shows up the first time a console tries to use both.
+from auth import secret as _secret  # noqa: E402
 
 
 def issue_token(user_id, role, dept_id=None, district_code=None, ttl_s=900):
-    """Mint a token. D7 replaces this with the real login flow; the shape stays."""
+    """Mint an access token for a socket. Same shape auth.issue_tokens mints, `typ` included.
+
+    Without the `typ` claim a token minted here is rejected by the REST side - it checks that a
+    refresh token is not being used as an access token - so the two halves of the API disagreed
+    about their own tokens. One shape, both doors.
+    """
     return jwt.encode({"sub": str(user_id), "role": role, "dept_id": dept_id,
-                       "district_code": district_code, "exp": int(time.time()) + ttl_s},
+                       "district_code": district_code, "typ": "access",
+                       "exp": int(time.time()) + ttl_s},
                       _secret(), algorithm="HS256")
 
 
