@@ -1,0 +1,20 @@
+# One dependency per line, alphabetical. Three lanes append to this file, so keeping it sorted
+# and one-per-line makes the merge conflicts trivial instead of structural.
+#
+# Lane D (api, db, scripts) needs everything below. Lane I adds the CV stack (opencv-python, av,
+# ultralytics, easyocr, lap); lane G adds whatever the gateway needs. Salvage the old list with
+# `git show origin/priyanshu/platform:requirements.txt` rather than guessing.
+argon2-cffi
+boto3
+fastapi
+httpx2
+psycopg2-binary
+pydantic-settings
+pyjwt
+pytest
+pytest-timeout
+python-dotenv
+redis
+reportlab
+uvicorn[standard]
+websockets

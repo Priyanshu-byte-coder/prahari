@@ -1,0 +1,74 @@
+name: tests
+
+# D7's Done-when is "the scope test is green and runs in CI on every merge". A scope test that
+# only ever runs on the author's laptop is a scope test that stops running the week before the
+# deadline, which is the week it matters.
+
+on:
+  push:
+    branches: [main, "lane/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # The same image lane D verified the schema against: timescaledb, pgvector and pg_trgm
+        # are already in it, so db/migrate.sql applies unchanged.
+        image: timescale/timescaledb-ha:pg16
+        env:
+          POSTGRES_USER: sentinel
+          POSTGRES_DB: sentinel
+          # Throwaway, generated per run: a CI service container is reachable only from the job.
+          POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sentinel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      TEST_POSTGRES_DSN: postgresql://sentinel:${{ github.run_id }}-${{ github.run_attempt }}@localhost:5432/sentinel
+      TEST_REDIS_URL: redis://localhost:6379/0
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Apply the schema
+        run: psql "$TEST_POSTGRES_DSN" -v ON_ERROR_STOP=1 -f db/migrate.sql
+
+      - name: Apply it a second time
+        # migrate.sql claims to be re-runnable; a claim nobody checks is a claim that stops
+        # being true.
+        run: psql "$TEST_POSTGRES_DSN" -v ON_ERROR_STOP=1 -f db/migrate.sql
+
+      - name: Run the tests
+        # --timeout keeps a hung socket test from burning the job's whole allowance.
+        run: python -m pytest tests/ -q --timeout 120
+
+      - name: The scope test, named
+        # D7's verify, run again on its own so a failure here is unmistakable in the log.
+        run: python -m pytest tests/test_d_scope.py -q --timeout 120
