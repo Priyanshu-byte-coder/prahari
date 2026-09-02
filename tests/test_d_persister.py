@@ -164,3 +164,28 @@ def test_signing_without_object_store_keys_refuses_rather_than_defaulting(monkey
     store = Store(dsn=DSN, redis_url=REDIS_URL, scope_check=lambda ctx: True)
     with pytest.raises(RuntimeError, match="MINIO_ACCESS_KEY"):
         store.crop_url(CROP)
+
+
+def test_a_row_for_an_unknown_camera_is_dead_lettered_not_fatal(store, rig):
+    # A selftest rig publishing under SELFTEST-000, or a camera deleted mid-run, produces a row
+    # Postgres refuses. Postgres aborts the whole transaction on it, so a persister that only
+    # knows how to insert batches loses the good rows with it - or dies, which is what happened
+    # the first time a worker selftest ran against a live stack.
+    persister, camera = rig
+    good = make_rows(camera, 3)
+    orphan = make_rows("NO-SUCH-CAMERA", 1)[0]
+    publish(store, persister.stream, good[:2] + [orphan] + good[2:])
+
+    persister.run_once()
+
+    assert count(store, camera) == 3               # every good row landed
+    assert persister.dead_lettered >= 1
+    assert persister.lag() == 0                    # and the group is not stuck behind it
+
+
+def test_the_dead_letter_carries_the_reason(store, rig):
+    persister, _camera = rig
+    publish(store, persister.stream, make_rows("NO-SUCH-CAMERA", 1))
+    persister.run_once()
+    last = store.redis.xrevrange("sightings.dead", count=1)[0][1]
+    assert "camera_id" in last.get("reason", "") or "foreign key" in last.get("reason", "").lower()
