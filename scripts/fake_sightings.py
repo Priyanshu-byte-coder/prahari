@@ -33,14 +33,35 @@ IST = timezone(timedelta(hours=5, minutes=30))
 STREAM = "sightings"
 DEFAULT_REDIS = "redis://localhost:6379/0"
 
-# The five cameras the scripted vehicle crosses, in order, with the seconds it takes to get
-# from the previous one. Ids are placeholders until G1 publishes data/cameras.seed.json; the
-# route only needs them to be stable and in order.
-ROUTE = [("GJ-AHD-0001", 0), ("GJ-AHD-0002", 47), ("GJ-AHD-0005", 63),
-         ("GJ-AHD-0009", 52), ("GJ-AHD-0012", 71)]
+# Seconds between consecutive hops of the scripted vehicle. Travel time, not decoration: D6
+# scores plausibility on the speed each gap implies.
+ROUTE_GAPS = [0, 47, 63, 52, 71]
 ROUTE_PLATE = "GJ01AB1234"
 
-CAMERAS = [f"GJ-AHD-{i:04d}" for i in range(1, 31)]
+# Camera ids come from lane G's seed ([C8]) when it exists. They have to: sightings.camera_id
+# references cameras.camera_id, so a generator inventing its own ids publishes rows the
+# persister cannot insert - the pipeline fails at the first foreign key rather than at a
+# readable error. The placeholders below are only for a checkout with no seed file yet.
+PLACEHOLDER_CAMERAS = [f"GJ-AHD-{i:04d}" for i in range(1, 31)]
+SEED_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "data", "cameras.seed.json")
+
+
+def load_camera_ids(path=SEED_PATH):
+    """Camera ids from data/cameras.seed.json, or the placeholders when it is not there yet."""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            seeded = [entry.get("camera_id") for entry in json.load(handle)]
+    except (OSError, ValueError, TypeError, AttributeError):
+        return list(PLACEHOLDER_CAMERAS)
+    seeded = [camera_id for camera_id in seeded if camera_id]
+    return seeded or list(PLACEHOLDER_CAMERAS)
+
+
+CAMERAS = load_camera_ids()
+
+# The five cameras the scripted vehicle crosses, in order, paired with those gaps.
+ROUTE = list(zip(CAMERAS[:len(ROUTE_GAPS)], ROUTE_GAPS))
 CLASSES = ["two_wheeler", "three_wheeler", "car", "lcv", "bus", "truck", "tractor"]
 COLOURS = ["white", "silver", "black", "blue", "red", "grey", "yellow"]
 CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
