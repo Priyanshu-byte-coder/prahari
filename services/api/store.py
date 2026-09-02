@@ -101,6 +101,28 @@ class Store:
             execute_values(cur, INSERT, [self._tuple(r) for r in rows], page_size=len(rows))
             return cur.rowcount
 
+    def insert_sightings_individually(self, rows):
+        """Insert one row at a time. Returns (written, rejected) where rejected is a list of
+        (row, reason).
+
+        The slow path, used only after a batch has failed. One row referencing a camera that is
+        not in the registry - a selftest rig, a camera deleted mid-run - aborts the whole
+        transaction in Postgres, so a persister that only knows how to insert batches loses 200
+        good sightings to one bad one, or dies. This finds the bad ones and keeps the rest.
+        """
+        import psycopg2
+
+        written, rejected = 0, []
+        for row in rows:
+            try:
+                with self.conn as conn, conn.cursor() as cur:
+                    cur.execute(INSERT.replace("VALUES %s", "VALUES (" + ",".join(
+                        ["%s"] * len(COLUMNS)) + ")"), self._tuple(row))
+                    written += cur.rowcount
+            except psycopg2.Error as exc:
+                rejected.append((row, str(exc).strip().splitlines()[0]))
+        return written, rejected
+
     def cache_recent(self, rows):
         """Push sighting ids onto plate:<plate_norm>, newest first, capped and expiring."""
         plated = [r for r in rows if r.get("plate_norm")]
