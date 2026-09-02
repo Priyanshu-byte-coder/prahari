@@ -11,9 +11,14 @@ Updated: 2026-09-01 · KB v2 · cap 300 lines · patched after **every** complet
   published and persisted with 0 pending, 5 alerts raised and pushed over the WebSocket,
   `GET /api/route` returning 5 ordered hops, System Admin refused live views per [C10], audit
   chain verifying. Route coordinates are still geocoded/LOW (see issue #17).
-- Open integration gaps, both filed: **#44** the console serves its own unauthenticated
-  `/api/cameras`, which bypasses D7's scope; **#45** ultralytics is unpinned and its tracker
-  signature changed under us.
+- Post-merge fixes, all on `main`: #42 ultralytics 8.4 tracker signature · #43 generator uses the
+  seeded camera ids, `make seed` applies migrate.sql, compose ports overridable · #46 persister
+  dead-letters a row Postgres refuses instead of dying · #47 CI installs a requirements file that
+  fits on a runner · #49 one token shape and one signing key across REST and the socket.
+- SonarCloud is off the repo. CI is the pytest workflow plus GitGuardian.
+- Open integration gaps, filed: **#44** the console serves its own unauthenticated
+  `/api/cameras`, which bypasses D7's scope; **#45** ultralytics is unpinned; **#48** the worker selftest
+  publishes under a camera id that is not in the registry.
 
 - 2026-08-31. **7 days to submission (7 Sep)**. Lane D is complete: D1-D10 all DONE, in PR #37.
 - 2026-08-29. **9 days to submission (7 Sep)**, 12 to the live event (10–11 Sep, i-Hub Gandhinagar).
