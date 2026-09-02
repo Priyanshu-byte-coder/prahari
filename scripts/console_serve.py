@@ -1,7 +1,7 @@
 """Prahari console server — map, live wall, and the camera API behind them.
 
     python scripts/console_serve.py
-    open http://localhost:5173/web/console.html
+    open http://localhost:5173/               # portal: links every console + the live API
 
 Endpoints:
     GET  /api/cameras            merged seed + geo + wall status
@@ -118,7 +118,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._proxy(path)
         if path == "/":
             self.send_response(302)
-            self.send_header("Location", "/web/console.html")
+            self.send_header("Location", "/web/home.html")
             self.end_headers()
             return
         return super().do_GET()

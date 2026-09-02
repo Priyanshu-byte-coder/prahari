@@ -15,6 +15,7 @@ rather than forgotten in the code.
 import json
 import logging
 import os
+import threading
 
 log = logging.getLogger(__name__)
 
@@ -52,7 +53,12 @@ class Store:
         self.dsn = dsn or os.environ.get("POSTGRES_DSN") or DEFAULT_DSN
         self.redis_url = redis_url or os.environ.get("REDIS_URL") or DEFAULT_REDIS_URL
         self.scope_check = scope_check
-        self._conn = None
+        # One Store is shared across every request (built once in create_app), and FastAPI
+        # runs sync endpoints in a threadpool - a single psycopg2 connection's `with conn:`
+        # is not reentrant across threads, so two concurrent requests on it raise
+        # "the connection cannot be re-entered recursively". Thread-local, same fix lane G
+        # already used for the gateway's requests.Session.
+        self._local = threading.local()
         self._redis = None
         self._s3 = s3
 
@@ -61,9 +67,11 @@ class Store:
     @property
     def conn(self):
         import psycopg2
-        if self._conn is None or self._conn.closed:
-            self._conn = psycopg2.connect(self.dsn)
-        return self._conn
+        conn = getattr(self._local, "conn", None)
+        if conn is None or conn.closed:
+            conn = psycopg2.connect(self.dsn)
+            self._local.conn = conn
+        return conn
 
     @property
     def redis(self):
@@ -73,8 +81,10 @@ class Store:
         return self._redis
 
     def close(self):
-        if self._conn is not None and not self._conn.closed:
-            self._conn.close()
+        """Closes this thread's connection only - every other thread's stays open."""
+        conn = getattr(self._local, "conn", None)
+        if conn is not None and not conn.closed:
+            conn.close()
 
     # -- sightings ---------------------------------------------------------------------
 

@@ -18,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fastapi import Depends, FastAPI, HTTPException, Query           # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware                   # noqa: E402
 
 import audit as audit_module                                          # noqa: E402
 import auth as auth_module                                            # noqa: E402
@@ -155,6 +156,16 @@ def create_app(store=None):
     app.include_router(build_router(resolved))
     app.include_router(audit_module.build_router(resolved))
     app.include_router(grants_module.build_router(resolved))
+    # The console (web/) is served separately, off scripts/console_serve.py on its own port
+    # (5173 by default), so its fetches to this API are cross-origin. Auth is a Bearer token
+    # in the Authorization header, never a cookie, so credentialed CORS is not needed - a
+    # plain localhost allow-list is. Dev/demo only: this never runs anywhere but a laptop.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     return app
 
 
