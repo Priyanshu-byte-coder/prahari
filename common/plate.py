@@ -22,6 +22,16 @@ CLASSES = ("0ODQ", "1IL", "8B", "5S", "2Z", "6G")
 TO_DIGIT = {c: k[0] for k in CLASSES for c in k}
 TO_ALPHA = {c: k[1] for k in CLASSES for c in k}
 
+# grammar_fix uses these, not the two above, and the difference is the whole of I4's
+# zero-confident-wrong bar. A slot table that maps *every* class member to the class
+# representative also rewrites characters that were already the right kind: D and Q are in the
+# "0ODQ" class, so a letter slot turned a correctly read D into an O, and L became I. Both
+# readers had read the plate right and the grammar broke it, at 0.99 confidence, in the band an
+# officer acts on. [C7] says it precisely - "letter slots: 0->O 1->I 8->B 5->S; digit slots: the
+# reverse" - the conversion is digit->letter and letter->digit, never letter->letter.
+DIGIT_TO_ALPHA = {k[0]: k[1] for k in CLASSES}
+ALPHA_TO_DIGIT = {c: k[0] for k in CLASSES for c in k if not c.isdigit()}
+
 _CANON = str.maketrans(TO_DIGIT)
 _SEPARATORS = re.compile(r"[^A-Z0-9]")
 _SAME_CLASS = {frozenset((a, b)) for k in CLASSES for a in k for b in k if a != b}
@@ -66,6 +76,10 @@ def grammar_fix(s):
 
     A string outside 9-11 characters comes back untouched: forcing a malformed read into a
     plate shape invents a registration that was never on the vehicle.
+
+    Only the wrong *kind* of character is converted - a digit in a letter slot, a letter in a
+    digit slot. A letter that is merely in a confusion class stays as it was read; see the note
+    on DIGIT_TO_ALPHA for the reads that rule was written from.
     """
     if s is None:
         return None
@@ -76,9 +90,11 @@ def grammar_fix(s):
     # corrupted RTO digit. Upgrade to trying both grammars and scoring them if a standard plate
     # ever OCRs an H into that slot.
     if n <= 10 and s[3] == "H":
-        slots = ((0, 2, TO_DIGIT), (2, 4, TO_ALPHA), (4, 8, TO_DIGIT), (8, n, TO_ALPHA))
+        slots = ((0, 2, ALPHA_TO_DIGIT), (2, 4, DIGIT_TO_ALPHA),
+                 (4, 8, ALPHA_TO_DIGIT), (8, n, DIGIT_TO_ALPHA))
     else:
-        slots = ((0, 2, TO_ALPHA), (2, 4, TO_DIGIT), (4, n - 4, TO_ALPHA), (n - 4, n, TO_DIGIT))
+        slots = ((0, 2, DIGIT_TO_ALPHA), (2, 4, ALPHA_TO_DIGIT),
+                 (4, n - 4, DIGIT_TO_ALPHA), (n - 4, n, ALPHA_TO_DIGIT))
     out = list(s)
     for start, end, table in slots:
         for i in range(start, end):
