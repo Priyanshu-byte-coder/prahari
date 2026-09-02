@@ -1,0 +1,49 @@
+# What CI needs to run tests/ — everything in requirements.txt except the OCR engines.
+#
+# The full list does not fit on a GitHub runner: paddlepaddle and paddleocr, plus the CUDA build
+# of torch that ultralytics pulls by default, exhaust the ~14 GB of free disk and pip dies with
+# "No space left on device" before a single test runs.
+#
+# Nothing is lost. services/worker/plate.py imports easyocr and paddleocr lazily, inside the
+# function that reads a crop, precisely so the metrics endpoint and the tests do not pay for
+# them - so the plate tests exercise the vote, the grammar and the cleanup without an engine
+# present. The CI workflow installs the CPU build of torch before this file for the same reason.
+#
+# Developers still install requirements.txt. This file is not the source of truth for the stack;
+# it is the subset the test job needs, and it is here so a red CI means broken code rather than
+# a full disk.
+
+fastapi
+uvicorn[standard]
+pydantic-settings
+requests
+
+# lane I — decode, detect and track. No OCR engines: see the note above.
+av
+opencv-python-headless
+numpy
+ultralytics
+lap
+
+# lane D — persistence, matching, RBAC, export
+psycopg2-binary
+redis
+minio
+pyjwt
+argon2-cffi
+python-multipart
+boto3
+reportlab
+python-dotenv
+
+# lane G — gateway drivers
+onvif-zeep
+
+# shared and test-only
+python-ulid
+pytest
+pytest-timeout
+httpx2
+websockets
+fakeredis
+prometheus-client
