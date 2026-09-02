@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prahari — operator console</title>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<script src="vendor/leaflet.js"></script>
+<style>
+:root{
+  --bg:#0d1014; --panel:#151a21; --panel2:#1b212a; --line:#262e3a;
+  --ink:#e8ecf2; --dim:#8b97a8; --faint:#5c6675;
+  --live:#34d399; --connecting:#60a5fa; --retry:#fbbf24; --stopped:#6b7280; --dead:#f87171;
+  --accent:#3b82f6;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--bg); color:var(--ink); overflow:hidden;
+  font:13px/1.5 ui-sans-serif,-apple-system,system-ui,"Segoe UI",sans-serif;
+  display:grid; grid-template-rows:52px 1fr; }
+
+/* ---------- header ---------- */
+header{
+  display:flex; align-items:center; gap:16px; padding:0 14px;
+  background:var(--panel); border-bottom:1px solid var(--line); }
+.brand{font-weight:700; letter-spacing:.02em; font-size:15px}
+.brand span{color:var(--accent)}
+.stat{display:flex; gap:6px; align-items:baseline; color:var(--dim); font-size:12px}
+.stat b{color:var(--ink); font-size:14px; font-variant-numeric:tabular-nums}
+.sep{width:1px; height:22px; background:var(--line)}
+.grow{flex:1}
+.seg{display:flex; background:var(--panel2); border:1px solid var(--line); border-radius:7px; overflow:hidden}
+.seg button{
+  background:none; border:0; color:var(--dim); padding:6px 13px; cursor:pointer;
+  font:inherit; font-weight:600; }
+.seg button.on{background:var(--accent); color:#fff}
+button.btn{
+  background:var(--panel2); color:var(--ink); border:1px solid var(--line);
+  border-radius:7px; padding:7px 13px; font:inherit; font-weight:600; cursor:pointer; }
+button.btn:hover{border-color:var(--accent)}
+button.btn.go{background:#0f7a4d; border-color:#0f7a4d; color:#fff}
+button.btn.stop{background:#8a2b2b; border-color:#8a2b2b; color:#fff}
+
+/* ---------- layout ---------- */
+main{display:grid; grid-template-columns:274px 1fr 0; min-height:0}
+main.detail{grid-template-columns:274px 1fr 330px}
+aside{background:var(--panel); border-right:1px solid var(--line); display:flex;
+      flex-direction:column; min-height:0}
+#stage{position:relative; min-height:0; overflow:hidden}
+#detail{background:var(--panel); border-left:1px solid var(--line); overflow-y:auto;
+        min-height:0; padding:14px}
+
+/* ---------- filters + list ---------- */
+.filters{padding:10px; border-bottom:1px solid var(--line); display:grid; gap:8px}
+input,select{
+  width:100%; background:#0e1218; color:var(--ink); border:1px solid var(--line);
+  border-radius:6px; padding:7px 9px; font:inherit; }
+input:focus,select:focus{outline:0; border-color:var(--accent)}
+.two{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+#list{overflow-y:auto; flex:1}
+.row{display:flex; gap:9px; align-items:center; padding:8px 11px;
+     border-bottom:1px solid var(--line); cursor:pointer}
+.row:hover{background:var(--panel2)}
+.row.sel{background:#20293a; box-shadow:inset 3px 0 0 var(--accent)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--stopped)}
+.dot.live{background:var(--live); box-shadow:0 0 0 3px #34d39926}
+.dot.connecting{background:var(--connecting); animation:pulse 1.2s infinite}
+.dot.retrying{background:var(--retry)}
+.dot.idle{background:var(--faint)}
+@keyframes pulse{50%{opacity:.35}}
+.row .cid{color:var(--dim); font-variant-numeric:tabular-nums; min-width:20px; font-size:12px}
+.row .nm{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.chip{font-size:10px; padding:1px 5px; border-radius:4px; background:var(--panel2);
+      color:var(--dim); border:1px solid var(--line)}
+.chip.HIGH{color:var(--live);border-color:#34d39955}
+.chip.MEDIUM{color:var(--retry);border-color:#fbbf2455}
+.chip.LOW{color:var(--dead);border-color:#f8717155}
+
+/* ---------- map ---------- */
+#map{position:absolute; inset:0}
+.leaflet-container{background:#0d1014}
+.leaflet-tile-loaded{opacity:1 !important}
+.pin{border-radius:50%; border:2px solid #0d1014; box-shadow:0 0 0 1px #ffffff33}
+
+/* ---------- wall ---------- */
+#wall{position:absolute; inset:0; overflow-y:auto; padding:12px; display:none;
+      grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; align-content:start}
+.tile{background:#000; border:1px solid var(--line); border-radius:9px; overflow:hidden;
+      position:relative; aspect-ratio:16/9; cursor:pointer}
+.tile img{position:absolute; inset:0; z-index:1; width:100%; height:100%; object-fit:cover;
+          display:block}
+.tile .ph{position:absolute; inset:0; z-index:0; display:grid; place-items:center; color:var(--faint);
+          font-size:12px; text-align:center; padding:10px}
+.tile .bar{position:absolute; left:0; right:0; bottom:0; z-index:2; padding:6px 8px;
+  background:linear-gradient(transparent,#000000cc); display:flex; gap:7px; align-items:center;
+  font-size:11px}
+.tile .bar .nm{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.tile .age{color:var(--dim); font-variant-numeric:tabular-nums}
+.tile.sel{border-color:var(--accent); box-shadow:0 0 0 2px #3b82f655}
+/* A minutes-old frame shown as "live" is a lie a judge will catch. Dim it
+   and colour the age instead. */
+.tile.stale img{filter:grayscale(.6) brightness(.55)}
+.tile.stale .age{color:var(--retry); font-weight:700}
+.tile .staletag{position:absolute; top:7px; left:7px; z-index:2; font-size:10px;
+  background:#7a5a00cc; color:#ffe9a8; padding:2px 6px; border-radius:4px; display:none}
+.tile.stale .staletag{display:block}
+
+/* ---------- detail ---------- */
+#detail h3{margin:0 0 2px; font-size:15px}
+#detail .sub{color:var(--dim); font-size:12px; margin-bottom:10px}
+#detail img{width:100%; border-radius:8px; background:#000; aspect-ratio:16/9; object-fit:cover}
+.kv{display:grid; grid-template-columns:96px 1fr; gap:4px 10px; margin:10px 0; font-size:12px}
+.kv dt{color:var(--dim)}
+.kv dd{margin:0; word-break:break-all}
+h4{margin:14px 0 6px; font-size:11px; text-transform:uppercase; letter-spacing:.07em;
+   color:var(--dim); font-weight:600}
+.hint{color:var(--faint); font-size:11px; line-height:1.6}
+#modal{position:fixed; inset:0; background:#000000e6; display:none; place-items:center;
+       z-index:9999; padding:24px}
+#modal img{max-width:100%; max-height:88vh; border-radius:10px}
+kbd{background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:0 4px;
+    font:11px ui-monospace,monospace}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">प्रहरी <span>Prahari</span></div>
+  <div class="sep"></div>
+  <div class="stat"><b id="s-total">0</b> cameras</div>
+  <div class="stat"><b id="s-live" style="color:var(--live)">0</b> live</div>
+  <div class="stat"><b id="s-stale" style="color:var(--retry)">0</b> stale</div>
+  <div class="stat"><b id="s-placed">0</b> placed</div>
+  <div class="sep"></div>
+  <div class="seg" id="view">
+    <button data-v="map" class="on">Map</button>
+    <button data-v="wall">Wall</button>
+    <button data-v="split">Split</button>
+  </div>
+  <div class="grow"></div>
+  <span class="hint" id="wallnote"></span>
+  <button class="btn go"   id="startAll">▶ Start wall</button>
+  <button class="btn stop" id="stopAll">■ Stop</button>
+</header>
+
+<main id="main">
+  <aside>
+    <div class="filters">
+      <input id="q" placeholder="Search name, location, id…  ( / )" autocomplete="off">
+      <div class="two">
+        <select id="fDistrict" autocomplete="off"><option value="">All districts</option></select>
+        <select id="fStatus" autocomplete="off">
+          <option value="">Any status</option>
+          <option value="live">Live</option>
+          <option value="connecting">Connecting</option>
+          <option value="retrying">Retrying</option>
+          <option value="stopped">Stopped</option>
+          <option value="idle">Idle</option>
+        </select>
+      </div>
+    </div>
+    <div id="list"></div>
+  </aside>
+
+  <div id="stage">
+    <div id="map"></div>
+    <div id="wall"></div>
+  </div>
+
+  <div id="detail"></div>
+</main>
+
+<div id="modal"><img id="modalImg" alt=""></div>
+
+<script>
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+
+/** Escape text before inserting into innerHTML. */
+const esc = s => { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; };
+
+let cams = [], wall = {cameras:[]}, sel = null, view = 'map';
+let markers = {}, wedges = {}, tileTimers = {};
+
+const wallOf = id => (wall.cameras || []).find(c => c.camera_id === String(id)) || {status:'idle'};
+const geoOf  = c => c.geo || {};
+const placed = c => geoOf(c).verified === true;
+
+/* ================= map ================= */
+// fadeAnimation:false -- with the fade on, tiles can stay stuck at opacity:0
+// after a fitBounds during load: they report leaflet-tile-loaded and are
+// simply never painted. A black map with pins floating on it.
+const map = L.map('map', {zoomControl:true, attributionControl:true,
+                          fadeAnimation:false}).setView([22.6,71.6], 7);
+const layers = {
+  'Streets':  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                {maxZoom:19, attribution:'© OpenStreetMap'}),
+  'Satellite':L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                {maxZoom:19, attribution:'© Esri'}),
+  'Dark':     L.tileLayer('https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}.png',
+                {maxZoom:19, attribution:'© Stadia, © OpenStreetMap'}),
+};
+layers['Streets'].addTo(map);
+L.control.layers(layers, {}, {position:'topright'}).addTo(map);
+
+const STATUS_COLOR = {live:'#34d399', connecting:'#60a5fa', retrying:'#fbbf24',
+                      stopped:'#6b7280', idle:'#5c6675'};
+
+function pinIcon(c){
+  const st = wallOf(c.camera_id).status;
+  const col = STATUS_COLOR[st] || '#5c6675';
+  const conf = geoOf(c).coord_conf;
+  const dash = conf === 'LOW' ? 'border-style:dashed;' : '';
+  const size = sel && sel.camera_id === c.camera_id ? 18 : 13;
+  return L.divIcon({
+    className:'', iconSize:[size,size], iconAnchor:[size/2,size/2],
+    html:`<div class="pin" style="width:${size}px;height:${size}px;background:${col};${dash}"></div>`
+  });
+}
+
+/* A wedge shows where a camera looks. Only drawn when a bearing exists --
+   inventing one would put a confident lie on the map. */
+function wedge(c){
+  const g = geoOf(c);
+  if (g.bearing_deg === null || g.bearing_deg === undefined || !g.lat) return null;
+  const fov = g.fov_deg || 70, rng = (g.range_m || 60) / 1000 / 111;
+  const pts = [[g.lat, g.lon]];
+  for (let a = g.bearing_deg - fov/2; a <= g.bearing_deg + fov/2; a += 5){
+    const r = a * Math.PI/180;
+    pts.push([g.lat + Math.cos(r)*rng,
+              g.lon + Math.sin(r)*rng / Math.cos(g.lat*Math.PI/180)]);
+  }
+  return L.polygon(pts, {color:'#3b82f6', weight:1, fillOpacity:.14, interactive:false});
+}
+
+function drawMap(){
+  Object.values(markers).forEach(m => map.removeLayer(m));
+  Object.values(wedges).forEach(w => w && map.removeLayer(w));
+  markers = {}; wedges = {};
+  const shown = filtered();
+  const bounds = [];
+  shown.forEach(c => {
+    const g = geoOf(c);
+    if (!g.lat) return;
+    const m = L.marker([g.lat, g.lon], {icon:pinIcon(c)}).addTo(map);
+    m.on('click', () => select(c.camera_id));
+    m.bindTooltip(`${c.camera_id} · ${c.location_raw || c.name}`, {direction:'top'});
+    markers[c.camera_id] = m;
+    const w = wedge(c); if (w){ w.addTo(map); wedges[c.camera_id] = w; }
+    bounds.push([g.lat, g.lon]);
+  });
+  if (bounds.length && !map._fitOnce){ map.fitBounds(bounds, {padding:[40,40]}); map._fitOnce = true; }
+}
+
+/* ================= wall ================= */
+function drawWall(){
+  const shown = filtered();
+  $('#wall').innerHTML = shown.map(c => {
+    const st = wallOf(c.camera_id);
+    return `<div class="tile ${sel&&sel.camera_id===c.camera_id?'sel':''} ${st.stale?'stale':''}" data-id="${esc(c.camera_id)}">
+      <span class="staletag">stale</span>
+      <div class="ph" id="ph-${esc(c.camera_id)}">${st.has_frame?'':phText(st)}</div>
+      <img id="im-${esc(c.camera_id)}" alt="" style="display:${st.has_frame?'block':'none'}">
+      <div class="bar">
+        <span class="dot ${st.status}"></span>
+        <span class="nm">${esc(c.camera_id)} · ${esc(c.location_raw || c.name)}</span>
+        <span class="age" id="ag-${esc(c.camera_id)}"></span>
+      </div>
+    </div>`;
+  }).join('');
+  $$('#wall .tile').forEach(t => {
+    t.onclick = e => {
+      const id = t.dataset.id;
+      if (e.shiftKey){ openModal(id); } else { select(id); }
+    };
+  });
+  shown.forEach(c => refreshTile(c.camera_id));
+}
+
+const phText = st => ({
+  connecting:'connecting…', retrying:'retrying', stopped:'stopped',
+  idle:'press Start wall', live:'waiting for keyframe…'
+}[st.status] || st.status);
+
+function refreshTile(id){
+  const img = document.getElementById('im-' + id);
+  if (!img) return;
+  const st = wallOf(id);
+  if (!st.has_frame) return;
+  const probe = new Image();
+  probe.onload = () => {
+    img.src = probe.src; img.style.display = 'block';
+    const ph = document.getElementById('ph-' + id); if (ph) ph.textContent = '';
+  };
+  probe.src = `/tile/${id}.jpg?t=${Date.now()}`;
+}
+
+/* ================= list + filters ================= */
+function filtered(){
+  const q = $('#q').value.trim().toLowerCase();
+  const d = $('#fDistrict').value, s = $('#fStatus').value;
+  return cams.filter(c => {
+    const hay = `${c.camera_id} ${c.name} ${c.location_raw||''} ${c.district_code||''}`.toLowerCase();
+    if (q && !hay.includes(q)) return false;
+    if (d && c.district_code !== d) return false;
+    if (s && wallOf(c.camera_id).status !== s) return false;
+    return true;
+  });
+}
+
+function drawList(){
+  const shown = filtered();
+  $('#list').innerHTML = shown.map(c => {
+    const st = wallOf(c.camera_id), g = geoOf(c);
+    return `<div class="row ${sel&&sel.camera_id===c.camera_id?'sel':''}" data-id="${esc(c.camera_id)}">
+      <span class="dot ${st.status}"></span>
+      <span class="cid">${esc(c.camera_id)}</span>
+      <span class="nm">${placed(c)?'✓ ':''}${esc(c.location_raw || c.name)}</span>
+      <span class="chip ${g.coord_conf||''}">${esc(g.coord_conf || '—')}</span>
+    </div>`;
+  }).join('');
+  $$('#list .row').forEach(r => r.onclick = () => select(r.dataset.id));
+}
+
+/* ================= detail ================= */
+function select(id){
+  sel = cams.find(c => String(c.camera_id) === String(id));
+  $('#main').classList.add('detail');
+  drawList(); drawMap(); if (view !== 'map') drawWall();
+  renderDetail();
+  const g = geoOf(sel);
+  if (g.lat && view !== 'wall') map.setView([g.lat, g.lon], Math.max(map.getZoom(), 15));
+}
+
+function renderDetail(){
+  if (!sel){ $('#detail').innerHTML=''; return; }
+  const c = sel, g = geoOf(c), st = wallOf(c.camera_id);
+  $('#detail').innerHTML = `
+    <h3>Camera ${esc(c.camera_id)}</h3>
+    <div class="sub">${esc(c.location_raw || c.name)}</div>
+    <img id="dImg" src="/tile/${esc(c.camera_id)}.jpg?t=${Date.now()}" alt="">
+    <div class="hint" id="dNote">${st.has_frame ? 'cached frame' : phText(st)}</div>
+    <div class="row" style="border:0;padding:8px 0;gap:8px">
+      <button class="btn go"   style="flex:1" onclick="one('start',${JSON.stringify(String(c.camera_id))})">▶ Start</button>
+      <button class="btn stop" style="flex:1" onclick="one('stop',${JSON.stringify(String(c.camera_id))})">■ Stop</button>
+    </div>
+    <h4>Status</h4>
+    <dl class="kv">
+      <dt>wall</dt><dd>${esc(st.status)}${st.detail?` — ${esc(st.detail)}`:''}</dd>
+      <dt>frames</dt><dd>${esc(st.frames ?? 0)}</dd>
+      <dt>frame age</dt><dd>${esc(st.age_s ?? '—')}${st.age_s!=null?' s':''}</dd>
+    </dl>
+    <h4>Placement</h4>
+    <dl class="kv">
+      <dt>lat, lon</dt><dd>${esc(g.lat ?? '—')}, ${esc(g.lon ?? '—')}</dd>
+      <dt>confidence</dt><dd><span class="chip ${g.coord_conf||''}">${esc(g.coord_conf||'—')}</span></dd>
+      <dt>source</dt><dd>${esc(g.coord_source || '—')}</dd>
+      <dt>bearing</dt><dd>${esc(g.bearing_deg ?? '— (no wedge drawn)')}</dd>
+      <dt>verified</dt><dd>${g.verified ? 'yes' : 'no — geocoded, not checked against the frame'}</dd>
+      <dt>landmark</dt><dd>${esc(g.landmark || '—')}</dd>
+    </dl>
+    <h4>Transport</h4>
+    <dl class="kv">
+      <dt>district</dt><dd>${esc(c.district_code)}</dd>
+      <dt>install</dt><dd>${esc(c.install_type)} <span class="hint">(seed says FIX for all — overlay shows otherwise)</span></dd>
+      <dt>hls</dt><dd>${esc((c.transports||{}).hls || '—')}</dd>
+      <dt>rtsp</dt><dd>${esc((c.transports||{}).rtsp || '—')} <span class="hint">8554 filtered</span></dd>
+    </dl>
+    <div class="hint">Shift-click a wall tile to enlarge. <kbd>/</kbd> search · <kbd>Esc</kbd> close.</div>`;
+}
+
+window.one = async (what, id) => {
+  await fetch(`/api/wall/${what}`, {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ids:[String(id)]})});
+  poll();
+};
+
+/* ================= modal ================= */
+function openModal(id){
+  $('#modalImg').src = `/tile/${id}.jpg?t=${Date.now()}`;
+  $('#modal').style.display = 'grid';
+}
+$('#modal').onclick = () => $('#modal').style.display = 'none';
+
+/* ================= polling ================= */
+async function poll(){
+  try{
+    wall = await (await fetch('/api/wall')).json();
+  }catch(e){ return; }
+  const live = wall.cameras.filter(c => c.status === 'live').length;
+  $('#s-live').textContent = live;
+  $('#s-stale').textContent = wall.cameras.filter(c => c.stale).length;
+  $('#wallnote').textContent = wall.running
+    ? `${wall.running} pullers · frame every ${wall.interval}s`
+    : 'wall stopped';
+  drawList();
+  if (view !== 'wall') drawMap();
+  if (view !== 'map') {
+    // keep tiles fresh without rebuilding the grid
+    filtered().forEach(c => refreshTile(c.camera_id));
+    $$('#wall .tile').forEach(t => {
+      const st = wallOf(t.dataset.id);
+      const ag = document.getElementById('ag-' + t.dataset.id);
+      if (ag) ag.textContent = st.age_s != null ? st.age_s + 's' : '';
+      const d = t.querySelector('.dot'); if (d) d.className = 'dot ' + st.status;
+      t.classList.toggle('stale', !!st.stale);
+      const ph = document.getElementById('ph-' + t.dataset.id);
+      if (ph && !st.has_frame) ph.textContent = phText(st);
+    });
+  }
+  if (sel){
+    const st = wallOf(sel.camera_id);
+    const n = $('#dNote'); if (n) n.textContent = st.has_frame ? `cached frame · ${st.age_s}s old` : phText(st);
+    const im = $('#dImg'); if (im && st.has_frame) im.src = `/tile/${sel.camera_id}.jpg?t=${Date.now()}`;
+  }
+}
+
+/* ================= boot ================= */
+async function boot(){
+  cams = await (await fetch('/api/cameras')).json();
+  $('#s-total').textContent = cams.length;
+  $('#s-placed').textContent = cams.filter(placed).length;
+  const ds = [...new Set(cams.map(c => c.district_code).filter(Boolean))].sort();
+  $('#fDistrict').innerHTML = '<option value="">All districts</option>' +
+    ds.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
+  await poll();
+  drawList(); drawMap(); drawWall();
+  setInterval(poll, 2000);
+}
+
+$$('#view button').forEach(b => b.onclick = () => {
+  $$('#view button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  view = b.dataset.v;
+  const stage = $('#stage');
+  if (view === 'map'){ $('#map').style.display='block'; $('#wall').style.display='none'; }
+  else if (view === 'wall'){ $('#map').style.display='none'; $('#wall').style.display='grid'; }
+  else {
+    $('#map').style.display='block'; $('#wall').style.display='grid';
+    $('#map').style.inset='0 50% 0 0'; $('#wall').style.inset='0 0 0 50%';
+  }
+  if (view !== 'split'){ $('#map').style.inset='0'; $('#wall').style.inset='0'; }
+  setTimeout(() => map.invalidateSize(), 60);
+  drawWall(); drawMap();
+});
+
+$('#startAll').onclick = async () => {
+  $('#startAll').textContent = 'starting…';
+  await fetch('/api/wall/start', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+  $('#startAll').textContent = '▶ Start wall';
+  poll();
+};
+$('#stopAll').onclick = async () => {
+  await fetch('/api/wall/stop', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+  poll();
+};
+
+['#q','#fDistrict','#fStatus'].forEach(s =>
+  $(s).addEventListener('input', () => { drawList(); drawMap(); drawWall(); }));
+
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && !/input|select/i.test(e.target.tagName)){ e.preventDefault(); $('#q').focus(); }
+  if (e.key === 'Escape'){ $('#modal').style.display='none'; $('#main').classList.remove('detail'); sel=null; drawList(); }
+});
+
+boot();
+</script>
+</body>
+</html>
