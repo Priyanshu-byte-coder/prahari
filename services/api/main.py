@@ -158,10 +158,4 @@ def create_app(store=None):
     return app
 
 
-app = None      # built lazily by uvicorn's factory or by the tests
-
-
-def factory():
-    global app
-    app = create_app()
-    return app
+app = create_app()      # `uvicorn services.api.main:app` per AGENTS.md and the demo script
