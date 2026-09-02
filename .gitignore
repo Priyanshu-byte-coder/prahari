@@ -1,0 +1,25 @@
+# weights, video, crops, secrets - AGENTS.md: never commit anything over 10 MB
+models/**
+!models/README.md
+fixtures/clips/**
+!fixtures/clips/README.md
+fixtures/golden/crops/
+fixtures/golden/frames/
+fixtures/golden/report.json
+docs/accuracy-report.md
+
+*.pt
+*.onnx
+*.engine
+*.mp4
+*.mkv
+*.jpg
+*.jpeg
+*.png
+!docs/**/*.png
+
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
