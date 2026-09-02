@@ -1,25 +1,54 @@
-# weights, video, crops, secrets - AGENTS.md: never commit anything over 10 MB
-models/**
-!models/README.md
-fixtures/clips/**
-!fixtures/clips/README.md
-fixtures/golden/crops/
-fixtures/golden/frames/
-fixtures/golden/report.json
-docs/accuracy-report.md
+# Secrets
+.env
 
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# Node / web
+node_modules/
+web/dist/
+
+# Model weights
 *.pt
 *.onnx
 *.engine
+models/**/*.pt
+models/**/*.onnx
+models/**/*.engine
+
+# Video, crops, other large/binary artifacts -- never committed
+fixtures/clips/*.mp4
+fixtures/clips/*.mkv
+data/crops/
+data/videos/
+data/osrm/*.osrm*
+data/osrm/*.pbf
 *.mp4
 *.mkv
-*.jpg
-*.jpeg
-*.png
-!docs/**/*.png
+*.log
+logs/
+.DS_Store
 
-.env
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.venv/
+# Kept from lane D's list when the two .gitignore files merged.
+data/videos/*.mp4
+data/videos/*.mkv
+data/snapshots/
+data/models/*.pt
+data/models/*.onnx
+data/models/*.engine
+infra/mediamtx.exe
+infra/mediamtx.zip
+infra/mediamtx.yml
+infra/LICENSE
+data/snapshots/*.jpg
+!data/snapshots/grid_contact_sheet.jpg
+logs_api.txt
+cams_tmp.json
+data/detections/
+yolov8*.pt
+simgrid/

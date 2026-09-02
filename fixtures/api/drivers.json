@@ -1,0 +1,26 @@
+[
+  {
+    "driver": "mediamtx",
+    "status": "live",
+    "cameras": 27,
+    "note": "HLS via MediaMTX; port 8554 filtered at this grid so RTSP resolves 0/30"
+  },
+  {
+    "driver": "rtsp",
+    "status": "live",
+    "cameras": 0,
+    "note": "PyAV rtsp_transport=tcp; ready when port 8554 opens — probe upgrades automatically"
+  },
+  {
+    "driver": "onvif",
+    "status": "live",
+    "cameras": 0,
+    "note": "WS-Discovery + GetStreamUri; no ONVIF cameras in the sandbox grid"
+  },
+  {
+    "driver": "vms",
+    "status": "stub",
+    "cameras": 0,
+    "note": "STUB: interface complete, awaiting vendor credentials — list_cameras / get_stream_uri / subscribe_events typed and returning mock rows"
+  }
+]

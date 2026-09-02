@@ -1,0 +1,26 @@
+[
+  {
+    "id": 3, "kind": "plate", "plate_norm": "GJ01AB1234", "plate_canon": "6J01A81234",
+    "face_vec": null, "description": null,
+    "category": "stolen_vehicle", "reason": "Stolen vehicle reported 2026-08-29",
+    "severity": "HIGH", "owner_dept_id": 1, "classification": "CONFIDENTIAL",
+    "added_by": 12, "valid_from": "2026-08-29T00:00:00+05:30",
+    "valid_until": "2026-11-29T00:00:00+05:30", "source": "manual"
+  },
+  {
+    "id": 7, "kind": "plate", "plate_norm": "GJ01AB1234", "plate_canon": "6J01A81234",
+    "face_vec": null, "description": "Absconding suspect — FIR #12345",
+    "category": "wanted_person", "reason": "Court warrant",
+    "severity": "CRITICAL", "owner_dept_id": 1, "classification": "SECRET",
+    "added_by": 5, "valid_from": "2026-08-30T00:00:00+05:30",
+    "valid_until": "2027-08-30T00:00:00+05:30", "source": "manual"
+  },
+  {
+    "id": 11, "kind": "plate", "plate_norm": "GJ05ZZ0001", "plate_canon": "6J05ZZ0001",
+    "face_vec": null, "description": null,
+    "category": "blacklisted_vehicle", "reason": "Multiple traffic violations",
+    "severity": "MEDIUM", "owner_dept_id": 2, "classification": "RESTRICTED",
+    "added_by": 8, "valid_from": "2026-08-01T00:00:00+05:30",
+    "valid_until": "2026-12-01T00:00:00+05:30", "source": "csv_import"
+  }
+]

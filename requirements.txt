@@ -1,0 +1,42 @@
+# Stack per AGENTS.md. Shared across all three lanes -- G5 owns this file.
+fastapi
+uvicorn[standard]
+pydantic-settings
+requests
+
+# lane I -- decode, detect, track, OCR
+av
+opencv-python-headless
+numpy
+ultralytics
+lap
+paddleocr
+paddlepaddle
+
+# lane D -- persistence, matching, RBAC, export
+psycopg2-binary
+redis
+minio
+pyjwt
+argon2-cffi
+python-multipart
+weasyprint
+
+# lane G -- gateway drivers
+onvif-zeep
+# numpy is not optional here: PyAV's frame.to_ndarray() imports it lazily, so
+# without it the drivers decode fine and then fail per frame.
+numpy
+
+# shared
+python-ulid
+pytest
+
+# lane D -- added when lane D merged: object storage client, PDF, the API test client
+# and the socket client the WebSocket tests drive a real server with.
+boto3
+httpx2
+pytest-timeout
+python-dotenv
+reportlab
+websockets

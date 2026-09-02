@@ -1,0 +1,36 @@
+[
+  {
+    "id": 1,
+    "watchlist_id": 3,
+    "sighting_id": "01J6XMABCD000001",
+    "camera_id": "1",
+    "pts": "2026-08-31T10:29:55+05:30",
+    "band": "CONFIRMED",
+    "state": "NEW",
+    "count": 1,
+    "created_at": "2026-08-31T10:29:56+05:30",
+    "plate_text": "GJ01AB1234",
+    "category": "stolen_vehicle",
+    "reason": "Stolen vehicle reported 2026-08-29",
+    "severity": "HIGH",
+    "camera_name": "Chimanbhai Patel Bridge",
+    "district_code": "AHMEDABAD"
+  },
+  {
+    "id": 2,
+    "watchlist_id": 7,
+    "sighting_id": "01J6XMABCD000002",
+    "camera_id": "4",
+    "pts": "2026-08-31T10:28:12+05:30",
+    "band": "CONFIRMED",
+    "state": "ACKNOWLEDGED",
+    "count": 3,
+    "created_at": "2026-08-31T10:28:13+05:30",
+    "plate_text": "GJ01AB1234",
+    "category": "wanted_person",
+    "reason": "FIR #12345 — absconding suspect",
+    "severity": "CRITICAL",
+    "camera_name": "Paldi Circle",
+    "district_code": "AHMEDABAD"
+  }
+]

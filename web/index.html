@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prahari — GIS Console</title>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="vendor/MarkerCluster.css">
+<link rel="stylesheet" href="vendor/MarkerCluster.Default.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <div class="brand">प्रहरी <span>Prahari</span></div>
+  <div class="sep"></div>
+  <div class="stat"><b id="s-total">0</b> cameras</div>
+  <div class="stat"><b id="s-live" class="c-live">0</b> live</div>
+  <div class="stat"><b id="s-deg" class="c-deg">0</b> degraded</div>
+  <div class="stat"><b id="s-down" class="c-down">0</b> down</div>
+  <div class="stat"><b id="s-alerts" class="c-alert">0</b> alerts</div>
+  <div class="grow"></div>
+  <div class="seg" id="viewSeg">
+    <button data-v="map" class="on">Map</button>
+    <button data-v="route">Route</button>
+    <button data-v="wall">Wall</button>
+    <button data-v="admin">Admin</button>
+  </div>
+</header>
+
+<main id="main">
+  <aside id="sidebar">
+    <div class="filters">
+      <input id="q" placeholder="Search plate, camera, location…  ( / )" autocomplete="off">
+      <div class="two">
+        <select id="fDist" autocomplete="off"><option value="">All districts</option></select>
+        <select id="fHealth" autocomplete="off">
+          <option value="">Any health</option>
+          <option value="LIVE">Live</option>
+          <option value="DEGRADED">Degraded</option>
+          <option value="DOWN">Down</option>
+          <option value="UNKNOWN">Unknown</option>
+        </select>
+      </div>
+    </div>
+    <div id="list"></div>
+  </aside>
+
+  <div id="stage">
+    <!-- Map view -->
+    <div id="mapView" class="view active">
+      <div id="map"></div>
+    </div>
+
+    <!-- Route view -->
+    <div id="routeView" class="view" style="display:none">
+      <div id="routeMap"></div>
+      <div id="routePanel"></div>
+    </div>
+
+    <!-- Wall view -->
+    <div id="wallView" class="view" style="display:none">
+      <div id="wallGrid"></div>
+    </div>
+
+    <!-- Admin view -->
+    <div id="adminView" class="view" style="display:none">
+      <div id="adminContent"></div>
+    </div>
+  </div>
+
+  <div id="detail"></div>
+</main>
+
+<!-- Modals -->
+<div id="modal" class="modal-overlay">
+  <div class="modal-box">
+    <img id="modalImg" alt="">
+    <button class="modal-close" id="modalClose">×</button>
+  </div>
+</div>
+
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/leaflet.markercluster.js"></script>
+<script src="map.js"></script>
+<script src="wedges.js"></script>
+<script src="events.js"></script>
+<script src="ws.js"></script>
+<script src="route.js"></script>
+<script src="wall.js"></script>
+<script src="admin.js"></script>
+<script>
+// Bootstrap: load fixtures (works with API down) or live API
+const API = window.API_BASE || '';
+
+/** Escape text before inserting into innerHTML. */
+const esc = s => { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; };
+
+async function apiFetch(path, fallback) {
+  try {
+    const r = await fetch(API + path);
+    if (r.ok) return r.json();
+  } catch (_) {}
+  // Fall back to fixtures when API is down — G7 contract
+  try {
+    const name = path.replace(/^\/api\//, '').replace(/\?.*$/, '').replace(/\//g, '_');
+    const r = await fetch(`../fixtures/api/${name}.json`);
+    if (r.ok) return r.json();
+  } catch (_) {}
+  return fallback;
+}
+
+window.apiFetch = apiFetch;
+window.prahari = {};
+
+async function boot() {
+  const [cameras, alerts] = await Promise.all([
+    apiFetch('/api/cameras', []),
+    apiFetch('/api/alerts?state=NEW&limit=50', []),
+  ]);
+  window.prahari.cameras = cameras;
+  window.prahari.alerts  = alerts;
+
+  // Stats
+  document.getElementById('s-total').textContent = cameras.length;
+  document.getElementById('s-live').textContent  = cameras.filter(c => c.health === 'LIVE').length;
+  document.getElementById('s-deg').textContent   = cameras.filter(c => c.health === 'DEGRADED').length;
+  document.getElementById('s-down').textContent  = cameras.filter(c => c.health === 'DOWN').length;
+  document.getElementById('s-alerts').textContent = alerts.filter(a => a.state === 'NEW').length;
+
+  // District filter
+  const dists = [...new Set(cameras.map(c => c.district_code).filter(Boolean))].sort();
+  const fDist = document.getElementById('fDist');
+  dists.forEach(d => {
+    const o = document.createElement('option'); o.value = d; o.textContent = d;
+    fDist.appendChild(o);
+  });
+
+  // Init modules
+  MapView.init(cameras);
+  WedgeLayer.init(cameras);
+  EventsLayer.init();
+  WsClient.init();
+  RouteView.init();
+  WallView.init(cameras);
+  AdminView.init();
+  renderList(cameras);
+}
+
+// Camera list
+function renderList(cameras) {
+  const q    = document.getElementById('q').value.trim().toLowerCase();
+  const dist = document.getElementById('fDist').value;
+  const hlth = document.getElementById('fHealth').value;
+  const shown = cameras.filter(c => {
+    const hay = `${c.camera_id} ${c.name} ${c.district_code || ''} ${c.transport_in_use || ''}`.toLowerCase();
+    if (q && !hay.includes(q)) return false;
+    if (dist && c.district_code !== dist) return false;
+    if (hlth && c.health !== hlth) return false;
+    return true;
+  });
+  const list = document.getElementById('list');
+  list.innerHTML = shown.map(c => `
+    <div class="row" data-id="${esc(c.camera_id)}">
+      <span class="hdot h-${(c.health||'UNKNOWN').toLowerCase()}"></span>
+      <span class="cid">${esc(c.camera_id)}</span>
+      <span class="nm">${esc(c.name)}</span>
+      <span class="chip cc-${(c.coord_conf||'').toLowerCase()}">${esc(c.coord_conf || '—')}</span>
+    </div>`).join('');
+  list.querySelectorAll('.row').forEach(r =>
+    r.addEventListener('click', () => selectCamera(r.dataset.id)));
+}
+window.renderList = renderList;
+
+function selectCamera(id) {
+  const c = (window.prahari.cameras || []).find(x => String(x.camera_id) === String(id));
+  if (!c) return;
+  window.prahari.selected = c;
+  document.querySelectorAll('#list .row').forEach(r =>
+    r.classList.toggle('sel', r.dataset.id === String(id)));
+  MapView.flyTo(c);
+  showDetail(c);
+  document.getElementById('main').classList.add('detail');
+}
+window.selectCamera = selectCamera;
+
+function showDetail(c) {
+  const d = document.getElementById('detail');
+  const snapUrl = API ? `${API}/api/cameras/${c.camera_id}/snapshot` : null;
+  d.innerHTML = `
+    <button class="detail-close" onclick="document.getElementById('main').classList.remove('detail');document.getElementById('detail').innerHTML=''">×</button>
+    <h3>Camera ${esc(c.camera_id)}</h3>
+    <div class="sub">${esc(c.name)}</div>
+    ${snapUrl ? `<img class="snap" src="${esc(snapUrl)}" alt="" onerror="this.style.display='none'">` : '<div class="snap-placeholder">snapshot requires live API</div>'}
+    <h4>Health</h4>
+    <dl class="kv">
+      <dt>status</dt><dd><span class="hdot h-${(c.health||'UNKNOWN').toLowerCase()}"></span> ${esc(c.health||'UNKNOWN')}</dd>
+      <dt>updated</dt><dd>${c.health_at ? esc(new Date(c.health_at).toLocaleTimeString()) : '—'}</dd>
+    </dl>
+    <h4>Location</h4>
+    <dl class="kv">
+      <dt>district</dt><dd>${esc(c.district_code||'—')}</dd>
+      <dt>lat, lon</dt><dd>${c.lat != null ? esc(c.lat.toFixed(5)) : '—'}, ${c.lon != null ? esc(c.lon.toFixed(5)) : '—'}</dd>
+      <dt>confidence</dt><dd><span class="chip cc-${(c.coord_conf||'').toLowerCase()}">${esc(c.coord_conf||'—')}</span></dd>
+      <dt>bearing</dt><dd>${c.bearing_deg != null ? esc(c.bearing_deg + '°') : '— (no wedge)'}</dd>
+    </dl>
+    <h4>Transport</h4>
+    <dl class="kv">
+      <dt>in use</dt><dd>${esc(c.transport_in_use||'—')}</dd>
+      <dt>driver</dt><dd>${esc(c.driver||'—')}</dd>
+    </dl>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn go" onclick="WallView.openOne(${JSON.stringify(String(c.camera_id))});switchView('wall')">▶ Open in wall</button>
+      <button class="btn" onclick="RouteView.openSearch(${JSON.stringify(String(c.camera_id))});switchView('route')">Route</button>
+    </div>
+    <div class="hint" style="margin-top:10px">Shift-click a wall tile to enlarge. <kbd>Esc</kbd> close panel.</div>`;
+  // Refresh snapshot every 5 s
+  if (snapUrl) {
+    clearInterval(window._snapTimer);
+    window._snapTimer = setInterval(() => {
+      const img = d.querySelector('.snap');
+      if (img) img.src = snapUrl + '?t=' + Date.now();
+    }, 5000);
+  }
+}
+
+// View switching
+function switchView(v) {
+  document.querySelectorAll('#viewSeg button').forEach(b =>
+    b.classList.toggle('on', b.dataset.v === v));
+  const views = {map:'mapView', route:'routeView', wall:'wallView', admin:'adminView'};
+  Object.entries(views).forEach(([key, id]) => {
+    const el = document.getElementById(id);
+    el.style.display = key === v ? '' : 'none';
+    el.classList.toggle('active', key === v);
+  });
+  if (v === 'map') { MapView.invalidate(); }
+  if (v === 'route') { RouteView.activate(); }
+  if (v === 'wall') { WallView.activate(); }
+  if (v === 'admin') { AdminView.activate(); }
+}
+window.switchView = switchView;
+
+document.querySelectorAll('#viewSeg button').forEach(b =>
+  b.addEventListener('click', () => switchView(b.dataset.v)));
+
+['q', 'fDist', 'fHealth'].forEach(id =>
+  document.getElementById(id).addEventListener('input', () =>
+    renderList(window.prahari.cameras || [])));
+
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && !/input|select/i.test(e.target.tagName)) {
+    e.preventDefault(); document.getElementById('q').focus();
+  }
+  if (e.key === 'Escape') {
+    document.getElementById('modal').style.display = 'none';
+    document.getElementById('main').classList.remove('detail');
+    document.getElementById('detail').innerHTML = '';
+  }
+});
+
+document.getElementById('modalClose').addEventListener('click', () =>
+  document.getElementById('modal').style.display = 'none');
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal'))
+    document.getElementById('modal').style.display = 'none';
+});
+
+window.openModal = function(src) {
+  document.getElementById('modalImg').src = src;
+  document.getElementById('modal').style.display = 'flex';
+};
+
+boot();
+</script>
+</body>
+</html>

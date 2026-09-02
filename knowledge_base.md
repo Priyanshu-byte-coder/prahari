@@ -4,11 +4,13 @@ Updated: 2026-09-01 · KB v2 · cap 300 lines · patched after **every** complet
 
 ## 0. Now
 
+- 2026-08-31. **7 days to submission (7 Sep)**. Lane D is complete: D1-D10 all DONE, in PR #37.
 - 2026-08-29. **9 days to submission (7 Sep)**, 12 to the live event (10–11 Sep, i-Hub Gandhinagar).
 - `main` holds docs only — commit `416ef26 "Restart"` wiped the tree. Working code from before is at
   `4d0c945` and on `origin/priyanshu/platform`; salvage with `git show`, do not rewrite (`TASK.md §4`).
-- Wave 0 is today: G1 camera seed + G5 compose · D2's fake-sightings generator · I5 `common/plate.py`.
-  After those land, no lane can block another.
+- Wave 0 is today: G1 camera seed + G5 compose · D2's fake-sightings generator (**done**) · I5 `common/plate.py`.
+  Lane D's wave 1 (D1, D2, D3) is done and in PR #37; it was built against throwaway
+  timescaledb-ha and redis containers because G5's compose has not landed.
 - Tickets are mirrored as GitHub issues `#1–#35` on `Priyanshu-byte-coder/prahari` (private repo, all
   three are collaborators). Title prefix is the ticket id — `[I3] …`, `[G7] …`, `[D5] …`. Bodies are
   generated from `TASK.md`, so **edit the ticket in `TASK.md`, not in the issue**.
@@ -16,6 +18,9 @@ Updated: 2026-09-01 · KB v2 · cap 300 lines · patched after **every** complet
 - First green light is in: `python -m services.worker.selftest --assert-xadd` replays a clip with a
   known plate and lands a CONFIRMED [C1] row on `sightings` 0.43 s after the pass. Against a live
   grid camera it is the same command with `--source rtsp://...`; lane I is no longer waiting on anyone.
+- Open PRs, none merged: **#37** lane D wave 1+2 (D1-D5) · **#38** I5 `common/plate.py` ·
+  **#40** lane G wave 0+1 (G1, G5, G2, G3). The merge queue is the bottleneck, not the code.
+- Nothing is running yet. First green light we want: a sighting row on Redis from a live grid camera.
 
 ## 1. Ticket board
 
@@ -37,38 +42,50 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 | I10 Re-ID | 2 | P1 | DONE | ce9c3cb | ResNet-18 trunk; OSNet is a weights path |
 | I11 fine-tune + TensorRT | 3 | P1 | WIP | 4fb493a | export + parity green; fine-tune needs a dataset |
 | I12 bonus analytics | 2 | P1 | DONE | 12dacf2 | crowd, stopped, wrong-way, loitering |
+| I5 common/plate.py + vectors | 1 | 0 | DONE | bac680d | D's plate_compat auto-upgraded |
+| I1 decode 5fps + motion gate | 2 | 1 | TODO | | URL or local clip — no gateway needed |
+| I2 backend + detector + batching | 2 | 1 | TODO | | pretrained yolov8s |
+| I3 ByteTrack + sighting builder | 2 | 1 | TODO | | |
+| I4 plate detect + OCR + grammar + vote | 3 | 2 | TODO | | the hard one |
+| I6 publish Redis + MinIO + metrics | 2 | 2 | TODO | | lane's only real output |
+| I8 worker selftest + replay harness | 1 | 2 | TODO | | feeds J1 |
+| I7 golden set + accuracy report | 2 | 3 | TODO | | deck numbers come from here |
+| I9 deck, 10 slides | 2 | 3 | TODO | | |
+| I10 Re-ID | 2 | P1 | TODO | | corroboration only |
+| I11 fine-tune + TensorRT | 3 | P1 | TODO | | 8–9 Sep only |
+| I12 bonus analytics | 2 | P1 | TODO | | crowd, wrong-way, loitering |
 
 ### Lane G — EDGE + CONSOLE — neevmodh (18 pt)
 
 | id | pt | wave | state | commit | note |
 |---|---|---|---|---|---|
-| G1 grid recon + cameras.seed.json | 1 | 0 | TODO | | salvage `probe_grid.py` |
-| G5 infra compose + env + Makefile | 1 | 0 | TODO | | other lanes need this today |
-| G2 CameraSource + transport resolution | 2 | 1 | TODO | | publishes `camera:transport:<id>` |
-| G3 health monitor | 2 | 1 | TODO | | sole producer of `camera.health` |
-| G6 coordinate ground truth | 1 | 1 | TODO | | before any route UI |
-| G7 map layers 1–2 + API fixtures | 2 | 1 | TODO | | fixtures first, they unblock the lane |
-| G8 wedges + bearing editor | 2 | 2 | TODO | | |
-| G9 events layer + slider + WS client | 2 | 2 | TODO | | |
-| G10 route view | 2 | 2 | TODO | | the graded test case |
-| G11 video wall + admin drivers page | 2 | 2 | TODO | | |
-| G4 ONVIF + VMS stub | 1 | 3 | TODO | | hybrid bonus; drop to P1 if late |
+| G1 grid recon + cameras.seed.json | 1 | 0 | DONE | 697edc5 | grid returned 502, seed built from salvaged catalogue |
+| G5 infra compose + env + Makefile | 1 | 0 | DONE | 8231618 | `make up` verified: all 3 containers healthy (neevmodh, 2026-09-01) |
+| G2 CameraSource + transport resolution | 2 | 1 | DONE | 8231618 | probe+drivers done, 27/30 resolve to HLS; all SonarCloud issues fixed |
+| G3 health monitor | 2 | 1 | DONE | 8231618 | sole producer of `camera.health`; selftest + health tests green |
+| G6 coordinate ground truth | 1 | 1 | DONE | d501d49 | geo_helper.html placement tool + geo_bootstrap.py |
+| G7 map layers 1–2 + API fixtures | 2 | 1 | DONE | d501d49 | fixtures/api/*.json + web/map.js + web/index.html |
+| G8 wedges + bearing editor | 2 | 2 | DONE | d501d49 | web/wedges.js — L.marker+DivIcon drag (fixed Copilot review) |
+| G9 events layer + slider + WS client | 2 | 2 | DONE | d501d49 | web/events.js + web/ws.js |
+| G10 route view | 2 | 2 | DONE | d501d49 | web/route.js — numbered pins, PROBABLE, IMPLAUSIBLE, CSV |
+| G11 video wall + admin drivers page | 2 | 2 | DONE | d501d49 | web/wall.js + web/admin.js |
+| G4 ONVIF + VMS stub | 1 | 3 | DONE | d501d49 | interface complete; awaiting vendor credentials |
 | G12 Grafana dashboard | 2 | P1 | TODO | | |
 
 ### Lane D — CORE — Priyanshu-byte-coder (17 pt)
 
 | id | pt | wave | state | commit | note |
 |---|---|---|---|---|---|
-| D1 schema + registry loader | 2 | 1 | TODO | | hypertable before first insert |
-| D2 fake_sightings + persister | 2 | 1 | TODO | | generator first, unblocks the lane |
-| D3 watchlist + CSV + feed stubs | 2 | 1 | TODO | | |
-| D4 matcher bands + alert FSM | 2 | 2 | TODO | | imports I5, no second copy |
-| D5 WebSocket fanout | 2 | 2 | TODO | | kills all polling |
+| D1 schema + registry loader | 2 | 1 | DONE | | applies and re-applies clean on timescaledb-ha:pg16 |
+| D2 fake_sightings + persister | 2 | 1 | DONE | | soak: 14991 rows at 49.5/s, pending stayed 0 |
+| D3 watchlist + CSV + feed stubs | 2 | 1 | DONE | | repo + feeds; HTTP routes land with the app |
+| D4 matcher bands + alert FSM | 2 | 2 | DONE | | band table + FSM green against I5 from PR #38 |
+| D5 WebSocket fanout | 2 | 2 | DONE | | push, scope filtering and resume backfill tested |
 | D6 route API + plausibility + export | 2 | 2 | TODO | | the graded test case |
-| D7 RBAC + audit | 3 | 3 | TODO | | scope test must run in CI |
-| D8 HLD document | 2 | 3 | TODO | | mandatory deliverable |
-| D9 cross-department grants | 2 | P1 | TODO | | |
-| D10 audit hash-chain verify | 1 | P1 | TODO | | |
+| D7 RBAC + audit | 3 | 3 | DONE | | scope test green, runs in GitHub Actions |
+| D8 HLD document | 2 | 3 | DONE | | docs/hld.md, 13 sections, gaps named |
+| D9 cross-department grants | 2 | P1 | DONE | | case number, 72 h cap, target-dept approval, logged |
+| D10 audit hash-chain verify | 1 | P1 | DONE | | GET /api/admin/audit/verify, tamper test green |
 
 ### Joint
 
@@ -136,10 +153,50 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
   formats, model card, deck outline, demo script, submission checklist.
 
 ### lane G
-_(nothing yet)_
+- `scripts/probe_grid.py` — hits grid `/api/ingest`, probes RTSP/HLS reachability per camera, writes `data/cameras.seed.json` [C8]; falls back to salvaged catalogue if the sandbox is down. `--check` prints count + reachability.
+- `data/cameras.seed.json` — [C8] camera seed, 30 cameras, `district_code` best-effort from location text, `UNKNOWN` where ambiguous.
+- `data/catalogue/ingest.json.bootstrap` — real 30-camera catalogue salvaged from `4d0c945` (host `live.corp8.cloud`), offline fallback source for probe_grid.py.
+- `infra/docker-compose.yml` — postgres16+timescaledb+pgvector (`timescale/timescaledb-ha:pg16`), redis, minio, osrm (profile `full`, no Gujarat extract yet -- D6).
+- `.env.example` — [C9] keys verbatim. `.gitignore` — `.env`, weights, video, crops per build rules. `requirements.txt` — full stack, shared root file.
+- `Makefile` — `up` (compose up+ps), `down`, `seed` (db/schema.sql + load_registry.py, both lane D, not built yet), `check` (pytest).
+- `services/gateway/source.py` — [C6] `CameraSource` protocol, `Frame`, `Health`, `TsSource`, backoff/watchdog constants.
+- `services/gateway/probe.py` — `probe_rtsp` (socket+DESCRIBE), `probe_hls` (cookie-gated GET), `resolve_transport` → `TransportResult`, `publish` (the G→I seam), `reprobe_forever` (10 min).
+- `services/gateway/sources/rtsp.py` — `RTSPSource`, PyAV `rtsp_transport=tcp`, backoff + stall watchdog. `sources/mediamtx.py` — `MediaMTXSource` (HLS), picks `hls_pdt` vs `server_receive` from the playlist.
+- `services/gateway/selftest.py` — `--probe-all` transport table with per-camera reason; `--publish` writes Redis. `tests/test_g_probe.py` — 10 tests, no network.
 
 ### lane D
-_(nothing yet)_
+- `db/schema.sql` — [C3] verbatim, the copy a reviewer diffs against the contract — 9 tables, hypertable, 5 sighting indexes.
+- `db/migrate.sql` — the file that actually runs: same objects, IF NOT EXISTS, named indexes, `if_not_exists => TRUE`.
+- `scripts/load_registry.py` — joins `cameras.seed.json` + `camera_geo.json` into `cameras` — `read_json`, `build_rows`, `UPSERT`.
+- `scripts/fake_sightings.py` — synthetic [C1] rows on the `sightings` stream — `ulid`, `sighting`, `route_schedule`, `ROUTE`.
+- `tests/test_d_schema.py` — schema.sql vs migrate.sql drift, index and re-runnability checks.
+- `tests/test_d_registry.py` — the seed/geo join, including every way lane G's two files disagree.
+- `tests/test_d_generator.py` — [C1] field set, ULID ordering, route hop order and gaps.
+- `common/plate_compat.py` — the single stand-in for I5 — `canon`, `normalise`, `is_valid_plate`, `USING_I5`. Delete when `common/plate.py` lands.
+- `services/api/store.py` — Postgres + Redis access — `Store.insert_sightings`, `cache_recent`, `recent_sighting_ids`, `crop_url`.
+- `services/api/persister.py` — consumer group `persister` — `Persister.run_once`, `reclaim`, `lag`, dead-letters to `sightings.dead`.
+- `services/api/watchlist.py` — CRUD + all-or-nothing CSV import — `WatchlistRepo`, `validate_row`, `ImportRejected`.
+- `services/api/feeds.py` — [C6] feeds — `ManualFeed`, `CSVFeed` live; `VahanFeed`, `EGujCopFeed` labelled STUB; `pull_all`.
+- `tests/test_d_persister.py` — redelivery, poisoned message, dead-consumer reclaim. Needs a live Redis and Postgres.
+- `tests/test_d_watchlist.py` — the D3 verify (2 bad rows, nothing written) plus the feed protocol checks.
+- `services/api/alerts.py` — dedup, the NEW->ACK->ACTIONED|DISMISSED machine, audit chain — `AlertRepo`, `IllegalTransition`, `TRANSITIONS`.
+- `services/api/matcher.py` — consumer group `matcher`, canon index + trigram fallback — `band_for`, `best_match`, `WatchlistIndex`, `Matcher`.
+- `services/api/ws.py` — `/ws` fanout, scope at connect, resume backfill — `Hub`, `Scope`, `Subscriber`, `create_app`, `issue_token`.
+- `tests/test_d_alerts.py` — the D4 band table and every illegal transition.
+- `tests/test_d_ws.py` — push, scope filtering, resume, heartbeat, slow-console drop.
+- `services/api/route.py` — [C4] `/api/route` + export — `RouteBuilder`, `collapse`, `flag_implausible`, `snap`, `haversine_km`.
+- `services/api/export.py` — CSV and reportlab PDF, every export audited — `to_csv`, `to_pdf`, `render`, `record_export`.
+- `tests/test_d_route.py` — five ordered hops with one flagged, fuzzy fallback, exports, HTTP surface.
+- `services/api/scope.py` — [C10] in one table — `Scope`, `CAPABILITIES`, `DEPARTMENT_PREDICATE`, `apply_session_scope`.
+- `services/api/auth.py` — argon2 + JWT (15 min / 8 h), login/refresh, bootstrap CLI — `UserRepo`, `issue_tokens`, `requires`.
+- `services/api/audit.py` — the one hash chain — `append_audit`, `record`, `AuditLog.verify` (D10).
+- `services/api/main.py` — every [C4] endpoint on one app — `create_app`, `CameraRepo`, scoped routers.
+- `tests/test_d_scope.py` — D7's verify: Transport viewer sees only Transport, across cameras, watchlist and alerts.
+- `.github/workflows/ci.yml` — pytest against timescaledb-ha + redis services on every push and PR.
+- `services/api/grants.py` — bounded cross-department access — `GrantRepo`, `widen`, `MAX_DURATION`.
+- `tests/test_d_grants.py` — request, approve, self-approval refused, expiry, the audited read.
+- `docs/hld.md` — the mandatory HLD: integration, correlation, alerts, security, privacy, scale tiers, failure table.
+- `requirements.txt` — one dependency per line, alphabetical, three lanes append to it.
 
 ## 3. Gotchas
 
@@ -174,11 +231,42 @@ _(nothing yet)_
   put). `Publisher.warm()` probes once at startup and a failed PUT opens a 60 s circuit.
 - `[I]` A synthetic fixture's plate must be stamped inside the *detector's* box, not just inside
   the image - at 0.86 of the photo's height it lands on the pavement and the crop has no plate.
+- `[G]` `live.corp8.cloud` is intermittent — it 502'd for hours on 08-29 then came back. `probe_grid.py` falls back to `ingest.json.bootstrap` when it does; always re-run once it is up.
+- `[ALL]` The grid is behind a **Cloudflare cookie gate**: first request 302s to `?cookieCheck=1` with a Set-Cookie, then serves. **HEAD answers 404, not 405** — a HEAD probe reports every live camera as down. Use a streamed GET through a cookie-carrying `requests.Session` and confirm the body starts with `#EXTM3U`. This cost a full 0/30-vs-27/30 wrong answer.
+- `[G]` Port 8554 is filtered at the grid: dial it **once at the host**, not once per camera, or 30 full timeouts buy you one fact. RTSP is 0/30; HLS is the real path (27/30 as of 08-29).
+- `[G]` Cameras **17, 18, 22** are dead on both transports (hls HTTP 500 / ReadTimeout), not a probe bug — same three across G1 and G2 runs. Expect 27, not 30, and say so rather than quietly showing 30 pins.
+- `[G]` HLS carries no PTS worth trusting unless the playlist has `EXT-X-PROGRAM-DATE-TIME`; `MediaMTXSource` reads the playlist once at open and labels frames `hls_pdt` or `server_receive` accordingly. A `server_receive` row is **not** a capture time — the UI must show it as approximate.
+- `[G]` OSRM needs a preprocessed Gujarat extract (`osrm-extract` + `osrm-contract`) before `osrm-routed` can serve anything — put it behind compose profile `full` rather than crash-looping the default `make up`. D6 owns building the extract.
+- `[G]` No Docker in this dev sandbox — `infra/docker-compose.yml` is YAML-validated but `make up` giving green containers is unverified. Whoever runs it first on a real laptop should update this line.
 - `[G]` Read per-camera properties from `GET http://$GRID_HOST/api/ingest` before decoding.
 - `[G]` A stalled RTSP connection does not error out — it just stops. You need a watchdog, not a try/except.
 - `[G]` District-centroid coordinates make the demo car teleport. G6 before G10, no exceptions.
 - `[G]` Judges' networks block WebRTC — the 3 s HLS fallback badge must be rehearsed on a phone hotspot.
 - `[D]` Timescale hypertable must be created before any row is inserted into `sightings`.
+- `[D]` MinIO only accepts SigV4. boto3 falls back to SigV2 when it cannot infer a region and
+  signs a URL MinIO rejects — pass `Config(signature_version="s3v4")` and a `region_name`.
+- `[D]` Ack after the commit, never before: Redis streams are at-least-once, so the replay is
+  the normal path. `ON CONFLICT (pts_first, sighting_id) DO NOTHING` is what absorbs it.
+- `[D]` A consumer that dies leaves its messages pending and invisible to `>` forever. XAUTOCLAIM
+  on the idle path is the only thing that gets them back — J1's chaos drill tests exactly this.
+- `[D]` Starlette's `TestClient` cannot test a server-pushed WebSocket frame: a client thread
+  parked in `receive()` starves the app's own background task, so only heartbeats arrive. Run
+  uvicorn in a thread on port 0 and connect with `websockets.sync.client` — see `serving()` in
+  `tests/test_d_ws.py`. Cost: an hour.
+- `[D]` A `@dataclass` in a `set()` needs `eq=False`, or it is unhashable and every subscribe
+  raises `TypeError: unhashable type`.
+- `[ALL]` SonarCloud findings are readable without a SonarCloud login:
+  `gh api repos/OWNER/REPO/commits/<sha>/check-runs` for the id, then
+  `gh api repos/OWNER/REPO/check-runs/<id>/annotations`. The web UI 404s on a private project
+  unless you are signed in, and the PR comment only prints the ratings. Cost: 40 minutes.
+- `[ALL]` A Security Hotspot cannot be cleared from code - somebody marks it reviewed in the
+  SonarCloud UI. Chasing one with code changes is wasted time.
+- `[D]` pg_trgm `similarity()` on ten-character plates: one edit scores 0.57, two 0.47. A 0.7
+  floor returns nothing — fine for D6's user-facing fuzzy search, dead code as D4's retrieval
+  step. D4 retrieves at 0.4 and lets weighted_levenshtein decide.
+- `[D]` `timescale/timescaledb-ha:pg16` already carries timescaledb, pgvector and pg_trgm, so
+  `db/migrate.sql` runs on it unchanged — plain `postgres:16` needs all three installed by hand.
+  Useful for G5: that image is the one lane D verified against.
 - `[ALL]` `gh` is authed as Neal006 with scopes `gist, read:org, repo, workflow` — **no `project` scope**.
   Projects v2 needs `gh auth refresh -s project` (interactive, browser).
 
@@ -246,6 +334,40 @@ _(nothing yet)_
 - 2026-09-02 — The golden set ships synthetic (rendered plates on a real vehicle photo) until the
   grid clips are labelled. Every row is tagged `synthetic`, the report prints it separately and
   calls it an upper bound, and the deck quotes the hand-labelled split.
+- 2026-08-31 — D4's band comes from [C7]'s weighted cost alone: 0 exact, 0.5 one confusion edit
+  (PROBABLE), 1.0-2.0 anything else within two edits (POSSIBLE), above 2.0 no alert. A plain
+  edit and two confusion edits both cost 1.0 and D4 calls both POSSIBLE, so the collision is
+  harmless and no second distance function is needed.
+- 2026-08-31 — an exact string match on a sighting whose own band is not CONFIRMED is raised as
+  PROBABLE, never CONFIRMED. A POSSIBLE read that happens to spell a watched plate is exactly
+  the case that must not put CONFIRMED in front of an officer.
+- 2026-08-31 — D5 reads the Redis streams with XREAD, not the `ws-fanout` consumer group named
+  in [C2]. A group splits messages between members, so with two API replicas half the alerts
+  would reach half the consoles. Fanout is broadcast; every process reads the whole stream.
+  Not a contract change — [C2] names the consumer, and D still owns both ends of it.
+- 2026-08-31 — with `JWT_SECRET` unset, `ws.py` signs with a random per-process key rather than
+  accepting unsigned tokens. Until D7 issues real ones, a dev run still works and a forged
+  token still fails; "no secret configured" must never mean "open socket".
+
+- 2026-08-31 — D6 renders the PDF with reportlab, not WeasyPrint as the ticket says. WeasyPrint
+  needs GTK libraries on the machine; reportlab is a pure wheel, and the layout was salvageable
+  from `origin/priyanshu/platform:services/api/route_report.py`.
+- 2026-08-31 — the route PDF's picture is a schematic of the hop coordinates, not a basemap. There
+  is no tile source we can ship offline, and calling an unreferenced polyline a map would be a lie
+  on a document an officer signs.
+- 2026-08-31 — `RouteResponse` carries an extra `snapped` boolean alongside [C4]'s
+  `snapped_geometry`. Additive, so no consumer breaks, and without it a straight line between
+  cameras is indistinguishable from a road path.
+
+- 2026-08-31 — audit rows hash `int(user_id)`, not the JWT's `sub` string. Postgres stores an
+  integer; hashing the string made verify() report tampering on rows nobody touched.
+- 2026-08-31 — RLS policies treat an unset `prahari.dept_ids` as a maintenance connection and
+  allow the row, because the migration, the persister and the matcher connect without a user.
+  The application predicate stays the primary control; RLS is the backstop for a query somebody
+  forgets to scope. Marked `# ponytail:` in db/migrate.sql.
+- 2026-08-31 — `services/api/main.py` exists although D7's file list stops at auth/scope/audit.
+  The scope test has to go through HTTP with a real token, and that needs an app with the [C4]
+  endpoints on it; D3 and D4 deliberately stopped at the repository layer.
 
 ## 5. Contract changes
 
@@ -281,12 +403,21 @@ changing one without a line here breaks somebody else's lane silently.
   one-frame rate on an RTX 3050 Laptop
 - 09-02 | I5 | common/plate.py, tests/test_i_plate.py | grammar slots convert only the wrong kind
   of character; 13 confident-wrong reads became 0
+- 08-29 | I5 | common/plate.py, tests/test_i_plate.py | 23 tests green; D's `plate_compat.py`
+  flipped `USING_I5` True on import, so its fallback half can be deleted
 
 ### lane G
-_(none)_
+- 09-01 | G5 | infra/docker-compose.yml | `make up` verified on real Docker: sentinel-postgres, sentinel-redis, sentinel-minio all healthy. MinIO healthcheck fixed from `mc ready` → `curl /minio/health/live`.
+- 09-01 | G2–G11 | PR #40 final fixes | All Neal006 blocking issues + 5 Copilot issues + SonarCloud Security E + Reliability C resolved. 32 tests green. `allow_redirects` SSRF guard, thread-local sessions, `while not _closed` generators, `autocomplete` on inputs, `esc()` everywhere, `datetime.now(utc)`.
+- 08-29 | G2 | services/gateway/{source,probe,selftest}.py, sources/{rtsp,mediamtx}.py, tests/test_g_probe.py | probe order RTSP→HLS live-verified: **27/30 resolve, all HLS, rtsp 0/30**; 17/18/22 dead both ways (hls 500/ReadTimeout). 10 tests green, no network needed.
+- 08-29 | G5 | infra/docker-compose.yml, .env.example, .gitignore, requirements.txt, Makefile, repo skeleton | compose+env+Makefile written, YAML-validated; `make up` unverified, no Docker in this sandbox
+- 08-29 | G1 | scripts/probe_grid.py, data/cameras.seed.json | grid came back up; HEAD-probe bug found (Cloudflare gate 404s HEAD) — fixed to streamed GET, reachability went 0/30 → **27/30 via HLS**, rtsp 0/30 (8554 filtered). SonarCloud SSRF/path findings fixed too.
+- 08-29 | G1 | scripts/probe_grid.py, data/cameras.seed.json, data/catalogue/ingest.json.bootstrap | seed built and verified (`--check`); grid host was 502, used salvaged catalogue as bootstrap
 
 ### lane D
-_(none)_
+- 08-29 | D1 | db/schema.sql, db/migrate.sql, scripts/load_registry.py, tests/test_d_{schema,registry}.py | schema applies twice with no errors on a throwaway timescaledb-ha:pg16; loader upserts 3 fixture cameras, and a missing camera_geo.json no longer wipes stored coordinates
+- 08-29 | D3 | services/api/watchlist.py, services/api/feeds.py, tests/test_d_watchlist.py | all-or-nothing CSV import reports both bad rows by line number and writes nothing; VAHAN and e-GujCop stubs carry request/response shapes and label every row STUB
+- 08-29 | D2 | scripts/fake_sightings.py, services/api/{store,persister}.py, tests/test_d_{generator,persister}.py | 14991 rows at 49.5/s for 5 min, pending stayed 0; redelivery, poisoned message and dead-consumer reclaim covered by tests
 
 ### setup
 - 08-29 | lanes reassigned: inference→Neal006, edge+console→neevmodh, core→Priyanshu | TASK.md, knowledge_base.md, AGENTS.md | G→I seam became a Redis URL key, so the worker imports no gateway code
