@@ -1,0 +1,92 @@
+[
+  {
+    "camera_id": "1", "name": "Camera 1", "district_code": "AHMEDABAD",
+    "owner_dept_id": 1, "install_type": "PTZ",
+    "lat": 23.020000, "lon": 72.558000,
+    "coord_source": "geocoded", "coord_conf": "MEDIUM",
+    "bearing_deg": null, "fov_deg": 70, "range_m": 60,
+    "transports": {"rtsp": "rtsp://live.corp8.cloud:8554/stream/1", "hls": "https://live.corp8.cloud/live/stream/1/index.m3u8", "whep": "http://live.corp8.cloud:8889/stream/1/whep"},
+    "transport_in_use": "hls", "driver": "mediamtx",
+    "health": "LIVE", "health_at": "2026-08-31T10:30:00+05:30"
+  },
+  {
+    "camera_id": "4", "name": "Camera 4", "district_code": "AHMEDABAD",
+    "owner_dept_id": 1, "install_type": "FIX",
+    "lat": 23.012500, "lon": 72.565000,
+    "coord_source": "geocoded", "coord_conf": "MEDIUM",
+    "bearing_deg": 135, "fov_deg": 70, "range_m": 60,
+    "transports": {"rtsp": "rtsp://live.corp8.cloud:8554/stream/4", "hls": "https://live.corp8.cloud/live/stream/4/index.m3u8", "whep": "http://live.corp8.cloud:8889/stream/4/whep"},
+    "transport_in_use": "hls", "driver": "mediamtx",
+    "health": "LIVE", "health_at": "2026-08-31T10:30:00+05:30"
+  },
+  {
+    "camera_id": "5", "name": "Camera 5", "district_code": "AHMEDABAD",
+    "owner_dept_id": 1, "install_type": "FIX",
+    "lat": 23.100500, "lon": 72.590500,
+    "coord_source": "geocoded", "coord_conf": "MEDIUM",
+    "bearing_deg": 220, "fov_deg": 70, "range_m": 60,
+    "transports": {"rtsp": "rtsp://live.corp8.cloud:8554/stream/5", "hls": "https://live.corp8.cloud/live/stream/5/index.m3u8", "whep": "http://live.corp8.cloud:8889/stream/5/whep"},
+    "transport_in_use": "hls", "driver": "mediamtx",
+    "health": "DEGRADED", "health_at": "2026-08-31T10:28:00+05:30"
+  },
+  {
+    "camera_id": "6", "name": "Camera 6", "district_code": "JUNAGADH",
+    "owner_dept_id": 2, "install_type": "FIX",
+    "lat": 21.510000, "lon": 70.460000,
+    "coord_source": "geocoded", "coord_conf": "MEDIUM",
+    "bearing_deg": 45, "fov_deg": 70, "range_m": 60,
+    "transports": {"rtsp": "rtsp://live.corp8.cloud:8554/stream/6", "hls": "https://live.corp8.cloud/live/stream/6/index.m3u8", "whep": "http://live.corp8.cloud:8889/stream/6/whep"},
+    "transport_in_use": "hls", "driver": "mediamtx",
+    "health": "LIVE", "health_at": "2026-08-31T10:30:00+05:30"
+  },
+  {
+    "camera_id": "12", "name": "Camera 12", "district_code": "GANDHINAGAR",
+    "owner_dept_id": 3, "install_type": "FIX",
+    "lat": 23.165000, "lon": 72.583000,
+    "coord_source": "geocoded", "coord_conf": "MEDIUM",
+    "bearing_deg": 180, "fov_deg": 70, "range_m": 60,
+    "transports": {"rtsp": "rtsp://live.corp8.cloud:8554/stream/12", "hls": "https://live.corp8.cloud/live/stream/12/index.m3u8", "whep": "http://live.corp8.cloud:8889/stream/12/whep"},
+    "transport_in_use": "hls", "driver": "mediamtx",
+    "health": "DOWN", "health_at": "2026-08-31T10:15:00+05:30"
+  },
+  {
+    "camera_id": "17", "name": "Camera 17", "district_code": "RAJKOT",
+    "owner_dept_id": 4, "install_type": "FIX",
+    "lat": 22.296000, "lon": 70.793000,
+    "coord_source": "geocoded", "coord_conf": "MEDIUM",
+    "bearing_deg": null, "fov_deg": 70, "range_m": 60,
+    "transports": {"rtsp": "rtsp://live.corp8.cloud:8554/stream/17", "hls": "https://live.corp8.cloud/live/stream/17/index.m3u8", "whep": "http://live.corp8.cloud:8889/stream/17/whep"},
+    "transport_in_use": null, "driver": "mediamtx",
+    "health": "DOWN", "health_at": "2026-08-31T09:00:00+05:30"
+  },
+  {
+    "camera_id": "19", "name": "Camera 19", "district_code": "NAVSARI",
+    "owner_dept_id": 5, "install_type": "FIX",
+    "lat": 20.946700, "lon": 72.952000,
+    "coord_source": "geocoded", "coord_conf": "LOW",
+    "bearing_deg": null, "fov_deg": 70, "range_m": 60,
+    "transports": {"rtsp": "rtsp://live.corp8.cloud:8554/stream/19", "hls": "https://live.corp8.cloud/live/stream/19/index.m3u8", "whep": "http://live.corp8.cloud:8889/stream/19/whep"},
+    "transport_in_use": "hls", "driver": "mediamtx",
+    "health": "LIVE", "health_at": "2026-08-31T10:30:00+05:30"
+  },
+  {
+    "camera_id": "27", "name": "Camera 27", "district_code": "NAVSARI",
+    "owner_dept_id": 5, "install_type": "FIX",
+    "lat": 20.767169, "lon": 72.969345,
+    "coord_source": "geocoded", "coord_conf": "MEDIUM",
+    "bearing_deg": 90, "fov_deg": 70, "range_m": 60,
+    "transports": {"rtsp": "rtsp://live.corp8.cloud:8554/stream/27", "hls": "https://live.corp8.cloud/live/stream/27/index.m3u8", "whep": "http://live.corp8.cloud:8889/stream/27/whep"},
+    "transport_in_use": "hls", "driver": "mediamtx",
+    "health": "LIVE", "health_at": "2026-08-31T10:30:00+05:30"
+  },
+  {
+    "camera_id": "30", "name": "Camera 30", "district_code": "KUTCH",
+    "owner_dept_id": 6, "install_type": "FIX",
+    "lat": 23.080000, "lon": 70.133000,
+    "coord_source": "geocoded", "coord_conf": "MEDIUM",
+    "bearing_deg": 270, "fov_deg": 70, "range_m": 60,
+    "transports": {"rtsp": "rtsp://live.corp8.cloud:8554/stream/30", "hls": "https://live.corp8.cloud/live/stream/30/index.m3u8", "whep": "http://live.corp8.cloud:8889/stream/30/whep"},
+    "transport_in_use": "hls", "driver": "mediamtx",
+    "health": "UNKNOWN", "health_at": null
+  }
+]

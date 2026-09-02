@@ -1,0 +1,67 @@
+{
+  "plate": "GJ01AB1234",
+  "from": "2026-08-31T10:00:00+05:30",
+  "to":   "2026-08-31T11:00:00+05:30",
+  "fuzzy": false,
+  "hops": [
+    {
+      "n": 1,
+      "camera_id": "4", "name": "Paldi Circle",
+      "lat": 23.012500, "lon": 72.565000,
+      "pts": "2026-08-31T10:12:04+05:30",
+      "kind": "CONFIRMED", "band": "CONFIRMED",
+      "crop_url": "s3://crops/4/2026/08/31/01J6XMABCD000002.jpg",
+      "implied_speed_kmh": null, "flag": null, "reid_similarity": null
+    },
+    {
+      "n": 2,
+      "camera_id": "5", "name": "Visat teen Rasta",
+      "lat": 23.100500, "lon": 72.590500,
+      "pts": "2026-08-31T10:18:44+05:30",
+      "kind": "CONFIRMED", "band": "CONFIRMED",
+      "crop_url": "s3://crops/5/2026/08/31/hop2.jpg",
+      "implied_speed_kmh": 52.3, "flag": null, "reid_similarity": null
+    },
+    {
+      "n": 3,
+      "camera_id": "12", "name": "Tri Mandir Adalaj Tollnaka",
+      "lat": 23.165000, "lon": 72.583000,
+      "pts": "2026-08-31T10:25:11+05:30",
+      "kind": "PROBABLE", "band": "PROBABLE",
+      "crop_url": "s3://crops/12/2026/08/31/hop3.jpg",
+      "implied_speed_kmh": 61.8, "flag": null, "reid_similarity": 0.83
+    },
+    {
+      "n": 4,
+      "camera_id": "24", "name": "Dehgam",
+      "lat": 23.170222, "lon": 72.822349,
+      "pts": "2026-08-31T10:29:02+05:30",
+      "kind": "CONFIRMED", "band": "CONFIRMED",
+      "crop_url": "s3://crops/24/2026/08/31/hop4.jpg",
+      "implied_speed_kmh": 312.4, "flag": "IMPLAUSIBLE", "reid_similarity": null
+    },
+    {
+      "n": 5,
+      "camera_id": "1", "name": "Chimanbhai Patel Bridge",
+      "lat": 23.020000, "lon": 72.558000,
+      "pts": "2026-08-31T10:29:55+05:30",
+      "kind": "CONFIRMED", "band": "CONFIRMED",
+      "crop_url": "s3://crops/1/2026/08/31/01J6XMABCD000001.jpg",
+      "implied_speed_kmh": 48.1, "flag": null, "reid_similarity": null
+    }
+  ],
+  "snapped_geometry": {
+    "type": "LineString",
+    "coordinates": [
+      [72.565000, 23.012500],
+      [72.573000, 23.045000],
+      [72.580000, 23.078000],
+      [72.590500, 23.100500],
+      [72.583000, 23.165000],
+      [72.670000, 23.168000],
+      [72.822349, 23.170222],
+      [72.700000, 23.090000],
+      [72.558000, 23.020000]
+    ]
+  }
+}

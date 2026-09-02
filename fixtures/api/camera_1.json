@@ -1,0 +1,17 @@
+{
+  "camera_id": "1", "name": "Camera 1", "district_code": "AHMEDABAD",
+  "owner_dept_id": 1, "install_type": "PTZ",
+  "lat": 23.020000, "lon": 72.558000,
+  "coord_source": "geocoded", "coord_conf": "MEDIUM",
+  "bearing_deg": null, "fov_deg": 70, "range_m": 60,
+  "transports": {"rtsp": "rtsp://live.corp8.cloud:8554/stream/1", "hls": "https://live.corp8.cloud/live/stream/1/index.m3u8", "whep": "http://live.corp8.cloud:8889/stream/1/whep"},
+  "transport_in_use": "hls", "driver": "mediamtx",
+  "health": "LIVE", "health_at": "2026-08-31T10:30:00+05:30",
+  "health_history": [
+    {"health": "LIVE",     "at": "2026-08-31T10:30:00+05:30"},
+    {"health": "DEGRADED", "at": "2026-08-31T10:15:00+05:30"},
+    {"health": "LIVE",     "at": "2026-08-31T10:00:00+05:30"},
+    {"health": "DOWN",     "at": "2026-08-31T09:45:00+05:30"},
+    {"health": "LIVE",     "at": "2026-08-31T09:00:00+05:30"}
+  ]
+}

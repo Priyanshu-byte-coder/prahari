@@ -1,29 +1,56 @@
+# Secrets
+.env
+
+# Python
 .venv/
+venv/
 __pycache__/
 *.pyc
-.env
+*.egg-info/
+.pytest_cache/
+
+# Node / web
 node_modules/
 web/dist/
-data/videos/*.mp4
-data/videos/*.mkv
-data/snapshots/
+
+# Model weights
+*.pt
+*.onnx
+*.engine
+models/**/*.pt
+models/**/*.onnx
+models/**/*.engine
 data/models/*.pt
 data/models/*.onnx
 data/models/*.engine
+yolov8*.pt
+
+# Video, crops, snapshots and other large/binary artifacts -- never committed
+fixtures/clips/*.mp4
+fixtures/clips/*.mkv
+data/clips/*.mp4
+data/clips/*.mkv
+data/videos/
+data/crops/
+data/snapshots/*.jpg
+!data/snapshots/grid_contact_sheet.jpg
+data/detections/
+data/osrm/*.osrm*
+data/osrm/*.pbf
+*.mp4
+*.mkv
+*.log
+logs/
+logs_api.txt
+cams_tmp.json
+
+# Infra
 infra/mediamtx.exe
 infra/mediamtx.zip
 infra/mediamtx.yml
 infra/LICENSE
-logs/
-*.log
 
-data/snapshots/*.jpg
-!data/snapshots/grid_contact_sheet.jpg
-logs_api.txt
-cams_tmp.json
-data/detections/
-yolov8*.pt
+.DS_Store
 
 # Restart left these on disk untracked; keep them out of the new tree.
-.pytest_cache/
 simgrid/
