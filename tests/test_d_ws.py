@@ -261,3 +261,13 @@ def test_a_slow_console_is_dropped_not_waited_on(rig):
         hub.publish("alert.new", {"camera_id": f"CAM-A-{tag}", "alert_id": i})
     assert slow.dropped >= 1
     assert hub.seq >= 5                                    # the hub kept going
+
+
+def test_a_socket_token_is_also_a_valid_rest_token():
+    # The two halves of the API mint tokens through different functions; if they disagree about
+    # the shape, a console that can open the socket cannot call the REST endpoints beside it.
+    import auth
+
+    token = issue_token(7, "INVESTIGATOR", dept_id=3)
+    scope = auth.scope_from_token(token)            # raises when typ is not "access"
+    assert scope.role == "INVESTIGATOR" and scope.dept_id == 3
