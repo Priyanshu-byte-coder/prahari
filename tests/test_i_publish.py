@@ -86,6 +86,9 @@ def test_crop_key_is_dated_by_pts_not_by_upload_time():
 def test_redis_down_buffers_and_replays_in_order():
     """The chaos drill, in one test: no row is lost and the order survives - a route is an order."""
     p = Publisher(redis_client=None, s3=None)
+    # redis_client=None means "connect to REDIS_URL", so on a machine that has a Redis running -
+    # every CI runner here does - the drill silently tested the happy path instead of the outage.
+    p.redis = None
     ids = []
     for i in range(5):
         r = row(sighting_id=f"01J6{i}")
@@ -103,6 +106,7 @@ def test_redis_down_buffers_and_replays_in_order():
 
 def test_the_buffer_is_bounded():
     p = Publisher(redis_client=None, s3=None, buffer_max=3)
+    p.redis = None                                  # same reason as above: no broker, on purpose
     for i in range(10):
         p.publish(row(sighting_id=f"01J6{i}"))
     assert len(p.buffer) == 3

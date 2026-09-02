@@ -52,10 +52,20 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      - name: Reclaim disk
+        # A runner starts with ~14 GB free and the CV stack does not fit in it. Dropping the
+        # preinstalled toolchains nobody here uses buys back roughly 20 GB and costs 30 seconds.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost
+          df -h / | tail -1
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          # torch first, from the CPU index: ultralytics would otherwise pull the CUDA build,
+          # which is several gigabytes of driver libraries no runner has a GPU for.
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-ci.txt
 
       - name: Apply the schema
         run: psql "$TEST_POSTGRES_DSN" -v ON_ERROR_STOP=1 -f db/migrate.sql
