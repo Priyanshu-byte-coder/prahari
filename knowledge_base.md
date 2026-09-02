@@ -4,6 +4,17 @@ Updated: 2026-09-01 · KB v2 · cap 300 lines · patched after **every** complet
 
 ## 0. Now
 
+- 2026-09-02. **5 days to submission (7 Sep).** All three lane PRs are merged into `main`
+  (#37 lane D, #40 lane G, #41 lane I), plus #42 and #43. `pytest tests/` on `main`:
+  **299 passed, 6 skipped**.
+- The stack runs end to end on `infra/docker-compose.yml`: 30 cameras seeded, 897 sightings
+  published and persisted with 0 pending, 5 alerts raised and pushed over the WebSocket,
+  `GET /api/route` returning 5 ordered hops, System Admin refused live views per [C10], audit
+  chain verifying. Route coordinates are still geocoded/LOW (see issue #17).
+- Open integration gaps, both filed: **#44** the console serves its own unauthenticated
+  `/api/cameras`, which bypasses D7's scope; **#45** ultralytics is unpinned and its tracker
+  signature changed under us.
+
 - 2026-08-31. **7 days to submission (7 Sep)**. Lane D is complete: D1-D10 all DONE, in PR #37.
 - 2026-08-29. **9 days to submission (7 Sep)**, 12 to the live event (10–11 Sep, i-Hub Gandhinagar).
 - `main` holds docs only — commit `416ef26 "Restart"` wiped the tree. Working code from before is at
@@ -42,18 +53,6 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 | I10 Re-ID | 2 | P1 | DONE | ce9c3cb | ResNet-18 trunk; OSNet is a weights path |
 | I11 fine-tune + TensorRT | 3 | P1 | WIP | 4fb493a | export + parity green; fine-tune needs a dataset |
 | I12 bonus analytics | 2 | P1 | DONE | 12dacf2 | crowd, stopped, wrong-way, loitering |
-| I5 common/plate.py + vectors | 1 | 0 | DONE | bac680d | D's plate_compat auto-upgraded |
-| I1 decode 5fps + motion gate | 2 | 1 | TODO | | URL or local clip — no gateway needed |
-| I2 backend + detector + batching | 2 | 1 | TODO | | pretrained yolov8s |
-| I3 ByteTrack + sighting builder | 2 | 1 | TODO | | |
-| I4 plate detect + OCR + grammar + vote | 3 | 2 | TODO | | the hard one |
-| I6 publish Redis + MinIO + metrics | 2 | 2 | TODO | | lane's only real output |
-| I8 worker selftest + replay harness | 1 | 2 | TODO | | feeds J1 |
-| I7 golden set + accuracy report | 2 | 3 | TODO | | deck numbers come from here |
-| I9 deck, 10 slides | 2 | 3 | TODO | | |
-| I10 Re-ID | 2 | P1 | TODO | | corroboration only |
-| I11 fine-tune + TensorRT | 3 | P1 | TODO | | 8–9 Sep only |
-| I12 bonus analytics | 2 | P1 | TODO | | crowd, wrong-way, loitering |
 
 ### Lane G — EDGE + CONSOLE — neevmodh (18 pt)
 
