@@ -1,0 +1,344 @@
+"""The worker: cameras in, [C1] sighting rows out. This is where I1-I6 become one process.
+
+    decode (I1)  ->  bounded queue (I1)  ->  batched detect (I2)  ->  ByteTrack per camera (I3)
+                 ->  sighting builder (I3)  ->  plate candidates + readers + vote (I4)
+                 ->  Redis XADD + MinIO PUT (I6)                      /metrics throughout (I6)
+
+Two loops, not one thread per stage. Decoding is blocking I/O and gets a thread per camera;
+everything after it is GPU work and runs on one loop, because two threads taking turns on one
+GPU is slower than one thread using it properly. The batcher is what makes the single loop fast
+enough: frames from every camera go into one forward pass.
+
+OCR is the exception, and it had to be: two readers over one crop cost about 0.8 s, which is
+four frames at 5 fps. Run inline, it emptied the depth-2 queues and the pipeline processed two
+frames of a thirty-frame pass - the plate was decoded, detected, tracked, and then dropped on
+the floor. So OCR runs on its own thread with a bounded queue, and a sighting waits (briefly)
+for its outstanding reads when it closes. The budget is still the ticket's: a crop is only
+queued when the track has no CONFIRMED read and this crop is sharper than the last one read.
+"""
+
+from __future__ import annotations
+
+import argparse
+import logging
+import os
+import queue
+import threading
+import time
+from collections import Counter
+
+from services.worker import metrics
+from services.worker.backend import Batcher, LocalBackend
+from services.worker.decode import FPS, decode, resolve_source
+from services.worker.plate import read_all, readers
+from services.worker.publish import Publisher
+from services.worker.queues import FrameQueue
+from services.worker.sighting import SightingBuilder, sharpness
+from services.worker.tracker import Trackers
+
+logger = logging.getLogger("prahari.worker.run")
+
+MIN_CROP_PX = 48         # a vehicle box smaller than this has no readable plate at any upscale
+OCR_QUEUE = 4            # crops waiting to be read; full means the budget is spent, skip one
+OCR_DRAIN_S = 2.0        # how long a closing sighting waits for its outstanding reads
+
+
+class OcrPool:
+    """OCR on its own threads, with a per-sighting wait for the close path.
+
+    Bounded on purpose: when the readers fall behind, new crops are refused rather than
+    queued. A queue that grows is a queue that reads a plate two minutes after the vehicle
+    left, and the sighting it belongs to closed long ago.
+    """
+
+    def __init__(self, workers=1, depth=OCR_QUEUE, read=read_all):
+        self._read = read
+        self._queue = queue.Queue(maxsize=depth)
+        self._pending = Counter()
+        self._done = threading.Condition()
+        self._threads = [threading.Thread(target=self._loop, daemon=True, name=f"ocr-{i}")
+                         for i in range(workers)]
+        for thread in self._threads:
+            thread.start()
+
+    def submit(self, sighting, crop):
+        """Queue one crop. False when the queue is full - that is the budget, not an error."""
+        if crop is None or not crop.size:
+            return False
+        with self._done:
+            if self._queue.full():
+                return False
+            self._pending[id(sighting)] += 1
+        self._queue.put((sighting, crop))
+        return True
+
+    def _loop(self):
+        try:
+            readers()          # loading the engines costs ~20 s; overlap it with decoding
+        except Exception as exc:
+            logger.warning("no OCR reader loaded: %s", exc)
+        while True:
+            item = self._queue.get()
+            if item is None:
+                return
+            sighting, crop = item
+            try:
+                with metrics.timed("ocr"):
+                    readings = self._read(crop)
+                sighting.add_readings(readings, sharpness(crop))
+            except Exception as exc:
+                logger.warning("OCR failed on a crop: %s", exc)
+            finally:
+                with self._done:
+                    self._pending[id(sighting)] -= 1
+                    self._done.notify_all()
+
+    def drain(self, sighting, timeout=OCR_DRAIN_S):
+        """Wait for this sighting's reads before its row is built. Bounded: a stuck reader
+        delays one row by `timeout`, it does not hold the stream."""
+        with self._done:
+            if not self._done.wait_for(lambda: not self._pending[id(sighting)], timeout):
+                logger.warning("publishing %s with an OCR read still outstanding",
+                               sighting.sighting_id[:10])
+            self._pending.pop(id(sighting), None)
+
+    def close(self):
+        """Stop the readers. Queued crops are dropped, not drained.
+
+        Every sighting that mattered has already had its own `drain()`; what is left in the
+        queue belongs to rows that are published. Draining it at shutdown made a 6 s replay
+        take a minute to exit - and made I8's latency measurement a measurement of the
+        shutdown path.
+        """
+        dropped = 0
+        while True:
+            try:
+                self._queue.get_nowait()
+                dropped += 1
+            except queue.Empty:
+                break
+        if dropped:
+            logger.info("dropped %d queued crops at shutdown", dropped)
+        for _ in self._threads:
+            self._queue.put(None)
+        for thread in self._threads:
+            thread.join(timeout=5.0)
+
+
+class Worker:
+    """One process, N cameras. `cameras` maps camera_id -> source (URL or file path)."""
+
+    def __init__(self, cameras, backend=None, publisher=None, fps=FPS, hwaccel=False,
+                 once=False, reid=False, analytics=None, motion_gate=True, pace=None,
+                 ocr=None):
+        self.cameras = dict(cameras)
+        self.backend = backend if backend is not None else LocalBackend()
+        self.publisher = publisher if publisher is not None else Publisher()
+        self.fps = fps
+        self.hwaccel = hwaccel
+        self.once = once
+        self.reid = reid
+        self.analytics = analytics
+        self.motion_gate = motion_gate
+        # A file decodes as fast as the disk allows, so an unpaced replay hands the queues
+        # hundreds of frames a second and the depth-2 drop rule throws away nine out of ten -
+        # correct for a live camera that is ahead of the GPU, wrong for a clip we are asking
+        # the pipeline to actually process. Replays are paced to their own PTS; live sources
+        # arrive paced already.
+        self.pace = once if pace is None else pace
+        self.queues = {cid: FrameQueue(cid) for cid in self.cameras}
+        self.trackers = Trackers()
+        self.builders = {cid: SightingBuilder(cid) for cid in self.cameras}
+        self.batcher = Batcher()
+        self.ocr = ocr if ocr is not None else OcrPool()
+        self.published = 0
+        self.last_frame_wall = None       # I8 measures publish latency against this
+        self._stop = threading.Event()
+        self._threads = []
+
+    def warm(self):
+        """Load every model before the clock starts.
+
+        Weight loading, the CUDA context and the OCR engines are seconds of one-off cost that
+        have nothing to do with steady-state latency - and a pass that happens during them gets
+        no plate read at all, which is how I8 measured a CONFIRMED plate as NONE.
+        """
+        import numpy as np
+        self.backend.detect([np.zeros((544, 960, 3), dtype=np.uint8)])
+        readers()
+        if hasattr(self.publisher, "warm"):
+            self.publisher.warm()
+
+    # --- decode side --------------------------------------------------------------------
+
+    def _produce(self, camera_id):
+        source = self.cameras[camera_id]
+        started = time.time()
+        for frame in decode(camera_id, source, fps=self.fps, hwaccel=self.hwaccel,
+                            once=self.once, motion_gate=self.motion_gate):
+            if self.pace:
+                lag = frame.pts_seconds - (time.time() - started)
+                if lag > 0:
+                    time.sleep(min(lag, 1.0))
+            self.queues[camera_id].put(frame)
+            if self._stop.is_set():
+                return
+
+    def start(self):
+        for camera_id in self.cameras:
+            t = threading.Thread(target=self._produce, args=(camera_id,), daemon=True,
+                                 name=f"decode-{camera_id}")
+            t.start()
+            self._threads.append(t)
+
+    # --- inference side -----------------------------------------------------------------
+
+    def _collect(self):
+        """One pass over every camera's queue. Returns a batch when one is ready."""
+        batch = None
+        for q in self.queues.values():
+            frame = q.get(timeout=0.0 if len(self.queues) > 1 else 0.05)
+            if frame is not None:
+                batch = self.batcher.add(frame) or batch
+        return batch or self.batcher.due()
+
+    def process(self, frames):
+        """Detect, track, build sightings, spend the OCR budget, publish what closed."""
+        with metrics.timed("detect"):
+            detections = self.backend.detect([f.image for f in frames])
+        self.last_frame_wall = max(f.wall_clock for f in frames)
+        for frame, dets in zip(frames, detections):
+            builder = self.builders[frame.camera_id]
+            if frame.discontinuous:
+                for sighting in builder.flush():
+                    self._publish(sighting)
+            tracks = self.trackers.update(frame.camera_id, dets, frame.pts_seconds,
+                                          discontinuous=frame.discontinuous)
+            for track in tracks:
+                self._observe(builder, track, frame)
+            if self.analytics is not None:
+                self.analytics.observe(frame.camera_id, tracks, builder.epoch(frame.pts_seconds))
+            for sighting in builder.tick(frame.pts_seconds):
+                self._publish(sighting)
+
+    def _observe(self, builder, track, frame):
+        x1, y1, x2, y2 = (int(v) for v in track.xyxy)
+        h, w = frame.image.shape[:2]
+        crop = frame.image[max(0, y1):min(h, y2), max(0, x1):min(w, x2)]
+        sighting = builder.observe(track, crop=crop, wall_clock=frame.wall_clock)
+        if min(crop.shape[:2]) < MIN_CROP_PX or not sighting.wants_ocr:
+            return
+        self.ocr.submit(sighting, sighting.claim_ocr())
+
+    def _publish(self, sighting):
+        self.ocr.drain(sighting)
+        if self.reid and sighting.crop is not None:
+            try:
+                with metrics.timed("reid"):
+                    sighting.reid_vec = [float(v) for v in self.backend.reid([sighting.crop])[0]]
+            except Exception as exc:
+                logger.warning("re-id unavailable (%s) - publishing without a vector", exc)
+        self.publisher.publish(sighting)
+        self.published += 1
+        text, _conf, band = (sighting.vote.result() if sighting.vote else (None, 0, "NONE"))
+        logger.info("sighting %s cam=%s track=%s %s plate=%s [%s] frames=%d",
+                    sighting.sighting_id[:10], sighting.camera_id, sighting.track_id,
+                    sighting.label, text or "-", band, sighting.frames)
+
+    def run(self, seconds=None):
+        """Run until `seconds` elapse, the clips end (`once`), or stop() is called."""
+        self.start()
+        started = time.time()
+        idle = 0
+        try:
+            while not self._stop.is_set():
+                if seconds is not None and time.time() - started >= seconds:
+                    break
+                batch = self._collect()
+                if batch:
+                    idle = 0
+                    self.process(batch)
+                else:
+                    idle += 1
+                    time.sleep(0.005)
+                    if self.once and idle > 2 and self._drained():
+                        break
+                metrics.record_queues(self.queues.values())
+        finally:
+            self.stop()
+        return self.published
+
+    def _drained(self):
+        """True when a replay has nothing left anywhere: no decoder, no queue, no batch.
+
+        Checked instead of waiting out a fixed idle timeout, because the timeout is measured
+        by I8 as pipeline latency - the row is not late, the loop was.
+        """
+        return (not any(t.is_alive() for t in self._threads)
+                and not any(q.depth for q in self.queues.values())
+                and not len(self.batcher))
+
+    def stop(self):
+        self._stop.set()
+        for batch in (self.batcher.flush(),):
+            if batch:
+                self.process(batch)
+        for builder in self.builders.values():
+            for sighting in builder.flush():
+                self._publish(sighting)
+        self.ocr.close()
+        self.publisher.close()
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="Prahari inference worker: cameras -> sightings")
+    ap.add_argument("--camera", action="append", default=[],
+                    help="camera_id[=source]; source falls back to camera:transport:<id> [C2]")
+    ap.add_argument("--file", help="one local clip, this lane's independence from the gateway")
+    ap.add_argument("--seconds", type=float)
+    ap.add_argument("--fps", type=float, default=FPS)
+    ap.add_argument("--hwaccel", action="store_true")
+    ap.add_argument("--reid", action="store_true", help="[I10] attach a 512-d vector")
+    ap.add_argument("--analytics", action="store_true", help="[I12] crowd, wrong-way, loitering")
+    ap.add_argument("--metrics-port", type=int, default=metrics.PORT)
+    ap.add_argument("-v", "--verbose", action="store_true")
+    args = ap.parse_args(argv)
+    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
+                        format="%(levelname)s %(name)s %(message)s")
+
+    cameras = {}
+    for spec in args.camera:
+        camera_id, _, source = spec.partition("=")
+        cameras[camera_id] = source or None
+    if args.file:
+        cameras.setdefault("CLIP-000", args.file)
+    if not cameras:
+        ap.error("no cameras: pass --camera <id>[=<url>] or --file <clip>")
+
+    redis_client = getattr(Publisher(), "redis", None)
+    for camera_id, source in list(cameras.items()):
+        if source is None:
+            cameras[camera_id] = resolve_source(camera_id, redis_client)
+            if cameras[camera_id] is None:
+                ap.error(f"no source for {camera_id}: set camera:transport:{camera_id} or "
+                         f"pass {camera_id}=<url>")
+
+    analytics = None
+    if args.analytics:
+        from services.worker.analytics import Analytics
+        analytics = Analytics()
+
+    metrics.serve(args.metrics_port)
+    worker = Worker(cameras, fps=args.fps, hwaccel=args.hwaccel, once=bool(args.file),
+                    reid=args.reid, analytics=analytics)
+    published = worker.run(seconds=args.seconds)
+    print(f"published {published} sightings")
+    if analytics is not None:
+        for event in analytics.events:
+            print(f"  analytics: {event}")
+    return 0
+
+
+if __name__ == "__main__":
+    os.environ.setdefault("YOLO_VERBOSE", "0")
+    raise SystemExit(main())
