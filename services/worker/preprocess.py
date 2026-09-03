@@ -356,7 +356,11 @@ def deskew(grey, limit_deg=20.0):
     points = cv2.findNonZero(binary)
     if points is None or len(points) < 20:
         return grey
-    angle = cv2.minAreaRect(points)[-1]
+    # OpenCV has shipped two conventions for this angle: (0, 90] on 4.5+ and [-90, 0) before it,
+    # and the CI runner does not necessarily have the same build as a laptop. Fold it into
+    # [-45, 45] and the caller stops caring which one it got - without this, a level plate reads
+    # as 90 degrees of tilt on one build and 0 on the other.
+    angle = cv2.minAreaRect(points)[-1] % 90
     if angle > 45:
         angle -= 90
     if abs(angle) < 0.5 or abs(angle) > limit_deg:

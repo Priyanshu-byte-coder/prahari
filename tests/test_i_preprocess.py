@@ -150,8 +150,11 @@ def test_deskew_levels_a_tilted_plate():
     tilted = cv2.warpAffine(plate, m, (w, h), borderValue=235)
 
     def tilt(img):
+        # Same fold as preprocess.deskew: minAreaRect reports (0, 90] on OpenCV 4.5+ and
+        # [-90, 0) on older builds. Measuring without folding made this test read a level
+        # plate as 90 degrees of tilt on the CI runner and 0 on a laptop.
         binary = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
-        angle = cv2.minAreaRect(cv2.findNonZero(binary))[-1]
+        angle = cv2.minAreaRect(cv2.findNonZero(binary))[-1] % 90
         return abs(angle - 90) if angle > 45 else abs(angle)
 
     assert tilt(deskew(tilted)) < tilt(tilted)
