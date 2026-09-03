@@ -1,0 +1,765 @@
+<title>Prahari</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    /* neutrals — slate with a blue bias, picked not defaulted */
+    --ground:        #f4f5f7;
+    --surface:       #ffffff;
+    --surface-2:     #eceef1;
+    --line:          #d3d7dd;
+    --line-strong:   #b6bcc6;
+    --ink:           #1b1f27;
+    --ink-2:         #454b57;
+    --ink-3:         #6b7280;
+    /* one accent — the amber of an ANPR capture box and an alert badge */
+    --accent:        #b5731a;
+    --accent-bg:     #f7ead6;
+    /* semantic — separate from the accent */
+    --ok:            #1f7a3d;
+    --warn:          #9a6a12;
+    --crit:          #b23020;
+    --ok-bg:         #e3f2e6;
+    --crit-bg:       #f6e3df;
+
+    --maxw: 62rem;
+    --slide-pad: clamp(1.75rem, 5vw, 5rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0c0e12;
+      --surface:     #14171d;
+      --surface-2:   #1b1f27;
+      --line:        #272c36;
+      --line-strong: #3a4150;
+      --ink:         #e7e9ee;
+      --ink-2:       #b3b9c4;
+      --ink-3:       #7f8794;
+      --accent:      #e0a24a;
+      --accent-bg:   #2b2114;
+      --ok:          #4cc46a;
+      --warn:        #d7a53f;
+      --crit:        #ef6b56;
+      --ok-bg:       #14231a;
+      --crit-bg:     #2a1613;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #0c0e12;
+    --surface:     #14171d;
+    --surface-2:   #1b1f27;
+    --line:        #272c36;
+    --line-strong: #3a4150;
+    --ink:         #e7e9ee;
+    --ink-2:       #b3b9c4;
+    --ink-3:       #7f8794;
+    --accent:      #e0a24a;
+    --accent-bg:   #2b2114;
+    --ok:          #4cc46a;
+    --warn:        #d7a53f;
+    --crit:        #ef6b56;
+    --ok-bg:       #14231a;
+    --crit-bg:     #2a1613;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .deck { max-width: 78rem; margin: 0 auto; padding: clamp(1rem, 3vw, 2.5rem); }
+
+  /* ---- slide frame ---- */
+  .slide {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: var(--slide-pad);
+    margin-bottom: clamp(1rem, 2.5vw, 2rem);
+    overflow: hidden;
+  }
+  .slide::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: var(--accent);
+  }
+  .slide__num {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    color: var(--ink-3);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 0.6rem;
+    margin-bottom: clamp(1.25rem, 3vw, 2rem);
+  }
+  .slide__num b { color: var(--accent); font-weight: 600; }
+  .slide__eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-weight: 600;
+    font-size: 0.7rem;
+  }
+
+  h1, h2, h3 {
+    font-family: "Archivo", "IBM Plex Sans", sans-serif;
+    text-wrap: balance;
+    line-height: 1.12;
+    letter-spacing: -0.015em;
+    margin: 0;
+  }
+  .slide h2 {
+    font-size: clamp(1.65rem, 4vw, 2.7rem);
+    font-weight: 800;
+    max-width: 26ch;
+  }
+  .slide h2 + .lede {
+    margin-top: 1rem;
+    font-size: clamp(1rem, 1.6vw, 1.18rem);
+    color: var(--ink-2);
+    max-width: 60ch;
+  }
+  .slide h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 2rem 0 0.75rem;
+  }
+  p { max-width: 66ch; }
+  .body-cols { margin-top: 1.5rem; }
+  .body-cols p { margin: 0 0 1rem; }
+
+  strong { font-weight: 600; }
+  .muted { color: var(--ink-3); }
+
+  /* ---- cover ---- */
+  .cover {
+    padding: clamp(3rem, 9vw, 7rem) var(--slide-pad) clamp(2.5rem, 7vw, 5rem);
+  }
+  .cover::before { width: 5px; }
+  .cover__mark {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .cover h1 {
+    font-size: clamp(2.9rem, 10vw, 6.5rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    margin: 1.25rem 0 0;
+  }
+  .cover__tag {
+    font-size: clamp(1.05rem, 2.4vw, 1.5rem);
+    color: var(--ink-2);
+    max-width: 34ch;
+    margin: 1.25rem 0 0;
+    font-weight: 400;
+  }
+  .cover__thesis {
+    margin-top: clamp(2rem, 5vw, 3.5rem);
+    padding: 1.4rem 1.6rem;
+    background: var(--accent-bg);
+    border-left: 3px solid var(--accent);
+    font-family: "Archivo", sans-serif;
+    font-weight: 600;
+    font-size: clamp(1.1rem, 2.5vw, 1.55rem);
+    line-height: 1.3;
+    max-width: 40ch;
+  }
+  .cover__meta {
+    margin-top: clamp(2rem, 5vw, 3rem);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem 2rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    color: var(--ink-3);
+  }
+  .cover__meta span b { color: var(--ink-2); font-weight: 500; }
+
+  /* ---- tables ---- */
+  .table-wrap { overflow-x: auto; margin-top: 1.5rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 34rem; }
+  th, td {
+    text-align: left;
+    padding: 0.7rem 0.9rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  thead th {
+    font-family: "Archivo", sans-serif;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-3);
+    border-bottom: 1px solid var(--line-strong);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.take { color: var(--ink); }
+  td.reject { color: var(--ink-3); }
+  .cell-mono { font-family: "IBM Plex Mono", monospace; font-size: 0.82rem; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---- status pills ---- */
+  .pill {
+    display: inline-block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.5rem;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .pill--live { background: var(--ok-bg); color: var(--ok); }
+  .pill--wait { background: var(--accent-bg); color: var(--accent); }
+  .pill--crit { background: var(--crit-bg); color: var(--crit); }
+
+  /* ---- pipeline / flow diagram ---- */
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1.75rem;
+    align-items: stretch;
+  }
+  .flow__step {
+    flex: 1 1 8rem;
+    min-width: 7.5rem;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 0.8rem 0.85rem;
+    position: relative;
+  }
+  .flow__step .k {
+    font-family: "Archivo", sans-serif;
+    font-weight: 700;
+    font-size: 0.82rem;
+    display: block;
+  }
+  .flow__step .d {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.7rem;
+    color: var(--ink-3);
+    line-height: 1.45;
+    margin-top: 0.25rem;
+    display: block;
+  }
+  .flow__step[data-arrow]::after {
+    content: "→";
+    position: absolute;
+    right: -0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--accent);
+    font-size: 0.9rem;
+    z-index: 2;
+  }
+  .flow__step:last-child::after { content: none; }
+
+  /* ---- the sighting row card ---- */
+  .record {
+    margin-top: 1.75rem;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 1rem 1.1rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.8rem;
+    line-height: 1.7;
+    overflow-x: auto;
+  }
+  .record .key { color: var(--accent); }
+  .record .cmt { color: var(--ink-3); }
+
+  /* ---- measurement-pending chip ---- */
+  .run {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    border: 1px dashed var(--accent);
+    background: var(--accent-bg);
+    border-radius: 2px;
+    padding: 0.35rem 0.6rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    color: var(--accent);
+    line-height: 1.4;
+    vertical-align: middle;
+  }
+  .run b { font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.62rem; }
+  .run code { color: var(--ink-2); word-break: break-all; }
+  .runbar {
+    margin-top: 1.5rem;
+    padding: 0.9rem 1.1rem;
+    border: 1px dashed var(--line-strong);
+    border-radius: 2px;
+    background: var(--surface-2);
+    font-size: 0.82rem;
+    color: var(--ink-2);
+  }
+  .runbar b { color: var(--accent); font-family: "IBM Plex Mono", monospace; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; }
+
+  /* ---- FSM ---- */
+  .fsm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.55rem;
+    margin-top: 1.5rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+  }
+  .fsm .st {
+    background: var(--surface-2);
+    border: 1px solid var(--line-strong);
+    padding: 0.3rem 0.55rem;
+    border-radius: 2px;
+  }
+  .fsm .ar { color: var(--accent); }
+  .fsm .end { border-style: dashed; color: var(--ink-3); }
+
+  /* ---- arithmetic block ---- */
+  .calc {
+    margin-top: 1.25rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: clamp(0.72rem, 1.5vw, 0.85rem);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 2px;
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+    white-space: pre;
+    line-height: 1.8;
+    color: var(--ink-2);
+  }
+  .calc .r { color: var(--ink); font-weight: 600; }
+  .verdict {
+    margin-top: 1.25rem;
+    font-family: "Archivo", sans-serif;
+    font-weight: 700;
+    font-size: clamp(1.1rem, 2.6vw, 1.5rem);
+    color: var(--accent);
+  }
+
+  /* ---- two-up ---- */
+  .grid2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .panel {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 1rem 1.1rem;
+  }
+  .panel h3 { margin-top: 0; }
+  .panel ul { margin: 0.5rem 0 0; padding-left: 1.1rem; }
+  .panel li { margin: 0.35rem 0; font-size: 0.9rem; color: var(--ink-2); }
+
+  /* ---- roadmap ---- */
+  .road { display: grid; gap: 0.75rem; margin-top: 1.5rem; }
+  .road__row {
+    display: grid;
+    grid-template-columns: 8rem 1fr;
+    gap: 1rem;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--line);
+    align-items: baseline;
+  }
+  .road__row:last-child { border-bottom: none; }
+  .road__when {
+    font-family: "Archivo", sans-serif;
+    font-weight: 700;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+  }
+  .road__what { font-size: 0.9rem; color: var(--ink-2); }
+  @media (max-width: 34rem) { .road__row { grid-template-columns: 1fr; gap: 0.2rem; } }
+
+  /* ---- closing ---- */
+  .close {
+    background: var(--ink);
+    color: var(--ground);
+    border-color: var(--ink);
+  }
+  .close::before { background: var(--accent); }
+  .close .slide__num { border-color: rgba(255,255,255,0.15); color: rgba(255,255,255,0.55); }
+  .close blockquote {
+    margin: 1.5rem 0 0;
+    font-family: "Archivo", sans-serif;
+    font-weight: 600;
+    font-size: clamp(1.3rem, 4vw, 2.4rem);
+    line-height: 1.28;
+    letter-spacing: -0.02em;
+    max-width: 24ch;
+  }
+  .close .attrib {
+    margin-top: 1.75rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.76rem;
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 0.04em;
+  }
+
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---- print: one slide per page ---- */
+  @media print {
+    body { background: #fff; }
+    .deck { max-width: none; padding: 0; }
+    .slide, .cover, .close {
+      border: none;
+      border-radius: 0;
+      margin: 0;
+      padding: 1.4cm 1.6cm;
+      page-break-after: always;
+      break-after: page;
+      min-height: 0;
+    }
+    .slide::before, .cover::before, .close::before { width: 3pt; }
+    .close { background: #14171d !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .run, .runbar { border-color: #b5731a; }
+  }
+</style>
+
+<div class="deck">
+
+  <!-- ========== COVER ========== -->
+  <header class="slide cover">
+    <div class="cover__mark">Sentinel · Gujarat Police CCTV Integration Hackathon 2026</div>
+    <h1>Prahari</h1>
+    <p class="cover__tag">Federation middleware for the state's CCTV, not another VMS.</p>
+
+    <div class="cover__thesis">We ship 200-byte sighting rows, not video. That is the whole architecture.</div>
+
+    <div class="cover__meta">
+      <span><b>Model</b> &nbsp;Hybrid — M1 foundation + M3 core</span>
+      <span><b>Mandatory analytic</b> &nbsp;ANPR</span>
+      <span><b>Grid</b> &nbsp;~50 heterogeneous cameras → 80,000</span>
+      <span><b>Stack</b> &nbsp;open-source, vendor-neutral</span>
+    </div>
+  </header>
+
+  <!-- ========== 01 — THE HYBRID ========== -->
+  <section class="slide">
+    <div class="slide__num"><span>Prahari</span><span><b>01</b> / 10 · Solution model &amp; justification</span></div>
+    <p class="slide__eyebrow" style="color:var(--accent)">The hybrid</p>
+    <h2>It is not any one of the four reference models</h2>
+    <p class="lede">Model&nbsp;1 is the foundation the brief says it must be. Model&nbsp;3 is the architecture built on top of it. From Models&nbsp;2 and&nbsp;4 we take a technique and an ambition — and reject Model&nbsp;4's central video store outright.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Model</th><th>What we take</th><th>What we reject</th><th>Where it lives</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>M1</strong> Registry&nbsp;+&nbsp;GIS</td>
+            <td class="take">The camera registry as the spine of record; every asset on a map with a real coordinate</td>
+            <td class="reject">Its assumption that one department owns every camera</td>
+            <td class="cell-mono">cameras&nbsp;table, camera_geo.json</td>
+          </tr>
+          <tr>
+            <td><strong>M2</strong> Direct-attach viewing</td>
+            <td class="take">The direct RTSP / WHEP / HLS view — no transcode hop, no per-vendor console</td>
+            <td class="reject">M2 as an <em>architecture</em>: it forbids the federation layer we depend on</td>
+            <td class="cell-mono">MediaMTX + the wall</td>
+          </tr>
+          <tr>
+            <td><strong>M3</strong> Federation middleware</td>
+            <td class="take">The structure — drivers behind one interface, one event bus, one API</td>
+            <td class="reject">Its heavyweight per-site install</td>
+            <td class="cell-mono">gateway drivers, Redis Streams</td>
+          </tr>
+          <tr>
+            <td><strong>M4</strong> Central VMS</td>
+            <td class="take">Cross-department correlation and watchlist analytics</td>
+            <td class="reject"><strong>Central recording of 80,000 streams</strong> — the arithmetic is slide&nbsp;09</td>
+            <td class="cell-mono">matcher, alerts, access_grants</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:1.5rem"><strong>One line for the jury:</strong> federation middleware with pluggable drivers — three drivers live, the departmental-VMS driver interface-complete pending vendor credentials.</p>
+  </section>
+
+  <!-- ========== 02 — ARCHITECTURE ========== -->
+  <section class="slide">
+    <div class="slide__num"><span>Prahari</span><span><b>02</b> / 10 · Architecture &amp; protocol map</span></div>
+    <p class="slide__eyebrow" style="color:var(--accent)">End to end</p>
+    <h2>Five stages. Video stops at the first one.</h2>
+
+    <div class="flow">
+      <div class="flow__step" data-arrow>
+        <span class="k">Cameras / VMS</span>
+        <span class="d">RTSP/TCP · ONVIF · HLS · WHEP · vendor SDK</span>
+      </div>
+      <div class="flow__step" data-arrow>
+        <span class="k">Federation gateway</span>
+        <span class="d">drivers: mediamtx · rtsp · onvif · vms-stub</span>
+      </div>
+      <div class="flow__step" data-arrow>
+        <span class="k">Inference worker</span>
+        <span class="d">decode 5fps ▸ YOLOv8s ▸ ByteTrack ▸ plate ▸ OCR vote</span>
+      </div>
+      <div class="flow__step" data-arrow>
+        <span class="k">Core API</span>
+        <span class="d">persister ▸ matcher ▸ alerts ▸ ws-fanout ▸ route ▸ RBAC + audit</span>
+      </div>
+      <div class="flow__step">
+        <span class="k">GIS console</span>
+        <span class="d">Leaflet map · video wall · route view</span>
+      </div>
+    </div>
+
+    <div class="record">
+      <span class="cmt"># the atom — one sighting row, ~200 bytes ([C1]). Everything downstream reads it.</span><br>
+      Redis Streams: <span class="key">sightings</span>, <span class="key">camera.health</span> &nbsp; → &nbsp; Postgres / TimescaleDB
+    </div>
+
+    <p style="margin-top:1.5rem">Between the gateway and the worker there is exactly one contract: a URL string on the key <span class="cell-mono">camera:transport:&lt;id&gt;</span>. The worker imports no gateway code; the gateway knows no model. That seam is what lets a new vendor arrive as one driver file.</p>
+  </section>
+
+  <!-- ========== 03 — DRIVERS ========== -->
+  <section class="slide">
+    <div class="slide__num"><span>Prahari</span><span><b>03</b> / 10 · Interoperability</span></div>
+    <p class="slide__eyebrow" style="color:var(--accent)">Drivers</p>
+    <h2>Three live, one interface-complete — and we say which</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Driver</th><th>Protocol</th><th>Status</th><th>Cameras on the grid</th></tr></thead>
+        <tbody>
+          <tr><td class="cell-mono">mediamtx</td><td>RTSP / WHEP / HLS</td><td><span class="pill pill--live">Live</span></td><td class="num"><span class="run"><b>run</b><code>GET /api/admin/drivers</code></span></td></tr>
+          <tr><td class="cell-mono">rtsp</td><td>RTSP / TCP</td><td><span class="pill pill--live">Live</span></td><td class="num"><span class="muted">— from the same call</span></td></tr>
+          <tr><td class="cell-mono">onvif</td><td>ONVIF Profile S + events</td><td><span class="pill pill--live">Live</span></td><td class="num"><span class="muted">— from the same call</span></td></tr>
+          <tr><td class="cell-mono">vms-stub</td><td>vendor VMS SDK</td><td><span class="pill pill--wait">Interface-complete</span></td><td class="num">0 — awaiting credentials</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:1.5rem">The honest thing, said out loud: the fourth driver is an interface, not a claim. On our own network port 8554 is filtered, so the gateway probes each camera and degrades to HLS by itself. Heterogeneity is exactly what the brief tests — that fallback is the demo, not an excuse.</p>
+
+    <div class="runbar"><b>fill before submit</b> &nbsp; paste the driver → camera counts from <code>GET /api/admin/drivers</code> on the running system.</div>
+  </section>
+
+  <!-- ========== 04 — ANPR PIPELINE ========== -->
+  <section class="slide">
+    <div class="slide__num"><span>Prahari</span><span><b>04</b> / 10 · Video analytics — ANPR</span></div>
+    <p class="slide__eyebrow" style="color:var(--accent)">The mandatory analytic</p>
+    <h2>The pipeline, and the record it produces</h2>
+
+    <div class="flow">
+      <div class="flow__step" data-arrow><span class="k">Frame (PTS)</span><span class="d">decoded at 5 fps</span></div>
+      <div class="flow__step" data-arrow><span class="k">Vehicle detect</span><span class="d">YOLOv8s · batch 16 · 20 ms flush</span></div>
+      <div class="flow__step" data-arrow><span class="k">Track</span><span class="d">ByteTrack, one per camera</span></div>
+      <div class="flow__step" data-arrow><span class="k">Plate detect</span><span class="d">inside the vehicle crop</span></div>
+      <div class="flow__step" data-arrow><span class="k">Two readers</span><span class="d">EasyOCR + PaddleOCR</span></div>
+      <div class="flow__step"><span class="k">Grammar + vote</span><span class="d">per-character, refuses below 2/3</span></div>
+    </div>
+
+    <p style="margin-top:1.5rem">Plate detection runs on the <em>vehicle crop</em>, not the frame: a 20&nbsp;px plate in a 1920&nbsp;px frame is ~7&nbsp;px after letterboxing; inside a 300&nbsp;px crop it is a readable band. Grammar (<span class="cell-mono">^[A-Z]{2}[0-9]{2}[A-Z]{1,3}[0-9]{4}$</span>, BH series too) is applied before the vote, so the vote spends itself only on genuine ambiguity.</p>
+
+    <div class="record">
+      {<br>
+      &nbsp;&nbsp;<span class="key">"sighting_id"</span>: "…",  <span class="key">"camera_id"</span>: "GJ-AHD-0123",  <span class="key">"track_id"</span>: "…",<br>
+      &nbsp;&nbsp;<span class="key">"plate_text"</span>: "GJ01AB1234",  <span class="key">"plate_band"</span>: "CONFIRMED",<br>
+      &nbsp;&nbsp;<span class="key">"pts_first"</span>: 1725100841.20,  <span class="key">"ts_source"</span>: "rtsp_pts",  <span class="cmt">// never now()</span><br>
+      &nbsp;&nbsp;<span class="key">"vehicle_class"</span>: "car",  <span class="key">"crop_uri"</span>: "s3://…"<br>
+      }
+    </div>
+    <p class="muted" style="margin-top:0.75rem;font-size:0.85rem">Show one real row from the running system, not this mock.</p>
+  </section>
+
+  <!-- ========== 05 — MODEL CARD ========== -->
+  <section class="slide">
+    <div class="slide__num"><span>Prahari</span><span><b>05</b> / 10 · Analytics output quality</span></div>
+    <p class="slide__eyebrow" style="color:var(--accent)">Model card</p>
+    <h2>Four bands, never averaged into one number</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Band</th><th>Share</th><th>Precision</th><th>What the system does</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pill pill--live">CONFIRMED</span></td><td class="num">—</td><td class="num">—</td><td>publishes <span class="cell-mono">plate_text</span>, can raise an alert</td></tr>
+          <tr><td><span class="pill pill--wait">PROBABLE</span></td><td class="num">—</td><td class="num">—</td><td>publishes <span class="cell-mono">plate_text</span>, alert needs corroboration</td></tr>
+          <tr><td><span class="pill pill--wait">POSSIBLE</span></td><td class="num">—</td><td class="num">—</td><td><strong>publishes a crop and a null plate</strong></td></tr>
+          <tr><td><span class="pill pill--crit">NONE</span></td><td class="num">—</td><td class="num">—</td><td>vehicle row only</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:1.5rem">On the slide too, because leaving it off is how 70% becomes 95%: the <strong>refusal rate</strong> — the share of passes no reader can read, around 13% on real footage.</p>
+
+    <div class="grid2">
+      <div class="panel">
+        <h3>Accuracy — per band + refusal rate</h3>
+        <span class="run"><b>run</b><code>python scripts/accuracy_report.py --golden fixtures/golden/</code></span>
+        <p class="muted" style="font-size:0.82rem;margin-top:0.6rem">Quote the <em>hand-labelled</em> numbers, not synthetic. Writes docs/accuracy-report.md.</p>
+      </div>
+      <div class="panel">
+        <h3>Throughput</h3>
+        <span class="run"><b>run</b><code>python -m services.worker.backend --bench</code></span>
+        <span class="run" style="margin-top:0.5rem"><b>run</b><code>python -m services.worker.decode --bench --cameras 10 --seconds 600</code></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 06 — WATCHLIST + ALERTS ========== -->
+  <section class="slide">
+    <div class="slide__num"><span>Prahari</span><span><b>06</b> / 10 · Watchlist correlation &amp; alerts</span></div>
+    <p class="slide__eyebrow" style="color:var(--accent)">Real-time alerts</p>
+    <h2>Banded matching, an audited state machine</h2>
+
+    <p class="lede">Matching is banded, not binary: exact <span class="cell-mono">plate_norm</span>, then <span class="cell-mono">plate_canon</span> (confusion classes collapsed), then weighted edit distance&nbsp;≤&nbsp;1.0. Watchlist categories: stolen vehicles, wanted / missing persons, blacklisted vehicles, suspect lists.</p>
+
+    <div class="fsm">
+      <span class="st">NEW</span><span class="ar">→</span>
+      <span class="st">ACK</span><span class="ar">→</span>
+      <span class="st">IN_PROGRESS</span><span class="ar">→</span>
+      <span class="st end">RESOLVED</span>
+      <span class="ar">|</span>
+      <span class="st end">FALSE_POSITIVE</span>
+    </div>
+    <p style="margin-top:1rem">Every transition is written to the audit log with a user and a reason. Repeated sightings of one vehicle bump a count on the open alert — twenty alerts for one event is how an operator learns to ignore them.</p>
+
+    <div class="runbar"><b>fill before submit</b> &nbsp; sighting-to-alert latency from <code>python -m services.worker.selftest --assert-xadd</code> — put the pipeline half on the slide, against the 3&nbsp;s budget.</div>
+  </section>
+
+  <!-- ========== 07 — ROUTE ========== -->
+  <section class="slide">
+    <div class="slide__num"><span>Prahari</span><span><b>07</b> / 10 · The graded test case</span></div>
+    <p class="slide__eyebrow" style="color:var(--accent)">Route reconstruction</p>
+    <h2>A registration number in. A defensible route out.</h2>
+
+    <p class="lede">A judge types a vehicle registration; the map draws that vehicle's hops across the grid with timestamps and locations, snapped to roads via OSRM.</p>
+
+    <div class="grid2">
+      <div class="panel">
+        <h3>What it returns</h3>
+        <ul>
+          <li>Ordered hops: camera, coordinate, timestamp</li>
+          <li>Implied speed on each leg</li>
+          <li>CSV export, audited</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>What it refuses</h3>
+        <ul>
+          <li>A hop needing 180&nbsp;km/h through a city is flagged <span class="pill pill--crit">IMPLAUSIBLE</span>, not quietly drawn</li>
+          <li>A route that cannot lie to an officer is worth more than one that always answers</li>
+        </ul>
+      </div>
+    </div>
+    <p style="margin-top:1.5rem"><strong>Expected output for the jury:</strong> complete route, timestamped and location-wise, plus the live watchlist cross-referencing and auto-alerts running alongside it.</p>
+  </section>
+
+  <!-- ========== 08 — RBAC + AUDIT ========== -->
+  <section class="slide">
+    <div class="slide__num"><span>Prahari</span><span><b>08</b> / 10 · Security &amp; accountability</span></div>
+    <p class="slide__eyebrow" style="color:var(--accent)">RBAC + audit</p>
+    <h2>Enforced in SQL. Hiding a button is not access control.</h2>
+
+    <p class="lede">The department-scope matrix is enforced in the database with row-level security as the backstop — not in the UI. A district viewer's query simply returns fewer rows; a system administrator may not see live data at all.</p>
+
+    <div class="grid2">
+      <div class="panel">
+        <h3>Every action is logged</h3>
+        <ul>
+          <li>Every export and every live view writes an audit row</li>
+          <li>Cross-department access needs a case number, a 72&nbsp;h cap and target-department approval</li>
+          <li>The log is hash-chained; a tamper breaks the chain</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Integration-ready</h3>
+        <ul>
+          <li>APIs shaped for VAHAN, SARTHI, eGujCop (CCTNS), AFIS, NAFIS</li>
+          <li>Documented, open protocols — no lock-in on cameras, VMS, analytics or storage</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="runbar"><b>fill before submit</b> &nbsp; show <code>GET /api/admin/audit/verify</code> returning ok on the running system.</div>
+  </section>
+
+  <!-- ========== 09 — SCALE ========== -->
+  <section class="slide">
+    <div class="slide__num"><span>Prahari</span><span><b>09</b> / 10 · Scalability &amp; PoC readiness</span></div>
+    <p class="slide__eyebrow" style="color:var(--accent)">The arithmetic, printed so the jury can check it</p>
+    <h2>Four orders of magnitude, in four multiplications</h2>
+
+    <p style="margin-top:1.25rem;font-weight:600">Centralised video — the M4 approach we reject:</p>
+<div class="calc">80,000 cameras × 2 Mbps (H.264, 720p, 5 fps)   = 160,000 Mbps  <span class="r">≈ 160 Gbps</span>
+160 Gbps × 86,400 s/day                        <span class="r">≈ 1.7 PB/day</span>
+                                              <span class="r">≈ 26 PB at ~15-day retention</span></div>
+
+    <p style="margin-top:1.5rem;font-weight:600">Metadata — what we actually ship:</p>
+<div class="calc">~200 bytes per sighting row ([C1])
+80,000 cameras × ~1,000 sightings/camera/day   ≈ 80 M rows/day
+80 M × 200 B                                   ≈ 16 GB/day raw
+                                              <span class="r">≈ 2–3 GB/day compressed (Timescale)</span></div>
+
+    <p class="verdict">26 PB → 16 GB/day. That is the entire case for edge inference.</p>
+    <p class="muted" style="margin-top:1rem;font-size:0.85rem">Scale plan also covers: central / regional / edge compute, GPU sizing, low-bandwidth operation, hot / warm / cold storage by retention, HA, backup, DR, cybersecurity, and a capex + opex estimate.</p>
+  </section>
+
+  <!-- ========== 10 — ROADMAP ========== -->
+  <section class="slide">
+    <div class="slide__num"><span>Prahari</span><span><b>10</b> / 10 · Roadmap &amp; operational impact</span></div>
+    <p class="slide__eyebrow" style="color:var(--accent)">What is built, what is next</p>
+    <h2>Honest about the line between the two</h2>
+
+    <div class="road">
+      <div class="road__row">
+        <div class="road__when">Now</div>
+        <div class="road__what">Three drivers · ANPR with a banded vote · watchlist alerts with an audited FSM · route reconstruction with plausibility flags · RBAC + hash-chained audit · GIS console + video wall.</div>
+      </div>
+      <div class="road__row">
+        <div class="road__when">Next 30 days</div>
+        <div class="road__what">The VMS driver against real vendor credentials · detectors fine-tuned on labelled Gujarat footage (+ TensorRT) · re-ID as PROBABLE corroboration · crowd, wrong-way and loitering analytics.</div>
+      </div>
+      <div class="road__row">
+        <div class="road__when">Then</div>
+        <div class="road__what">Face matching under a separate legal authorisation · ANPR-grade camera-siting guidance — a plate under 100&nbsp;px wide is a siting fault, not a model fault.</div>
+      </div>
+    </div>
+
+    <p style="margin-top:1.75rem"><strong>Operational impact:</strong> one console for 26 departments, a stolen vehicle traced across the state in seconds instead of phone calls, and every lookup on the record — so the system is trusted enough to be used.</p>
+  </section>
+
+  <!-- ========== CLOSE ========== -->
+  <section class="slide close">
+    <div class="slide__num"><span>Prahari</span><span>Close</span></div>
+    <blockquote>The fusion refuses to guess below a two-thirds majority. We would rather report nothing than report the wrong vehicle to a police officer.</blockquote>
+    <div class="attrib">Prahari · Sentinel 2026 · prize pool ₹51 lakh (portal figure)</div>
+  </section>
+
+</div>

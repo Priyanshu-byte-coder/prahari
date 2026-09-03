@@ -195,6 +195,9 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
   for both the grid map and the trace map, `/api/v1/*` proxy for the core API.
 - `web/home.html` — landing page, all numbers read live from `/api/cameras`, `/api/grid`,
   `/api/v1/{watchlist,alerts}` — no static claims.
+- `docs/deck.html` — the 10-slide submission deck (`deck-outline.md` is the spec). Self-contained,
+  `@media print` gives one slide/page for PPT/PDF export. The 6 measured numbers are dashed amber
+  chips naming their command — replace before submitting.
 - `scripts/console_serve.py` — static file server + `/api/wall/*` + `/api/v1/*` proxy (holds the
   console's own account so the browser never shows a login form; `GRID_KEY` env var signs the
   HLS-fallback session) + `/api/cameras` (merged seed + geo + wall status, and flattens `geo`'s
@@ -595,6 +598,11 @@ changing one without a line here breaks somebody else's lane silently.
   flipped `USING_I5` True on import, so its fallback half can be deleted
 
 ### lane G
+- 09-03 | #9 I9 | docs/deck.html | deck-outline.md rendered as a 10-slide HTML deck (Archivo +
+  IBM Plex, dark/light, `@media print` = one slide per page → export PPT/PDF from the browser).
+  The 6 measured numbers (`‹accuracy›` `‹bench›` `‹decode›` `‹latency›` `‹drivers›` `‹audit›`)
+  are dashed amber "run before submit" chips naming the exact command — unmissable, cannot
+  ship silently. Same content also at artifact 92fa6a63-9914-4e90-82d4-ca6da3924201.
 - 09-03 | #35 J1 | tests/test_integration.py, docs/demo-script.md | legs 2-3 could never
   pass — every core route is behind `requires(...)` and `_http` sent no token, so they
   always skipped. Added `_access_token()` (PRAHARI_TEST_JWT, or PRAHARI_TEST_USER/PASSWORD
