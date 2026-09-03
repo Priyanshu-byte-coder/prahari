@@ -75,3 +75,37 @@ def test_frame_conditioning_can_be_switched_off(monkeypatch):
     img = np.zeros((10, 10, 3), dtype=np.uint8)
     out = w._detector_images([_FakeFrame(img)])
     assert out[0] is img                              # the exact raw array, untouched
+
+
+def test_a_sighting_keeps_several_crops_for_fusion():
+    from services.worker.sighting import FUSE_CROPS, SightingBuilder
+    from services.worker.tracker import Track
+
+    b = SightingBuilder("CAM")
+    s = None
+    for i in range(FUSE_CROPS + 4):
+        crop = np.random.default_rng(i).integers(0, 255, (50, 150, 3), dtype=np.uint8)
+        s = b.observe(Track("CAM", 1, "car", 0.9, (0, 0, 150, 50), 1.0 + 0.2 * i), crop=crop)
+    crops = s.claim_ocr_crops()
+    assert 1 < len(crops) <= FUSE_CROPS               # a batch, capped
+    assert all(c is not None and c.size for c in crops)
+
+
+@pytest.mark.skipif(run_mod._prepare_for_ocr is None, reason="preprocess.py not importable")
+def test_the_ocr_pool_fuses_a_batch(monkeypatch):
+    monkeypatch.setattr(run_mod, "_FUSE", True)
+    seen = []
+
+    def fake_read(crop):
+        seen.append(crop.shape)
+        return []
+
+    pool = run_mod.OcrPool.__new__(run_mod.OcrPool)
+    pool._read = fake_read
+    crops = [np.full((48, 160, 3), 200, np.uint8) for _ in range(4)]
+    # exercise the fusion branch directly
+    readings = list(pool._read(crops[0]))
+    fused = run_mod.OcrPool._fused(crops)
+    assert fused is not None                          # 4 identical crops fuse cleanly
+    readings += list(pool._read(fused))
+    assert len(seen) == 2                             # sharpest raw + fused

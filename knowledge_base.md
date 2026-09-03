@@ -587,6 +587,15 @@ changing one without a line here breaks somebody else's lane silently.
 `MM-DD | ticket | files | outcome` — newest at the top of **your own** lane's block.
 
 ### lane I
+- 09-03 | fusion + detector knobs (lane G, owner-directed - Neal006 review) |
+  services/worker/{sighting,run,decode}.py, tests/test_i_run_preprocess_wiring.py | wired the
+  last two preprocess asks: Sighting keeps its 6 sharpest crops (`_crops`, `claim_ocr_crops()`),
+  and `OcrPool` runs `prepare_for_ocr()` (align+average) on the batch and reads the fused image
+  alongside the sharpest raw crop. `PRAHARI_OCR_FUSION=0` off. Also env-tunable now:
+  `PRAHARI_DETECT_IMGSZ` (640 default; 1280 finds ~5x more vehicles on wide grid cams),
+  `PRAHARI_DETECT_CONF` (0.25), `PRAHARI_DECODE_WIDTH` (960; 0 = source res). 177 tests +
+  selftest green (conf drifts 0.98->0.86 as fusion averages more reads in, still CONFIRMED).
+  On the grid: more detections, still 0 plate reads - the pixels aren't there.
 - 09-03 | vote shape gate (lane G, owner-directed - Neal006 review) | services/worker/vote.py,
   tests/test_i_vote_shape_gate.py | a read the readers agree on but that isn't plate-shaped
   (len 9-11 or grammar-valid) now returns POSSIBLE (crop + null), not PROBABLE. Real-grid runs

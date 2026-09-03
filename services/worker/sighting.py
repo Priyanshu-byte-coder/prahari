@@ -33,6 +33,7 @@ from common.plate import canon, grammar_fix, normalise
 logger = logging.getLogger("prahari.worker.sighting")
 
 CLOSE_AFTER_S = 6.0
+FUSE_CROPS = 6           # sharpest crops kept per track for multi-frame OCR fusion
 IST = timezone(timedelta(hours=5, minutes=30))
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
@@ -105,6 +106,7 @@ class Sighting:
     frames: int = 0
     vote: object | None = field(default=None, repr=False)
     _ocr_sharpness: float = 0.0
+    _crops: list = field(default_factory=list, repr=False)   # (sharpness, crop), sharpest first
 
     @property
     def wants_ocr(self):
@@ -123,6 +125,13 @@ class Sighting:
         """
         self._ocr_sharpness = max(self._ocr_sharpness, self.crop_sharpness)
         return self.crop
+
+    def claim_ocr_crops(self):
+        """Like `claim_ocr`, but returns the track's sharpest crops (sharpest first) so the
+        OCR pass can fuse several frames of the same plate. Falls back to `[self.crop]`."""
+        self._ocr_sharpness = max(self._ocr_sharpness, self.crop_sharpness)
+        crops = [c for _s, c in self._crops if c is not None and c.size]
+        return crops or ([self.crop] if self.crop is not None else [])
 
     def add_readings(self, readings, crop_sharpness=None):
         """Feed one crop's readers into the vote and remember how sharp that crop was."""
@@ -209,6 +218,11 @@ class SightingBuilder:
             if sharp > s.crop_sharpness:
                 s.crop, s.crop_sharpness = crop, sharp
                 s.colour = colour_of(crop) or s.colour
+            # Keep the FUSE_CROPS sharpest for multi-frame fusion; fuse() aligns them onto the
+            # sharpest and drops any it cannot register, so size/scene mismatch is handled there.
+            s._crops.append((sharp, crop))
+            s._crops.sort(key=lambda e: e[0], reverse=True)
+            del s._crops[FUSE_CROPS:]
         return s
 
     def tick(self, pts_seconds):

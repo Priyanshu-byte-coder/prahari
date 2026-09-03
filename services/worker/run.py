@@ -50,15 +50,20 @@ OCR_DRAIN_S = 2.0        # how long a closing sighting waits for its outstanding
 # of noise. Both are on by default and each has an env kill-switch in case they regress.
 _PREP_FRAMES = os.getenv("PRAHARI_PREPROCESS_FRAMES", "1").strip().lower() not in ("0", "false", "no")
 _FEAS_GATE = os.getenv("PRAHARI_FEASIBILITY_GATE", "1").strip().lower() not in ("0", "false", "no")
+# Multi-frame fusion: align + average several crops of one tracked plate before OCR. Adds
+# information from other frames (unlike a generative SR model, which invents it), so it lifts
+# a borderline read without risking a confident-wrong. On by default; PRAHARI_OCR_FUSION=0 off.
+_FUSE = os.getenv("PRAHARI_OCR_FUSION", "1").strip().lower() not in ("0", "false", "no")
 
 try:
     from services.worker.preprocess import feasibility as _feasibility
     from services.worker.preprocess import prepare_frame as _prepare_frame
+    from services.worker.preprocess import prepare_for_ocr as _prepare_for_ocr
 except Exception as _exc:                     # pragma: no cover - preprocess deps missing
-    _feasibility = _prepare_frame = None
+    _feasibility = _prepare_frame = _prepare_for_ocr = None
     logging.getLogger("prahari.worker.run").warning(
-        "preprocess.py not importable (%s) - frame conditioning and the feasibility gate are off",
-        _exc)
+        "preprocess.py not importable (%s) - frame conditioning, feasibility gate and OCR "
+        "fusion are off", _exc)
 
 
 class OcrPool:
@@ -79,15 +84,20 @@ class OcrPool:
         for thread in self._threads:
             thread.start()
 
-    def submit(self, sighting, crop):
-        """Queue one crop. False when the queue is full - that is the budget, not an error."""
-        if crop is None or not crop.size:
+    def submit(self, sighting, crops):
+        """Queue a crop, or a list of a track's crops to fuse. False when the queue is full."""
+        if crops is None:
+            return False
+        if not isinstance(crops, (list, tuple)):
+            crops = [crops]
+        crops = [c for c in crops if c is not None and getattr(c, "size", 0)]
+        if not crops:
             return False
         with self._done:
             if self._queue.full():
                 return False
             self._pending[id(sighting)] += 1
-        self._queue.put((sighting, crop))
+        self._queue.put((sighting, crops))
         return True
 
     def _loop(self):
@@ -99,17 +109,31 @@ class OcrPool:
             item = self._queue.get()
             if item is None:
                 return
-            sighting, crop = item
+            sighting, crops = item
+            best = crops[0]
             try:
                 with metrics.timed("ocr"):
-                    readings = self._read(crop)
-                sighting.add_readings(readings, sharpness(crop))
+                    readings = list(self._read(best))
+                    if _FUSE and _prepare_for_ocr is not None and len(crops) > 1:
+                        fused = self._fused(crops)
+                        if fused is not None:
+                            readings += list(self._read(fused))
+                sighting.add_readings(readings, sharpness(best))
             except Exception as exc:
                 logger.warning("OCR failed on a crop: %s", exc)
             finally:
                 with self._done:
                     self._pending[id(sighting)] -= 1
                     self._done.notify_all()
+
+    @staticmethod
+    def _fused(crops):
+        """Align + average the track's crops into one cleaner plate image, or None."""
+        try:
+            return _prepare_for_ocr(crops)
+        except Exception as exc:
+            logger.debug("fusion failed (%s) - reading the sharpest crop only", exc)
+            return None
 
     def drain(self, sighting, timeout=OCR_DRAIN_S):
         """Wait for this sighting's reads before its row is built. Bounded: a stuck reader
@@ -262,7 +286,7 @@ class Worker:
             return
         if not self._ocr_feasible(sighting, x2 - x1):
             return
-        self.ocr.submit(sighting, sighting.claim_ocr())
+        self.ocr.submit(sighting, sighting.claim_ocr_crops())
 
     def _ocr_feasible(self, sighting, vehicle_w_px):
         """The grid-measured gate: is a plate on a vehicle this wide readable at all?

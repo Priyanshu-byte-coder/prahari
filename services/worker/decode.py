@@ -34,7 +34,11 @@ from services.worker.queues import FrameQueue
 logger = logging.getLogger("prahari.worker.decode")
 
 FPS = 5.0
-WIDTH = 960
+# Frames are scaled to WIDTH before the pipeline. 960 keeps decode + detect cheap and, on the
+# real grid, loses nothing: a plate small at 1920 is still small at 960 (measured - the band
+# counts are identical). PRAHARI_DECODE_WIDTH raises it for a genuinely ANPR-sited camera where
+# the extra pixels land on the plate. 0 keeps the source resolution.
+WIDTH = int(os.getenv("PRAHARI_DECODE_WIDTH", "960"))
 BACKOFF_MIN, BACKOFF_MAX = 2.0, 30.0
 LOOP_REGRESSION_S = 1.0     # a PTS drop past this is a looped recording, not jitter
 MOTION_FRACTION = 0.005     # under 0.5% of the thumbnail changed -> nothing happened
@@ -106,9 +110,10 @@ def moved(previous, current, fraction=MOTION_FRACTION, delta=MOTION_DELTA):
 
 
 def scale(image, width=WIDTH):
-    """Match `scale=960:-2`: fix the width, keep the aspect ratio, force an even height."""
+    """Match `scale=960:-2`: fix the width, keep the aspect ratio, force an even height.
+    `width` of 0 keeps the source resolution."""
     h, w = image.shape[:2]
-    if w <= width:
+    if width <= 0 or w <= width:
         return image
     height = max(2, int(round(h * width / w)) // 2 * 2)
     return cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
