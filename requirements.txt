@@ -1,10 +1,8 @@
 # Stack per AGENTS.md. Shared across all three lanes -- G5 owns this file.
-# Merged for QA_testing: union of lane D, lane G and lane I requirements.
 fastapi
 uvicorn[standard]
 pydantic-settings
 requests
-python-dotenv
 
 # lane I -- decode, detect, track, OCR
 av
@@ -23,17 +21,28 @@ pyjwt
 argon2-cffi
 python-multipart
 weasyprint
-boto3
-reportlab
-httpx2
 
 # lane G -- gateway drivers
 onvif-zeep
 # numpy is not optional here: PyAV's frame.to_ndarray() imports it lazily, so
 # without it the drivers decode fine and then fail per frame.
+numpy
 
 # shared
 python-ulid
-websockets
 pytest
+
+# lane D -- added when lane D merged: object storage client, PDF, the API test client
+# and the socket client the WebSocket tests drive a real server with.
+boto3
+httpx2
 pytest-timeout
+python-dotenv
+reportlab
+websockets
+
+# Test-only, found missing when lane I merged: tests/test_i_publish.py imports fakeredis
+# and services/worker publishes metrics through prometheus_client. Without these the lane I
+# tests do not collect on a clean machine or in CI.
+fakeredis
+prometheus-client

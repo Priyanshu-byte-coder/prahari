@@ -163,11 +163,23 @@ HOP_BY_HOP = {"connection", "keep-alive", "transfer-encoding", "upgrade",
 WALL: Wall | None = None
 
 
+# [C4]'s Camera carries lat/lon at the top level, and the legacy web/map.js filters on
+# `c.lat != null`. Nesting them only under `geo` left every camera unplaced there -- "30
+# cameras, 0 placed" over an empty map -- even though the coordinates were in the payload.
+# app.js reads `c.geo.lat` directly and never needed this, but the flattening is free and
+# keeps the older page working too.
+GEO_TOP_LEVEL = ("lat", "lon", "bearing_deg", "fov_deg", "range_m",
+                 "coord_source", "coord_conf", "landmark")
+
+
 def load_cameras() -> list[dict]:
     seed = json.loads(SEED.read_text(encoding="utf-8"))
     geo = json.loads(GEO.read_text(encoding="utf-8")) if GEO.exists() else {}
     for cam in seed:
-        cam["geo"] = geo.get(str(cam["camera_id"]), {})
+        placement = geo.get(str(cam["camera_id"]), {})
+        cam["geo"] = placement                      # kept: the geo editor reads this shape
+        for field in GEO_TOP_LEVEL:                 # added: what [C4] and the legacy map expect
+            cam.setdefault(field, placement.get(field))
     return seed
 
 
@@ -325,7 +337,7 @@ def main() -> int:
         print("wall: starting all pullers")
 
     with Server(("127.0.0.1", args.port), Handler) as httpd:
-        print(f"console  http://localhost:{args.port}/web/console.html")
+        print(f"console  http://localhost:{args.port}/console")
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

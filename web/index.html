@@ -12,7 +12,7 @@
 <body>
 
 <header>
-  <a class="brand" href="home.html" title="Back to the Prahari portal">प्रहरी <span>Prahari</span></a>
+  <div class="brand">प्रहरी <span>Prahari</span></div>
   <div class="sep"></div>
   <div class="stat"><b id="s-total">0</b> cameras</div>
   <div class="stat"><b id="s-live" class="c-live">0</b> live</div>
@@ -26,8 +26,6 @@
     <button data-v="wall">Wall</button>
     <button data-v="admin">Admin</button>
   </div>
-  <div class="sep"></div>
-  <div id="authBox" class="auth-box"></div>
 </header>
 
 <main id="main">
@@ -92,30 +90,18 @@
 <script src="wall.js"></script>
 <script src="admin.js"></script>
 <script>
-// Live core API (services/api/main.py, [C4]). CORS on that app allows any localhost origin,
-// so this console can call it directly whether it is served by scripts/console_serve.py (5173)
-// or opened as a plain file. Logged out, calls fall through to fixtures — see apiFetch below.
-const LIVE_API = window.API_BASE || 'http://localhost:8000';
+// Bootstrap: load fixtures (works with API down) or live API
+const API = window.API_BASE || '';
 
 /** Escape text before inserting into innerHTML. */
 const esc = s => { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; };
 
-function authToken() { return localStorage.getItem('prahari_token') || ''; }
-function authRole()  { return localStorage.getItem('prahari_role')  || ''; }
-function authUser()  { return localStorage.getItem('prahari_user')  || ''; }
-
 async function apiFetch(path, fallback) {
-  const token = authToken();
-  // Console-server mode (no login yet): same-origin relative path, whatever console_serve.py
-  // implements (cameras today), fixtures for the rest. Live mode (logged in): the real API,
-  // cross-origin, with the Bearer token every [C10] scope check requires.
-  const base = token ? LIVE_API : (window.API_BASE || '');
   try {
-    const r = await fetch(base + path, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
+    const r = await fetch(API + path);
     if (r.ok) return r.json();
-    if (r.status === 401) { logout(); }
   } catch (_) {}
-  // Fall back to fixtures when the API is down or the call was never live — G7 contract
+  // Fall back to fixtures when API is down — G7 contract
   try {
     const name = path.replace(/^\/api\//, '').replace(/\?.*$/, '').replace(/\//g, '_');
     const r = await fetch(`../fixtures/api/${name}.json`);
@@ -126,60 +112,6 @@ async function apiFetch(path, fallback) {
 
 window.apiFetch = apiFetch;
 window.prahari = {};
-
-function renderAuthBox() {
-  const box = document.getElementById('authBox');
-  const token = authToken();
-  if (token) {
-    box.innerHTML = `
-      <span class="stat">${esc(authUser())} <span class="chip">${esc(authRole())}</span></span>
-      <button class="btn sm" id="logoutBtn">Log out</button>`;
-    document.getElementById('logoutBtn').addEventListener('click', logout);
-  } else {
-    box.innerHTML = `
-      <form id="loginForm" class="login-form">
-        <input id="luser" placeholder="username" autocomplete="username" required>
-        <input id="lpass" type="password" placeholder="password" autocomplete="current-password" required>
-        <button class="btn sm go" type="submit">Log in</button>
-        <span id="loginErr" class="c-alert" style="font-size:11px"></span>
-      </form>`;
-    document.getElementById('loginForm').addEventListener('submit', onLogin);
-  }
-}
-
-async function onLogin(e) {
-  e.preventDefault();
-  const username = document.getElementById('luser').value.trim();
-  const password = document.getElementById('lpass').value;
-  const errEl = document.getElementById('loginErr');
-  errEl.textContent = '';
-  try {
-    const r = await fetch(`${LIVE_API}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    });
-    if (!r.ok) { errEl.textContent = r.status === 401 ? 'wrong username or password' : `error ${r.status}`; return; }
-    const data = await r.json();
-    localStorage.setItem('prahari_token', data.access);
-    localStorage.setItem('prahari_role', data.role || '');
-    localStorage.setItem('prahari_user', username);
-    window.API_BASE = LIVE_API;   // ws.js and every apiFetch call now go live
-    renderAuthBox();
-    await boot();
-  } catch (_) {
-    errEl.textContent = `cannot reach the API at ${LIVE_API}`;
-  }
-}
-
-function logout() {
-  localStorage.removeItem('prahari_token');
-  localStorage.removeItem('prahari_role');
-  localStorage.removeItem('prahari_user');
-  renderAuthBox();
-  boot();
-}
-window.logout = logout;
 
 async function boot() {
   const [cameras, alerts] = await Promise.all([
@@ -254,7 +186,7 @@ window.selectCamera = selectCamera;
 
 function showDetail(c) {
   const d = document.getElementById('detail');
-  const snapUrl = authToken() ? `${LIVE_API}/api/cameras/${c.camera_id}/snapshot` : null;
+  const snapUrl = API ? `${API}/api/cameras/${c.camera_id}/snapshot` : null;
   d.innerHTML = `
     <button class="detail-close" onclick="document.getElementById('main').classList.remove('detail');document.getElementById('detail').innerHTML=''">×</button>
     <h3>Camera ${esc(c.camera_id)}</h3>
@@ -339,8 +271,6 @@ window.openModal = function(src) {
   document.getElementById('modal').style.display = 'flex';
 };
 
-if (authToken()) window.API_BASE = LIVE_API;   // resume a session started from home.html
-renderAuthBox();
 boot();
 </script>
 </body>

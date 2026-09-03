@@ -85,7 +85,26 @@ class Persister:
 
         if not rows:
             return 0
-        written = self.store.insert_sightings(rows)     # commits
+
+        import psycopg2
+
+        try:
+            written = self.store.insert_sightings(rows)  # commits
+        except psycopg2.Error as exc:
+            # One row Postgres refuses - a camera_id that is not in the registry is the common
+            # one - aborts the whole transaction, so the batch has to be re-tried row by row.
+            # Dying here instead would mean a single selftest rig publishing under an unknown
+            # camera stops every real sighting from being stored.
+            log.warning("batch rejected (%s) - retrying row by row",
+                        str(exc).strip().splitlines()[0])
+            written, refused = self.store.insert_sightings_individually(rows)
+            for row, reason in refused:
+                self.redis.xadd(DEAD_LETTER, {"id": row.get("sighting_id", ""),
+                                              "data": json.dumps(row), "reason": reason})
+                self.dead_lettered += 1
+                log.warning("sighting %s dead-lettered: %s", row.get("sighting_id"), reason)
+            rows = [r for r in rows if r not in [bad for bad, _ in refused]]
+
         self.store.cache_recent(rows)                   # cache after the commit, never before
         self.redis.xack(self.stream, self.group, *acks)
         self.persisted += len(rows)

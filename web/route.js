@@ -83,8 +83,8 @@ const RouteView = (() => {
 
   async function doSearch() {
     const plate = document.getElementById('routePlate').value.trim().toUpperCase();
-    const from  = toUtcIso(document.getElementById('routeFrom').value);
-    const to    = toUtcIso(document.getElementById('routeTo').value);
+    const from  = document.getElementById('routeFrom').value;
+    const to    = document.getElementById('routeTo').value;
     if (!plate) {
       document.getElementById('routeStatus').textContent = 'Enter a plate number.';
       return;
@@ -270,8 +270,8 @@ const RouteView = (() => {
     // When offline, show a message.
     if (!routeData) return;
     const plate = routeData.plate;
-    const from  = toUtcIso(document.getElementById('routeFrom').value);
-    const to    = toUtcIso(document.getElementById('routeTo').value);
+    const from  = document.getElementById('routeFrom').value;
+    const to    = document.getElementById('routeTo').value;
     const url   = `${window.API_BASE || ''}/api/route/export?plate=${encodeURIComponent(plate)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&fmt=pdf`;
     // Open in new tab — the server will return the PDF and write an audit row.
     window.open(url, '_blank');
@@ -295,13 +295,6 @@ const RouteView = (() => {
   function toLocal(d) {
     const pad = n => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }
-
-  /** A `datetime-local` input's .value has no timezone - the browser means it in local time,
-   *  but the API's `datetime.fromisoformat` treats a bare string as UTC. Converting here once,
-   *  at read time, is what keeps a route search in IST from silently querying the wrong 2 hours. */
-  function toUtcIso(localValue) {
-    return localValue ? new Date(localValue).toISOString() : localValue;
   }
 
   return { init, activate, openSearch };

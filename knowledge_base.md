@@ -1,15 +1,35 @@
 # knowledge_base.md — living memory
 
-Updated: 2026-09-02 · KB v2 · cap 300 lines (temporarily exceeded by the QA_testing three-way merge —
-next person to touch this file should fold old changelog lines into `## 7. Archived`) · patched after
-**every** completed task (`CLAUDE.md §3`)
+Updated: 2026-09-03 · KB v2 · cap 300 lines (temporarily exceeded — next person to touch this file
+should fold old changelog lines into `## 7. Archived`) · patched after **every** completed task
+(`CLAUDE.md §3`)
 
 ## 0. Now
 
-- 2026-09-02. **`QA_testing`** branch created locally: `main` + `lane/priyanshu` (D1–D10) +
-  `lane/neevmodh` (G1–G11) + `lane/neal006` (I1–I12, J1 leg 1) merged for integration testing ahead
-  of the wave-3 freeze. `priyanshu/platform` was left out — it is 4 commits behind main, never had a
-  PR, and is superseded by `lane/priyanshu`.
+- 2026-09-03. `QA_testing` merged with `main` (11 commits: the three lane PRs plus #42/#43/#46/#47/
+  #49 below). 13 files conflicted, all add/add from the earlier `Restart`; resolved by taking
+  `main`'s version for anything QA_testing's own session hadn't touched, and hand-merging
+  `services/gateway/wall.py` (kept, QA_testing-only work), `services/worker/tracker.py` (took
+  `main`'s — it rescales `track_buffer` for the 8.3→8.4 semantic change, QA_testing's fallback
+  didn't), and `scripts/console_serve.py` (kept QA_testing's rewrite, folded in `main`'s
+  `GEO_TOP_LEVEL` flattening for the legacy map page).
+- 2026-09-02. **5 days to submission (7 Sep).** All three lane PRs merged into `main`
+  (#37 lane D, #40 lane G, #41 lane I), plus #42 and #43. `pytest tests/` on `main`:
+  **299 passed, 6 skipped**.
+- The stack runs end to end on `infra/docker-compose.yml`: 30 cameras seeded, 897 sightings
+  published and persisted with 0 pending, 5 alerts raised and pushed over the WebSocket,
+  `GET /api/route` returning 5 ordered hops, System Admin refused live views per [C10], audit
+  chain verifying. Route coordinates are still geocoded/LOW (see issue #17).
+- Post-merge fixes, all on `main`: #42 ultralytics 8.4 tracker signature · #43 generator uses the
+  seeded camera ids, `make seed` applies migrate.sql, compose ports overridable · #46 persister
+  dead-letters a row Postgres refuses instead of dying · #47 CI installs a requirements file that
+  fits on a runner · #49 one token shape and one signing key across REST and the socket.
+- SonarCloud is off the repo. CI is the pytest workflow plus GitGuardian.
+- Open integration gaps, filed: **#44** the console serves its own unauthenticated
+  `/api/cameras`, which bypasses D7's scope; **#45** ultralytics is unpinned (see the tracker
+  gotcha in §3 — QA_testing's merge took the version that tolerates either signature, which
+  helps but is not a substitute for pinning); **#48** the worker selftest
+  publishes under a camera id that is not in the registry.
 - 2026-08-31. **7 days to submission (7 Sep)**. Lane D is complete: D1-D10 all DONE, in PR #37.
 - 2026-08-29. **9 days to submission (7 Sep)**, 12 to the live event (10–11 Sep, i-Hub Gandhinagar).
 - `main` holds docs only — commit `416ef26 "Restart"` wiped the tree. Working code from before is at
@@ -21,13 +41,11 @@ next person to touch this file should fold old changelog lines into `## 7. Archi
   three are collaborators). Title prefix is the ticket id — `[I3] …`, `[G7] …`, `[D5] …`. Bodies are
   generated from `TASK.md`, so **edit the ticket in `TASK.md`, not in the issue**.
   Filter your own work: `gh issue list --repo Priyanshu-byte-coder/prahari --assignee @me --label wave:1`
-- Open PRs, none merged: **#37** lane D wave 1+2 (D1-D5, mergeable, one Sonar rating failing) ·
-  **#40** lane G wave 0+1 (G1, G5, G2, G3; CHANGES_REQUESTED, two Sonar ratings failing) ·
-  **#41** lane I end-to-end (I1-I12, J1; merge-conflicting against `main`, two Sonar ratings failing).
-  The merge queue is the bottleneck, not the code.
 - First green light is in: `python -m services.worker.selftest --assert-xadd` replays a clip with a
   known plate and lands a CONFIRMED [C1] row on `sightings` 0.43 s after the pass. Against a live
-  grid camera it is the same command with `--source rtsp://...`; lane I is no longer waiting on anyone.
+  grid camera it is the same command with `--source rtsp://...`; lane I is no longer waiting on
+  anyone. All the PR/merge-queue lines below this used to describe are resolved — §0's newest
+  entries above are the current state; every PR named `#37`/`#38`/`#40`/`#41` is merged into `main`.
 
 ## 1. Ticket board
 
@@ -170,7 +188,8 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
   `/api/v1/{watchlist,alerts}` — no static claims.
 - `scripts/console_serve.py` — static file server + `/api/wall/*` + `/api/v1/*` proxy (holds the
   console's own account so the browser never shows a login form; `GRID_KEY` env var signs the
-  HLS-fallback session) + `/api/cameras` (merged seed + geo + wall status) + `/tile/<id>.jpg`.
+  HLS-fallback session) + `/api/cameras` (merged seed + geo + wall status, and flattens `geo`'s
+  lat/lon to the top level too — the legacy `web/map.js` reads it there) + `/tile/<id>.jpg`.
 
 ### lane D
 - `db/schema.sql` — [C3] verbatim, the copy a reviewer diffs against the contract — 9 tables, hypertable, 5 sighting indexes.
@@ -204,7 +223,8 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 - `services/api/grants.py` — bounded cross-department access — `GrantRepo`, `widen`, `MAX_DURATION`.
 - `tests/test_d_grants.py` — request, approve, self-approval refused, expiry, the audited read.
 - `docs/hld.md` — the mandatory HLD: integration, correlation, alerts, security, privacy, scale tiers, failure table.
-- `requirements.txt` — one dependency per line, three lanes append to it (merged as a grouped union for `QA_testing`).
+- `requirements.txt` — one dependency per line, three lanes append to it; merged from `main`'s
+  `requirements-ci.txt` split (below) into `QA_testing` as a grouped union.
 
 ## 3. Gotchas
 
@@ -249,9 +269,10 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 - `[I]` A synthetic fixture's plate must be stamped inside the *detector's* box, not just inside
   the image - at 0.86 of the photo's height it lands on the pavement and the crop has no plate.
 - `[I]` `ultralytics` >= 8.4 dropped `BYTETracker(args, frame_rate=...)` — it now takes `args`
-  only and uses `track_buffer` directly with no `frame_rate/30` scaling, so the old
-  `frame_rate=30` workaround (there to defeat that scaling) raises `TypeError`. `tracker.py`
-  tries the old call and falls back to `BYTETracker(args)` on `TypeError` so it works either way.
+  only and uses `track_buffer` directly with no `frame_rate/30` scaling, where 8.3 scaled it by
+  `frame_rate/30`. `tracker.py` tries the 8.3 call and falls back on `TypeError` to the 8.4 one
+  with `track_buffer` rescaled (`max(1, round(TRACK_BUFFER * BUFFER_FRAME_RATE / 30))`) so the
+  tracker keeps the same real-world memory on both — not pinning `ultralytics` is issue #45.
 - `[G]` The grid moved behind a real sign-in as of ~09-02: every HLS URL and `/api/ingest` now
   302 to `cctv.corp8.cloud/auth/login` (single access-key form). **RTSP and WebRTC/WHEP are
   unaffected** — the integrator's guide confirms they run direct against the public static IP
@@ -280,8 +301,9 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 - `[G]` Cameras **17, 18, 22** are dead on both transports (hls HTTP 500 / ReadTimeout), not a probe bug — same three across G1 and G2 runs. Expect 27, not 30, and say so rather than quietly showing 30 pins.
 - `[G]` HLS carries no PTS worth trusting unless the playlist has `EXT-X-PROGRAM-DATE-TIME`; `MediaMTXSource` reads the playlist once at open and labels frames `hls_pdt` or `server_receive` accordingly. A `server_receive` row is **not** a capture time — the UI must show it as approximate.
 - `[G]` OSRM needs a preprocessed Gujarat extract (`osrm-extract` + `osrm-contract`) before `osrm-routed` can serve anything — put it behind compose profile `full` rather than crash-looping the default `make up`. D6 owns building the extract.
-- `[G]` `make up` is now verified on real Docker (neevmodh, 09-01): sentinel-postgres, sentinel-redis,
-  sentinel-minio all healthy. MinIO healthcheck fixed from `mc ready` to `curl /minio/health/live`.
+- `[G]` `make up` is now verified on real Docker (neevmodh, 09-01, and still healthy 09-03 after
+  16h+ uptime): sentinel-postgres, sentinel-redis, sentinel-minio all healthy. MinIO healthcheck
+  fixed from `mc ready` to `curl /minio/health/live`.
 - `[G]` Read per-camera properties from `GET http://$GRID_HOST/api/ingest` before decoding.
 - `[G]` A stalled RTSP connection does not error out — it just stops. You need a watchdog, not a try/except.
 - `[G]` District-centroid coordinates make the demo car teleport. G6 before G10, no exceptions.
@@ -404,6 +426,73 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
   instead of picking one branch's version — each lane had appended its own copy independently and
   all three sets of entries are needed together on the merged tree.
 
+- 2026-09-01 — I1 decodes through PyAV instead of the ticket's `-f rawvideo -pix_fmt bgr24
+  pipe:1` ffmpeg pipe — a rawvideo pipe carries no timestamps, so PTS would have to be
+  reconstructed as index/fps, which drifts silently on the grid's looping recordings. That is
+  the exact number `ts_source` records in [C1]. `--hwaccel` keeps the CUDA half of that line.
+- 2026-09-01 — I1's flat-memory verdict is a plateau **band** (peak-to-trough of per-window RSS
+  floors over the median), budget 5% per 10 min, not a slope — a slope fit runs through the
+  warm-up ramp and flaps between FLAT and DRIFTING on identical code. Catches ≥6 MB/min against
+  2.2% of measured platform noise; re-measure in the compose stack at J1 for a tighter bound.
+
+- 2026-09-02 — `grammar_fix` converts only the wrong *kind* of character (digit in a letter slot,
+  letter in a digit slot), not every member of a confusion class. The old table rewrote a
+  correctly read D into an O and an L into an I, which I7 caught as 13 of 66 tracks CONFIRMED and
+  wrong. [C7]'s wording is unchanged - the implementation was wrong, not the contract - but
+  `common/plate.py` is imported by D, so the behaviour change is called out in the PR.
+- 2026-09-02 — `plate_text` needs a 2/3 per-character majority **and** at least two independent
+  reads; CONFIRMED additionally needs a grammar-valid string and three. One reader's single
+  opinion is a read, not a vote, and PROBABLE already exists for "named but not corroborated".
+- 2026-09-02 — OCR runs on its own thread with a bounded queue rather than in the frame loop, and
+  a closing sighting waits up to 2 s for its outstanding reads. Measured: inline OCR cost 28 of
+  30 frames of a pass. The queue being full *is* the OCR budget.
+- 2026-09-02 — Plate localisation is a classical blackhat/Sobel proposal until I11 trains a
+  detector. No labelled data exists yet, and `PRAHARI_PLATE_WEIGHTS` swaps it without a code
+  change. The whole vehicle crop is always the last candidate, because both readers ship their
+  own text detector.
+- 2026-09-02 — Re-id uses a torchvision ResNet-18 trunk (512-d, exactly [C3]'s width), not
+  OSNet/VeRi-776: no permissively licensed checkpoint could be verified in this window.
+  `PRAHARI_REID_WEIGHTS` takes a TorchScript module when one is vetted.
+- 2026-09-02 — I12's analytics events stay off Redis. [C2] has no analytics stream and adding one
+  is a contract change needing both other owners; they go to /metrics and the log instead.
+- 2026-09-02 — The golden set ships synthetic (rendered plates on a real vehicle photo) until the
+  grid clips are labelled. Every row is tagged `synthetic`, the report prints it separately and
+  calls it an upper bound, and the deck quotes the hand-labelled split.
+- 2026-08-31 — D4's band comes from [C7]'s weighted cost alone: 0 exact, 0.5 one confusion edit
+  (PROBABLE), 1.0-2.0 anything else within two edits (POSSIBLE), above 2.0 no alert. A plain
+  edit and two confusion edits both cost 1.0 and D4 calls both POSSIBLE, so the collision is
+  harmless and no second distance function is needed.
+- 2026-08-31 — an exact string match on a sighting whose own band is not CONFIRMED is raised as
+  PROBABLE, never CONFIRMED. A POSSIBLE read that happens to spell a watched plate is exactly
+  the case that must not put CONFIRMED in front of an officer.
+- 2026-08-31 — D5 reads the Redis streams with XREAD, not the `ws-fanout` consumer group named
+  in [C2]. A group splits messages between members, so with two API replicas half the alerts
+  would reach half the consoles. Fanout is broadcast; every process reads the whole stream.
+  Not a contract change — [C2] names the consumer, and D still owns both ends of it.
+- 2026-08-31 — with `JWT_SECRET` unset, `ws.py` signs with a random per-process key rather than
+  accepting unsigned tokens. Until D7 issues real ones, a dev run still works and a forged
+  token still fails; "no secret configured" must never mean "open socket".
+
+- 2026-08-31 — D6 renders the PDF with reportlab, not WeasyPrint as the ticket says. WeasyPrint
+  needs GTK libraries on the machine; reportlab is a pure wheel, and the layout was salvageable
+  from `origin/priyanshu/platform:services/api/route_report.py`.
+- 2026-08-31 — the route PDF's picture is a schematic of the hop coordinates, not a basemap. There
+  is no tile source we can ship offline, and calling an unreferenced polyline a map would be a lie
+  on a document an officer signs.
+- 2026-08-31 — `RouteResponse` carries an extra `snapped` boolean alongside [C4]'s
+  `snapped_geometry`. Additive, so no consumer breaks, and without it a straight line between
+  cameras is indistinguishable from a road path.
+
+- 2026-08-31 — audit rows hash `int(user_id)`, not the JWT's `sub` string. Postgres stores an
+  integer; hashing the string made verify() report tampering on rows nobody touched.
+- 2026-08-31 — RLS policies treat an unset `prahari.dept_ids` as a maintenance connection and
+  allow the row, because the migration, the persister and the matcher connect without a user.
+  The application predicate stays the primary control; RLS is the backstop for a query somebody
+  forgets to scope. Marked `# ponytail:` in db/migrate.sql.
+- 2026-08-31 — `services/api/main.py` exists although D7's file list stops at auth/scope/audit.
+  The scope test has to go through HTTP with a real token, and that needs an app with the [C4]
+  endpoints on it; D3 and D4 deliberately stopped at the repository layer.
+
 ## 5. Contract changes
 
 `YYYY-MM-DD — [Cx] what changed — who was told`. Nothing yet. Contracts in `TASK.md §C` are frozen;
@@ -414,10 +503,11 @@ changing one without a line here breaks somebody else's lane silently.
 `MM-DD | ticket | files | outcome` — newest at the top of **your own** lane's block.
 
 ### lane I
-- 09-03 | QA fix | services/worker/tracker.py | `ultralytics` >= 8.4 dropped
-  `BYTETracker(args, frame_rate=...)`; tracker construction now tries the old call and falls
-  back to `BYTETracker(args)` on `TypeError` — selftest green again (`SELFTEST OK`, plate read
-  back CONFIRMED end to end)
+- 09-03 | #42 (adopted into QA_testing at the merge) | services/worker/tracker.py | confirmed
+  independently on QA_testing before the merge: `ultralytics` >= 8.4 dropped
+  `BYTETracker(args, frame_rate=...)`. Took `main`'s fix over QA_testing's own — it rescales
+  `track_buffer` for the 8.3→8.4 semantic change, QA_testing's plain fallback didn't. Selftest
+  green either way (`SELFTEST OK`, plate read back CONFIRMED end to end).
 - 09-02 | J1 | tests/test_integration.py, docs/{demo-script,submission}.md | 4 legs, leg 1 green,
   the rest skip with their reason; chaos drills and the 8-minute script written down
 - 09-02 | I9 | docs/deck-outline.md | 10 slides; every number is a marker naming its command
@@ -442,6 +532,8 @@ changing one without a line here breaks somebody else's lane silently.
   one-frame rate on an RTX 3050 Laptop
 - 09-02 | I5 | common/plate.py, tests/test_i_plate.py | grammar slots convert only the wrong kind
   of character; 13 confident-wrong reads became 0
+- 08-29 | I5 | common/plate.py, tests/test_i_plate.py | 23 tests green; D's `plate_compat.py`
+  flipped `USING_I5` True on import, so its fallback half can be deleted
 
 ### lane G
 - 09-03 | QA fix | web/{app.html,app.js,app.css} (new), scripts/console_serve.py,
@@ -450,8 +542,11 @@ changing one without a line here breaks somebody else's lane silently.
   wall to RTSP-direct (no key needed, all 30 cameras verified open); fixed a CSS rule that
   collapsed Leaflet's own SVG renderer to 0×0 (every marker existed, none were visible); fixed
   a decode-thread corruption bug (HEVC frames under concurrent load) with a single-thread decode
-  + corrupt-frame guard. `/api/v1/*` proxy holds the console's own account so the operator never
-  sees a login form; RBAC still enforced server-side on every call.
+  + corrupt-frame guard, recalibrated once already after it false-positived on legitimate dark
+  footage. `/api/v1/*` proxy holds the console's own account so the operator never sees a login
+  form; RBAC still enforced server-side on every call. Merged with `main`'s #50 (flattens
+  lat/lon to the top level for the legacy `web/map.js`) — additive, no conflict with `app.js`,
+  which reads `c.geo.lat` directly.
 - 09-01 | G5 | infra/docker-compose.yml | `make up` verified on real Docker: sentinel-postgres, sentinel-redis, sentinel-minio all healthy. MinIO healthcheck fixed from `mc ready` → `curl /minio/health/live`.
 - 09-01 | G2–G11 | PR #40 final fixes | All Neal006 blocking issues + 5 Copilot issues + SonarCloud Security E + Reliability C resolved. 32 tests green. `allow_redirects` SSRF guard, thread-local sessions, `while not _closed` generators, `autocomplete` on inputs, `esc()` everywhere, `datetime.now(utc)`.
 - 08-29 | G2 | services/gateway/{source,probe,selftest}.py, sources/{rtsp,mediamtx}.py, tests/test_g_probe.py | probe order RTSP→HLS live-verified: **27/30 resolve, all HLS, rtsp 0/30**; 17/18/22 dead both ways (hls 500/ReadTimeout). 10 tests green, no network needed.
