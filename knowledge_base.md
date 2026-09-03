@@ -363,6 +363,16 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
   the camera. The RLVD/enforcement cameras (cam14 'Delight RLVD') are the ones aimed at
   plates; sample those before quoting an accuracy number.
 
+- `[D]` Grid sign-in takes **email + key** since 2026-09-03; it used to take the key alone, and
+  posting only `password` returns "Email or access password is incorrect" - which reads like an
+  expired key and sent an hour chasing the wrong thing. `GRID_EMAIL` + `GRID_KEY`.
+- `[D]` Cloudflare fronts the grid and answers 403 "browser required" to a bare client. The
+  User-Agent must travel as ffmpeg/PyAV's own `user_agent` option: inside `headers` ffmpeg
+  appends its own UA as well and the pair is rejected. Cookie goes in `headers`, UA does not.
+- `[D]` HLS is a *downscaled rendition* on most cameras: cam04 1920x1080 over RTSP arrives
+  854x480 over HLS, cam25 1280x960 -> 640x480, cam26 2560x1440 HEVC -> 854x480 H.264. That is
+  half the plate pixels. Use RTSP for anything ANPR; HLS is for the wall.
+
 ## 4. Decisions
 
 - 2026-08-29 — Timeline follows the portal (submit 7 Sep, event 10–11 Sep), not the plan's §16 sprints
@@ -596,6 +606,7 @@ changing one without a line here breaks somebody else's lane silently.
 - 08-29 | G1 | scripts/probe_grid.py, data/cameras.seed.json, data/catalogue/ingest.json.bootstrap | seed built and verified (`--check`); grid host was 502, used salvaged catalogue as bootstrap
 
 ### lane D
+- 09-03 | grid-live | scripts/console_serve.py, services/gateway/wall.py, run_demo_env.sh | grid sign-in fixed (email+key) and UA passed as its own PyAV option; wall pulls real HLS video, 6 cameras live in the console
 - 09-03 | grid+ocr | services/worker/preprocess.py, scripts/grid_survey.py, data/grid_survey.json, tests/test_i_preprocess.py | 30 cameras probed (18x1080p, 5x720p, 4x1280x960, 1x960x576, 1x1440p, cam30 unreachable; 23 h264 / 6 hevc; 25 fps mostly). Plate feasibility gate + tiling + crop enhancement + multi-frame fusion, 24 tests green
 - 09-03 | merge | web/app.*, web/home.html, scripts/console_serve.py, services/gateway/wall.py, tests/test_g_console_shape.py | QA_testing's console merged into main fast-forward; audit tab given its own SYSTEM_ADMIN proxy account; alerts polled every 5 s so the badge stops going stale; 304 tests pass against live services
 - 08-29 | D1 | db/schema.sql, db/migrate.sql, scripts/load_registry.py, tests/test_d_{schema,registry}.py | schema applies twice with no errors on a throwaway timescaledb-ha:pg16; loader upserts 3 fixture cameras, and a missing camera_geo.json no longer wipes stored coordinates

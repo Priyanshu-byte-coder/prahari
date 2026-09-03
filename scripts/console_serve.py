@@ -78,6 +78,18 @@ _TOKENS: dict = {name: {"value": None, "exp": 0.0} for name in ("live", "audit")
 # rather than showing thirty tiles stuck on "connecting".
 GRID_AUTH = os.environ.get("GRID_AUTH", "https://cctv.corp8.cloud/auth/login")
 GRID_KEY = os.environ.get("GRID_KEY", "").strip()
+# The sign-in form gained a second field on 2026-09-03: it now wants the registered email
+# alongside the access key, and posting the key alone comes back "Email or access password is
+# incorrect" - which reads exactly like an expired key and cost an hour of chasing the wrong
+# thing. Both fields, always.
+GRID_EMAIL = os.environ.get("GRID_EMAIL", "").strip()
+
+# Cloudflare in front of the grid answers 403 "browser required" to a bare client, so the
+# console signs in and pulls media with a browser User-Agent. Not evasion - the same session a
+# person gets, carried by the process that draws the wall.
+GRID_UA = os.environ.get("GRID_UA", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                    "Chrome/131.0.0.0 Safari/537.36")
 
 GRID = {"state": "no key" if not GRID_KEY else "not tried", "cookie": None, "detail": ""}
 
@@ -88,16 +100,23 @@ def grid_login() -> bool:
         GRID.update(state="no key", cookie=None,
                     detail="Set GRID_KEY to the access key issued for this grid.")
         return False
+    if not GRID_EMAIL:
+        GRID.update(state="no email", cookie=None,
+                    detail="Set GRID_EMAIL to the address the key was issued to - the grid's "
+                           "sign-in form needs both fields.")
+        return False
     sess = _session()
     try:
-        r = sess.post(GRID_AUTH, data={"password": GRID_KEY}, timeout=12, allow_redirects=True)
+        r = sess.post(GRID_AUTH, data={"email": GRID_EMAIL, "password": GRID_KEY},
+                      headers={"User-Agent": GRID_UA}, timeout=12, allow_redirects=True)
     except requests.RequestException as exc:
         GRID.update(state="unreachable", cookie=None, detail=f"{type(exc).__name__}")
         return False
     jar = "; ".join(f"{c.name}={c.value}" for c in sess.cookies)
     # A rejected key lands back on the login form rather than erroring.
     if "auth/login" in r.url or "name=\"password\"" in r.text[:4000]:
-        GRID.update(state="rejected", cookie=None, detail="The grid did not accept GRID_KEY.")
+        GRID.update(state="rejected", cookie=None,
+                    detail="The grid did not accept this email and key.")
         return False
     if not jar:
         GRID.update(state="no cookie", cookie=None, detail="Sign-in returned no session cookie.")
@@ -353,7 +372,8 @@ def main() -> int:
     ok = grid_login()
     print(f"grid HLS sign-in (fallback transport): {GRID['state']}" +
           (f" — {GRID['detail']}" if GRID["detail"] else ""))
-    WALL = Wall(cameras, interval=args.interval, headers=grid_headers())
+    WALL = Wall(cameras, interval=args.interval, headers=grid_headers(),
+                user_agent=GRID_UA)
     print(f"cameras with a wall transport: {len(WALL.feeds)}/{len(cameras)} "
           f"(RTSP direct to the grid's public IP, no key needed; HLS as fallback)")
     if not ok:

@@ -131,12 +131,19 @@ class CameraFeed:
 class Wall:
     """Owns one puller thread per camera. Start and stop are idempotent."""
 
-    def __init__(self, cameras: list[dict], interval: float = 2.0, headers: str | None = None):
+    def __init__(self, cameras: list[dict], interval: float = 2.0, headers: str | None = None,
+                 user_agent: str | None = None):
         self.interval = interval
         # Extra HTTP headers handed to PyAV on an HLS open, as one
         # CRLF-terminated block -- only used on the HLS fallback path; the
         # RTSP path needs no session at all.
         self.headers = headers
+        # The User-Agent has to travel as its own option, not as a line inside
+        # `headers`: ffmpeg appends its own UA to the request either way, and
+        # Cloudflare in front of the grid answers 403 to the pair. Passed
+        # through `user_agent` it replaces ffmpeg's instead of duplicating it,
+        # and the same session that works in a browser works here.
+        self.user_agent = user_agent
         self.feeds: dict[str, CameraFeed] = {}
         for cam in cameras:
             cid = str(cam["camera_id"])
@@ -210,6 +217,8 @@ class Wall:
             opts = {"multiple_requests": "1"}
             if self.headers:
                 opts["headers"] = self.headers
+            if self.user_agent:
+                opts["user_agent"] = self.user_agent
             return av.open(feed.hls_url, timeout=OPEN_TIMEOUT_S, options=opts), "hls"
         raise RuntimeError("no transport available for this camera")
 
