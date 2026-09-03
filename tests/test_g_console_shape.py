@@ -43,6 +43,36 @@ def test_the_audit_tab_is_proxied_under_the_admin_account():
     assert console_serve.account_for("route?plate=GJ01AB1234") == "live"
 
 
+def test_scoped_cameras_passes_the_apis_refusal_through(monkeypatch):
+    # [#44] a SYSTEM_ADMIN gets 403 on /api/cameras per [C10]; the console must
+    # not answer around that with the full local seed.
+    monkeypatch.setattr(console_serve, "OFFLINE", False)
+    monkeypatch.setattr(console_serve, "api_call",
+                        lambda *a, **k: (403, {"detail": "system admin may not view live data"}))
+    status, payload = console_serve.scoped_cameras()
+    assert status == 403
+    assert payload["detail"]
+
+
+def test_scoped_cameras_filters_the_seed_to_the_apis_allow_list(monkeypatch):
+    monkeypatch.setattr(console_serve, "OFFLINE", False)
+    seed = console_serve.load_cameras()
+    keep = str(seed[0]["camera_id"])
+    monkeypatch.setattr(console_serve, "api_call",
+                        lambda *a, **k: (200, [{"camera_id": keep}]))
+    status, payload = console_serve.scoped_cameras()
+    assert status == 200
+    assert [str(c["camera_id"]) for c in payload] == [keep]
+    assert "geo" in payload[0]  # geo shaping survives the filter
+
+
+def test_offline_flag_serves_the_full_local_seed(monkeypatch):
+    monkeypatch.setattr(console_serve, "OFFLINE", True)
+    status, payload = console_serve.scoped_cameras()
+    assert status == 200
+    assert len(payload) == len(console_serve.load_cameras())
+
+
 def test_no_admin_password_means_a_clear_answer_not_a_wrong_403(monkeypatch):
     monkeypatch.setattr(console_serve, "ADMIN_PASS", "")
     monkeypatch.setitem(console_serve.ACCOUNTS, "audit", ("console-audit", ""))

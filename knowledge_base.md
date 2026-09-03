@@ -31,8 +31,9 @@ should fold old changelog lines into `## 7. Archived`) · patched after **every*
   dead-letters a row Postgres refuses instead of dying · #47 CI installs a requirements file that
   fits on a runner · #49 one token shape and one signing key across REST and the socket.
 - SonarCloud is off the repo. CI is the pytest workflow plus GitGuardian.
-- Open integration gaps, filed: **#44** the console serves its own unauthenticated
-  `/api/cameras`, which bypasses D7's scope; **#45** ultralytics is unpinned (see the tracker
+- Open integration gaps, filed: **#44** DONE (`console_serve.scoped_cameras()` now draws
+  the API's scoped list; 401/403/503 pass through; `PRAHARI_CONSOLE_OFFLINE=1` for the
+  no-API demo path); **#45** ultralytics is unpinned (see the tracker
   gotcha in §3 — QA_testing's merge took the version that tolerates either signature, which
   helps but is not a substitute for pinning); **#48** the worker selftest
   publishes under a camera id that is not in the registry.
@@ -587,6 +588,11 @@ changing one without a line here breaks somebody else's lane silently.
   flipped `USING_I5` True on import, so its fallback half can be deleted
 
 ### lane G
+- 09-03 | #44 | scripts/console_serve.py, tests/test_g_console_shape.py | console's
+  `/api/cameras` was an unauthed read of the full seed — bypassed D7/[C10]. Now
+  `scoped_cameras()` uses the API's scoped list as the allow-list (geo/landmark shaping
+  kept); 401/403/503 pass straight through so the console shows the refusal;
+  `PRAHARI_CONSOLE_OFFLINE=1` opts back into the full seed for the no-API demo. 10 tests green.
 - 09-03 | QA fix | web/{app.html,app.js,app.css} (new), scripts/console_serve.py,
   services/gateway/wall.py | rebuilt the console on real Leaflet + the live API (no static
   fixtures); found and fixed the grid's move behind an HLS-only sign-in by switching the video

@@ -4,7 +4,11 @@
     open http://localhost:5173/               # portal: links every console + the live API
 
 Endpoints:
-    GET  /api/cameras            merged seed + geo + wall status
+    GET  /api/cameras            the core API's *scoped* camera list ([C10]/D7),
+                                 enriched here with geo + wall shape. 401/403/503
+                                 from the API are passed straight through. Set
+                                 PRAHARI_CONSOLE_OFFLINE=1 to serve the local seed
+                                 instead -- the no-API demo path only.
     GET  /api/wall               wall state (per-camera status, ages)
     POST /api/wall/start         {"ids": [...]} or {} for all
     POST /api/wall/stop          same shape
@@ -64,6 +68,11 @@ ADMIN_USER = os.environ.get("PRAHARI_CONSOLE_ADMIN_USER", "console-audit")
 ADMIN_PASS = os.environ.get("PRAHARI_CONSOLE_ADMIN_PASSWORD", "")
 
 ACCOUNTS = {"live": (API_USER, API_PASS), "audit": (ADMIN_USER, ADMIN_PASS)}
+
+# [#44] The console must not answer /api/cameras around the API's RBAC. It draws
+# the API's scoped list; this flag is the one exception, for demoing with no core
+# API running, and it announces itself so nobody mistakes it for the real thing.
+OFFLINE = os.environ.get("PRAHARI_CONSOLE_OFFLINE", "").strip().lower() in ("1", "true", "yes")
 
 # Only these API prefixes are reachable through the console proxy. Anything the
 # console does not draw stays unreachable from the browser.
@@ -228,6 +237,25 @@ def load_cameras() -> list[dict]:
     return seed
 
 
+def scoped_cameras() -> tuple[int, object]:
+    """[#44] The camera list the console renders, with the API — not this
+    process — deciding which cameras the operator may see.
+
+    On 200 the API's camera ids are the allow-list; geo/landmark shaping still
+    comes from `load_cameras()`. Any other status (401 no token, 403 for a
+    SYSTEM_ADMIN per [C10], 503 API down) is returned untouched so the console
+    shows the refusal rather than drawing around it. `PRAHARI_CONSOLE_OFFLINE`
+    opts back into the full local seed for the no-API demo path.
+    """
+    if OFFLINE:
+        return 200, load_cameras()
+    status, payload = api_call("GET", "cameras")
+    if status != 200:
+        return status, payload
+    allowed = {str(row["camera_id"]) for row in payload}
+    return 200, [cam for cam in load_cameras() if str(cam["camera_id"]) in allowed]
+
+
 class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(ROOT), **kw)
@@ -278,7 +306,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._json({"state": GRID["state"], "detail": GRID["detail"],
                                "auth_url": GRID_AUTH, "key_set": bool(GRID_KEY)})
         if path == "/api/cameras":
-            return self._json(load_cameras())
+            status, payload = scoped_cameras()
+            return self._json(payload, status)
         if path == "/api/wall":
             return self._json(WALL.state())
         if path.startswith("/tile/"):
