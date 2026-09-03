@@ -31,12 +31,14 @@ should fold old changelog lines into `## 7. Archived`) · patched after **every*
   dead-letters a row Postgres refuses instead of dying · #47 CI installs a requirements file that
   fits on a runner · #49 one token shape and one signing key across REST and the socket.
 - SonarCloud is off the repo. CI is the pytest workflow plus GitGuardian.
-- Open integration gaps, filed: **#44** DONE (`console_serve.scoped_cameras()` now draws
-  the API's scoped list; 401/403/503 pass through; `PRAHARI_CONSOLE_OFFLINE=1` for the
-  no-API demo path); **#45** ultralytics is unpinned (see the tracker
-  gotcha in §3 — QA_testing's merge took the version that tolerates either signature, which
-  helps but is not a substitute for pinning); **#48** the worker selftest
-  publishes under a camera id that is not in the registry.
+- Open integration gaps: all three filed ones cleared 2026-09-03 (lane G, at the repo
+  owner's direction — the two lane-I files below were touched cross-lane, flag to Neal006):
+  **#44** DONE `console_serve.scoped_cameras()` draws the API's scoped list; 401/403/503 pass
+  through; `PRAHARI_CONSOLE_OFFLINE=1` for the no-API demo. **#45** DONE `ultralytics>=8.3.0,<8.4`
+  pinned in `requirements.txt` + `requirements-ci.txt` — 8.3 is the series I7's accuracy numbers
+  were measured on; `tracker.py`'s both-version fallback stays as belt-and-braces. **#48** DONE
+  the selftest publishes to `sightings-selftest`, not `sightings`; SELFTEST-000 synthetic rows
+  never touch production storage. `--stream sightings --camera <registry-id>` for a live demo.
 - 2026-08-31. **7 days to submission (7 Sep)**. Lane D is complete: D1-D10 all DONE, in PR #37.
 - 2026-08-29. **9 days to submission (7 Sep)**, 12 to the live event (10–11 Sep, i-Hub Gandhinagar).
 - `main` holds docs only — commit `416ef26 "Restart"` wiped the tree. Working code from before is at
@@ -555,6 +557,11 @@ changing one without a line here breaks somebody else's lane silently.
 `MM-DD | ticket | files | outcome` — newest at the top of **your own** lane's block.
 
 ### lane I
+- 09-03 | #45 #48 (lane G, owner-directed cross-lane — review welcome, Neal006) |
+  requirements.txt, requirements-ci.txt, services/worker/selftest.py | pinned
+  `ultralytics>=8.3.0,<8.4` (I7 numbers are 8.3; the both-version fallback in tracker.py stays);
+  selftest now publishes to `sightings-selftest` so SELFTEST-000 rows never hit the real stream
+  or a live persister's FK. Integration test (leg 1) reads back from the same stream, unaffected.
 - 09-03 | #42 (adopted into QA_testing at the merge) | services/worker/tracker.py | confirmed
   independently on QA_testing before the merge: `ultralytics` >= 8.4 dropped
   `BYTETracker(args, frame_rate=...)`. Took `main`'s fix over QA_testing's own — it rescales

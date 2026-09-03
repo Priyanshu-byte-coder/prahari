@@ -22,7 +22,7 @@ requests
 av
 opencv-python-headless
 numpy
-ultralytics
+ultralytics>=8.3.0,<8.4   # pinned: see requirements.txt / #45
 lap
 
 # lane D — persistence, matching, RBAC, export

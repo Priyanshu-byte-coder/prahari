@@ -3,7 +3,12 @@
 This is the command that answers "is the lane working right now" in one line, and it is what
 J1's integration test drives. Everything it asserts is something a judge will see:
 
-    a [C1]-shaped row on the `sightings` stream        - the seam D reads
+    a [C1]-shaped row on the `sightings-selftest` stream - shape-identical to the seam D
+                                                          reads, but off it: SELFTEST-000 is
+                                                          not a registry camera, so a synthetic
+                                                          row must never reach production storage
+                                                          ([#48]). Pass `--stream sightings`
+                                                          with a real `--camera` for a live demo.
     the plate we injected, read back from the video    - the pipeline, end to end
     published within the latency budget                - it is a live system, not a batch job
 
@@ -35,6 +40,10 @@ logger = logging.getLogger("prahari.worker.selftest")
 
 BUDGET_S = 3.0
 CAMERA_ID = "SELFTEST-000"
+# [#48] Synthetic rows land here, not on `sightings`. SELFTEST-000 is not in `cameras`, so a
+# live persister rejects it (FK violation) and dead-letters it since #46. Keeping the row off
+# the real stream means J1 never has to reason about whether a fake sighting reached storage.
+SELFTEST_STREAM = "sightings-selftest"
 
 
 def _redis(url=None):
@@ -54,7 +63,7 @@ def _redis(url=None):
 
 
 def run(clip=None, plate=None, source=None, camera_id=CAMERA_ID, budget=BUDGET_S,
-        redis_url=None, stream="sightings", require_plate=True, reid=False, seconds=None):
+        redis_url=None, stream=SELFTEST_STREAM, require_plate=True, reid=False, seconds=None):
     """Replay one clip through the whole worker and check what landed. Returns a report dict."""
     from services.worker.run import Worker         # heavy: torch, ultralytics
 
@@ -132,14 +141,16 @@ def _text(value):
 def main(argv=None):
     ap = argparse.ArgumentParser(description="[I8] worker selftest / replay harness")
     ap.add_argument("--assert-xadd", action="store_true",
-                    help="[I6] verify: replay a clip and assert a valid [C1] row on `sightings`")
+                    help="[I6] verify: replay a clip and assert a valid [C1] row on "
+                         "`sightings-selftest` (off the real stream - see --stream)")
     ap.add_argument("--clip", help="clip to replay (generated with a known plate if absent)")
     ap.add_argument("--plate", help="the plate the clip carries, when you brought your own clip")
     ap.add_argument("--source", help="stream URL instead of a clip - the RTSP replay path")
     ap.add_argument("--camera", default=CAMERA_ID)
     ap.add_argument("--budget", type=float, default=BUDGET_S)
     ap.add_argument("--seconds", type=float, help="stop after N seconds (live sources)")
-    ap.add_argument("--stream", default="sightings")
+    ap.add_argument("--stream", default=SELFTEST_STREAM,
+                    help="stream to publish to; `sightings` (with a real --camera) for a live demo")
     ap.add_argument("--no-plate-check", action="store_true",
                     help="assert the row only, not the text - for clips with no known plate")
     ap.add_argument("--reid", action="store_true")

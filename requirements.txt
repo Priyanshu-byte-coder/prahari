@@ -8,7 +8,10 @@ requests
 av
 opencv-python-headless
 numpy
-ultralytics
+# Pinned to 8.3: 8.4 dropped BYTETracker's `frame_rate` arg and changed how `track_buffer`
+# maps to max_frames_lost (#45). tracker.py tolerates both, but the I7 accuracy numbers were
+# measured on 8.3 and a silent detector/tracker change before the demo would invalidate them.
+ultralytics>=8.3.0,<8.4
 lap
 paddleocr
 paddlepaddle
