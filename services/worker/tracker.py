@@ -82,7 +82,14 @@ class CameraTracker:
         args = SimpleNamespace(track_high_thresh=TRACK_THRESH, track_low_thresh=TRACK_LOW_THRESH,
                                new_track_thresh=TRACK_THRESH, track_buffer=TRACK_BUFFER,
                                match_thresh=MATCH_THRESH, fuse_score=True)
-        return BYTETracker(args, frame_rate=BUFFER_FRAME_RATE)
+        # ultralytics >= 8.4 dropped the frame_rate argument and uses track_buffer
+        # directly as the lost-track budget, so the old frame_rate=30 trick (which
+        # existed only to defeat its frame_rate/30 scaling) is now both invalid and
+        # unnecessary. Older builds still scale, so keep passing it when accepted.
+        try:
+            return BYTETracker(args, frame_rate=BUFFER_FRAME_RATE)
+        except TypeError:
+            return BYTETracker(args)
 
     def reset(self):
         """Drop every track. The grid loops its recordings, and a track id surviving the loop

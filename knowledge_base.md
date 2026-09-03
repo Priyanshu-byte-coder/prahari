@@ -159,6 +159,18 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 - `services/gateway/probe.py` — `probe_rtsp` (socket+DESCRIBE), `probe_hls` (cookie-gated GET), `resolve_transport` → `TransportResult`, `publish` (the G→I seam), `reprobe_forever` (10 min).
 - `services/gateway/sources/rtsp.py` — `RTSPSource`, PyAV `rtsp_transport=tcp`, backoff + stall watchdog. `sources/mediamtx.py` — `MediaMTXSource` (HLS), picks `hls_pdt` vs `server_receive` from the playlist.
 - `services/gateway/selftest.py` — `--probe-all` transport table with per-camera reason; `--publish` writes Redis. `tests/test_g_probe.py` — 10 tests, no network.
+- `services/gateway/wall.py` — background frame-puller pool behind the console's video wall. `Wall`
+  (`start` `stop` `state` `jpeg`), `CameraFeed`, `rtsp_url_for`/`hls_url_for` (build the correct
+  URL from the numeric camera id — never trust `cameras.seed.json`'s stale `transports` field for
+  these two), `_looks_corrupt` (discards a visibly bad decode, keeps the last good frame).
+- `web/app.html` + `web/app.js` + `web/app.css` — the real console (map/wall/trace/alerts/
+  watchlist/admin), replacing the old `console.html`/`map.js`/`wall.js`/etc; one shell, Leaflet
+  for both the grid map and the trace map, `/api/v1/*` proxy for the core API.
+- `web/home.html` — landing page, all numbers read live from `/api/cameras`, `/api/grid`,
+  `/api/v1/{watchlist,alerts}` — no static claims.
+- `scripts/console_serve.py` — static file server + `/api/wall/*` + `/api/v1/*` proxy (holds the
+  console's own account so the browser never shows a login form; `GRID_KEY` env var signs the
+  HLS-fallback session) + `/api/cameras` (merged seed + geo + wall status) + `/tile/<id>.jpg`.
 
 ### lane D
 - `db/schema.sql` — [C3] verbatim, the copy a reviewer diffs against the contract — 9 tables, hypertable, 5 sighting indexes.
@@ -236,6 +248,33 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
   put). `Publisher.warm()` probes once at startup and a failed PUT opens a 60 s circuit.
 - `[I]` A synthetic fixture's plate must be stamped inside the *detector's* box, not just inside
   the image - at 0.86 of the photo's height it lands on the pavement and the crop has no plate.
+- `[I]` `ultralytics` >= 8.4 dropped `BYTETracker(args, frame_rate=...)` — it now takes `args`
+  only and uses `track_buffer` directly with no `frame_rate/30` scaling, so the old
+  `frame_rate=30` workaround (there to defeat that scaling) raises `TypeError`. `tracker.py`
+  tries the old call and falls back to `BYTETracker(args)` on `TypeError` so it works either way.
+- `[G]` The grid moved behind a real sign-in as of ~09-02: every HLS URL and `/api/ingest` now
+  302 to `cctv.corp8.cloud/auth/login` (single access-key form). **RTSP and WebRTC/WHEP are
+  unaffected** — the integrator's guide confirms they run direct against the public static IP
+  `103.250.160.189` (ports 8554/8889) with no session or key at all, and this was verified: all
+  30 cameras (`cam01`..`cam30`, zero-padded from the numeric catalogue id) open cleanly over
+  RTSP with no `GRID_KEY`. `services/gateway/wall.py` now treats RTSP as the primary transport
+  and only falls back to HLS (which does need `GRID_KEY`) when RTSP itself fails. The old
+  catalogue URLs (`live.corp8.cloud:8554/stream/<n>`, `.../live/stream/<n>/index.m3u8`) are
+  stale — build URLs from the guide's pattern (`rtsp://<ip>:8554/stream/cam<NN>`,
+  `https://cctv.corp8.cloud/cam<NN>/index.m3u8`), never trust `cameras.seed.json`'s
+  `transports` field for these two.
+- `[G]` Cameras **17, 18, 22** reading DOWN was an artifact of an HLS-only probe — they open
+  fine over RTSP. A live transport attempt must override the catalogue's static probe verdict,
+  never the reverse (`web/app.js` `health()`).
+- `[G]` Multi-threaded FFmpeg frame decode (`thread_type="AUTO"`) under real concurrent load —
+  30 puller threads decoding at once — produced frames whose top rows decode clean and whose
+  bottom half degrades into flat-colour macroblocks (HEVC feeds especially). A fresh, uncontended
+  decode of the same camera was perfect, so it is thread-pool contention, not a bad source frame.
+  Fix: force single-threaded decode per feed (`codec_context.thread_type = "NONE"`,
+  `thread_count = 1`) — decode speed was never the bottleneck at one published frame per 2 s.
+  Kept a cheap downsampled dominant-colour check as a second guard (`_looks_corrupt` in
+  `wall.py`) that discards a still-bad frame and keeps the last good one rather than publish it;
+  a wrong picture on a console someone is watching is worse than a stale one.
 - `[G]` `live.corp8.cloud` is intermittent — it 502'd for hours on 08-29 then came back. `probe_grid.py` falls back to `ingest.json.bootstrap` when it does; always re-run once it is up.
 - `[G]` Port 8554 is filtered at the grid: dial it **once at the host**, not once per camera, or 30 full timeouts buy you one fact. RTSP is 0/30; HLS is the real path (27/30 as of 08-29).
 - `[G]` Cameras **17, 18, 22** are dead on both transports (hls HTTP 500 / ReadTimeout), not a probe bug — same three across G1 and G2 runs. Expect 27, not 30, and say so rather than quietly showing 30 pins.
@@ -375,6 +414,10 @@ changing one without a line here breaks somebody else's lane silently.
 `MM-DD | ticket | files | outcome` — newest at the top of **your own** lane's block.
 
 ### lane I
+- 09-03 | QA fix | services/worker/tracker.py | `ultralytics` >= 8.4 dropped
+  `BYTETracker(args, frame_rate=...)`; tracker construction now tries the old call and falls
+  back to `BYTETracker(args)` on `TypeError` — selftest green again (`SELFTEST OK`, plate read
+  back CONFIRMED end to end)
 - 09-02 | J1 | tests/test_integration.py, docs/{demo-script,submission}.md | 4 legs, leg 1 green,
   the rest skip with their reason; chaos drills and the 8-minute script written down
 - 09-02 | I9 | docs/deck-outline.md | 10 slides; every number is a marker naming its command
@@ -401,6 +444,14 @@ changing one without a line here breaks somebody else's lane silently.
   of character; 13 confident-wrong reads became 0
 
 ### lane G
+- 09-03 | QA fix | web/{app.html,app.js,app.css} (new), scripts/console_serve.py,
+  services/gateway/wall.py | rebuilt the console on real Leaflet + the live API (no static
+  fixtures); found and fixed the grid's move behind an HLS-only sign-in by switching the video
+  wall to RTSP-direct (no key needed, all 30 cameras verified open); fixed a CSS rule that
+  collapsed Leaflet's own SVG renderer to 0×0 (every marker existed, none were visible); fixed
+  a decode-thread corruption bug (HEVC frames under concurrent load) with a single-thread decode
+  + corrupt-frame guard. `/api/v1/*` proxy holds the console's own account so the operator never
+  sees a login form; RBAC still enforced server-side on every call.
 - 09-01 | G5 | infra/docker-compose.yml | `make up` verified on real Docker: sentinel-postgres, sentinel-redis, sentinel-minio all healthy. MinIO healthcheck fixed from `mc ready` → `curl /minio/health/live`.
 - 09-01 | G2–G11 | PR #40 final fixes | All Neal006 blocking issues + 5 Copilot issues + SonarCloud Security E + Reliability C resolved. 32 tests green. `allow_redirects` SSRF guard, thread-local sessions, `while not _closed` generators, `autocomplete` on inputs, `esc()` everywhere, `datetime.now(utc)`.
 - 08-29 | G2 | services/gateway/{source,probe,selftest}.py, sources/{rtsp,mediamtx}.py, tests/test_g_probe.py | probe order RTSP→HLS live-verified: **27/30 resolve, all HLS, rtsp 0/30**; 17/18/22 dead both ways (hls 500/ReadTimeout). 10 tests green, no network needed.

@@ -8,13 +8,23 @@ the HTTP layer then serves a tile in microseconds.
 Two decisions that keep this from melting a laptop:
 
 **Only keyframes are decoded.** `container.demux()` hands us every packet, but
-we skip straight past anything that is not a keyframe. HLS segments here are
-~2 s with a keyframe at the head, so this decodes ~0.5 fps per camera instead
-of 30 -- roughly a 60x saving -- and a wall of stills does not need more.
+we skip straight past anything that is not a keyframe. RTSP/HLS keyframes here
+land every ~1-2 s, so this decodes ~0.5-1 fps per camera instead of 30 -- a
+wall of stills does not need more.
 
 **Failure is per camera and never fatal.** A camera that will not open backs
 off and retries; the other 29 tiles carry on. `state()` reports what each
 worker is actually doing, so the UI can say "connecting" rather than lie.
+
+Transport: per the integrator's guide, RTSP and WebRTC/WHEP are served
+directly off the grid's public static IP with no password gate at all --
+only the HLS host (behind the CDN) needs a signed-in session. So RTSP is the
+default transport here: it needs nothing from GRID_KEY and works the moment
+the gateway ports (8554/TCP) are reachable. A feed that cannot open over RTSP
+after its first attempt alternates to HLS (with the console's session cookie,
+when one exists) on the following retry, and back again -- covering the
+guide's own advice ("if 8554 is blocked on your network, use HLS instead")
+without hard-coding which one a given network allows.
 """
 from __future__ import annotations
 
@@ -33,20 +43,69 @@ except ImportError:  # pragma: no cover - the server reports this cleanly
 OPEN_TIMEOUT_S = 25
 JPEG_QUALITY = 78
 THUMB = (640, 640)
+# "Reconnect with exponential backoff (start at ~2 s, cap at ~30 s)" -- the
+# integrator's guide's own numbers, not ours.
 BACKOFF_START_S = 2.0
-BACKOFF_MAX_S = 60.0
+BACKOFF_MAX_S = 30.0
 STALE_AFTER_S = 90.0
+
+# The grid's public static IP for the non-proxied transports (RTSP, WHEP).
+# A dedicated subdomain (stream.corp8.cloud) is mentioned as an alternative
+# in the guide but not required; the IP is stable and needs no DNS trust.
+GRID_PUBLIC_IP = "103.250.160.189"
+RTSP_PORT = 8554
+# The CDN host for the HLS fallback. The catalogue's own transports.hls field
+# (data/cameras.seed.json, from an earlier probe of live.corp8.cloud) predates
+# the current integrator's guide and points at a host/path shape the grid no
+# longer serves; this is the pattern the guide itself documents.
+HLS_HOST = "https://cctv.corp8.cloud"
+
+
+def rtsp_url_for(camera_id: str) -> str | None:
+    """rtsp://<public-ip>:8554/stream/cam<NN> -- direct, no session, no key.
+
+    The catalogue's numeric camera_id (1..30) maps onto the grid's own
+    zero-padded cam01..cam30 ids; every one of the 30 was probed and opens.
+    A camera_id outside that range (a future/unknown camera) yields no RTSP
+    URL rather than a guess.
+    """
+    try:
+        n = int(str(camera_id))
+    except ValueError:
+        return None
+    if not (1 <= n <= 99):
+        return None
+    return f"rtsp://{GRID_PUBLIC_IP}:{RTSP_PORT}/stream/cam{n:02d}"
+
+
+def hls_url_for(camera_id: str) -> str | None:
+    """https://cctv.corp8.cloud/cam<NN>/index.m3u8 -- the CDN fallback path.
+
+    Same cam<NN> id convention as RTSP. Behind a signed-in session (GRID_KEY);
+    used only when RTSP itself is unreachable on this network.
+    """
+    try:
+        n = int(str(camera_id))
+    except ValueError:
+        return None
+    if not (1 <= n <= 99):
+        return None
+    return f"{HLS_HOST}/cam{n:02d}/index.m3u8"
 
 
 @dataclass
 class CameraFeed:
     camera_id: str
-    url: str
+    rtsp_url: str | None
+    hls_url: str | None
     jpeg: bytes | None = None
     updated_at: float | None = None
     frames: int = 0
     status: str = "idle"        # idle | connecting | live | retrying | stopped
     detail: str = ""
+    transport: str = ""         # which one actually delivered the last frame
+    codec: str = ""
+    resolution: str = ""
     _stop: threading.Event = field(default_factory=threading.Event)
     _thread: threading.Thread | None = None
 
@@ -63,20 +122,32 @@ class CameraFeed:
             "age_s": round(age, 1) if age is not None else None,
             "stale": age is not None and age > STALE_AFTER_S,
             "has_frame": self.jpeg is not None,
+            "transport": self.transport,
+            "codec": self.codec,
+            "resolution": self.resolution,
         }
 
 
 class Wall:
     """Owns one puller thread per camera. Start and stop are idempotent."""
 
-    def __init__(self, cameras: list[dict], interval: float = 2.0):
+    def __init__(self, cameras: list[dict], interval: float = 2.0, headers: str | None = None):
         self.interval = interval
+        # Extra HTTP headers handed to PyAV on an HLS open, as one
+        # CRLF-terminated block -- only used on the HLS fallback path; the
+        # RTSP path needs no session at all.
+        self.headers = headers
         self.feeds: dict[str, CameraFeed] = {}
         for cam in cameras:
-            url = (cam.get("transports") or {}).get("hls")
-            if url:
-                cid = str(cam["camera_id"])
-                self.feeds[cid] = CameraFeed(camera_id=cid, url=url)
+            cid = str(cam["camera_id"])
+            rtsp = rtsp_url_for(cid)
+            # Prefer the correct, current URL pattern over whatever the
+            # catalogue's static probe recorded; fall back to the catalogue
+            # only for a camera outside the cam01..cam30 numbering this
+            # console knows how to construct a URL for.
+            hls = hls_url_for(cid) or (cam.get("transports") or {}).get("hls")
+            if rtsp or hls:
+                self.feeds[cid] = CameraFeed(camera_id=cid, rtsp_url=rtsp, hls_url=hls)
         self._lock = threading.Lock()
 
     # -- control ---------------------------------------------------------
@@ -127,30 +198,80 @@ class Wall:
 
     # -- the worker ------------------------------------------------------
 
+    def _open(self, feed: CameraFeed, use_rtsp: bool):
+        """One open attempt on the chosen transport. Raises on failure."""
+        if use_rtsp and feed.rtsp_url:
+            # DO -- force RTSP over TCP: UDP is accepted by the gateway but
+            # fails across NAT/firewalls and produces corrupt frames that
+            # look like model bugs, per the integrator's guide.
+            opts = {"rtsp_transport": "tcp"}
+            return av.open(feed.rtsp_url, timeout=OPEN_TIMEOUT_S, options=opts), "rtsp"
+        if feed.hls_url:
+            opts = {"multiple_requests": "1"}
+            if self.headers:
+                opts["headers"] = self.headers
+            return av.open(feed.hls_url, timeout=OPEN_TIMEOUT_S, options=opts), "hls"
+        raise RuntimeError("no transport available for this camera")
+
     def _pull(self, feed: CameraFeed) -> None:
         backoff = BACKOFF_START_S
+        # Prefer RTSP -- it needs no session at all. A feed alternates to
+        # HLS on the retry right after an RTSP failure (covering a network
+        # that blocks 8554) and back to RTSP on the one after that, rather
+        # than latching onto whichever failed first.
+        use_rtsp = feed.rtsp_url is not None
         while not feed._stop.is_set():
             try:
                 feed.status = "connecting"
-                with av.open(feed.url, timeout=OPEN_TIMEOUT_S) as container:
+                container, transport = self._open(feed, use_rtsp)
+                with container:
                     stream = container.streams.video[0]
-                    stream.thread_type = "AUTO"
+                    # Multi-threaded frame decode ("AUTO") is a correctness
+                    # trade this puller cannot afford: we feed the decoder
+                    # only sparse, isolated keyframe packets (everything
+                    # else is skipped below), and under real concurrent load
+                    # -- 30 of these threads decoding at once -- the threaded
+                    # HEVC path was observed producing frames whose top rows
+                    # decode cleanly and whose bottom half degrades into flat
+                    # magenta macroblocks: a slice/thread-pool sync failure,
+                    # not a bad source frame (a fresh, uncontended decode of
+                    # the same camera came back perfect). We publish at most
+                    # one frame every `interval` seconds, so decode speed is
+                    # not the bottleneck here; correctness is. Force a single
+                    # decode thread instead.
+                    stream.codec_context.thread_type = "NONE"
+                    stream.codec_context.thread_count = 1
                     feed.status = "live"
                     feed.detail = ""
+                    feed.transport = transport
+                    feed.codec = stream.codec_context.name
+                    feed.resolution = f"{stream.codec_context.width}x{stream.codec_context.height}"
                     backoff = BACKOFF_START_S
                     last_emit = 0.0
 
                     for packet in container.demux(stream):
                         if feed._stop.is_set():
                             break
-                        # Keyframes only: ~0.5 fps of decode instead of 30.
+                        # Keyframes only: a fraction of the real frame rate is
+                        # plenty for a wall of stills, and DON'T assume a
+                        # constant rate -- gaps between keyframes are normal,
+                        # not a disconnect, so nothing here treats them as one.
                         if not packet.is_keyframe:
                             continue
                         now = time.time()
                         if now - last_emit < self.interval:
                             continue
                         for frame in packet.decode():
-                            feed.jpeg = _encode(frame)
+                            img = _to_image(frame)
+                            if _looks_corrupt(img):
+                                # A wrong picture is worse than a stale one on
+                                # a console someone is actually watching: keep
+                                # the last good frame rather than overwrite it
+                                # with a decode failure, and let the next
+                                # keyframe try again on the following pass.
+                                feed.detail = "keyframe decoded as visibly corrupt, kept last good frame"
+                                break
+                            feed.jpeg = _encode(img)
                             feed.updated_at = time.time()
                             feed.frames += 1
                             last_emit = now
@@ -158,6 +279,10 @@ class Wall:
             except Exception as exc:
                 feed.status = "retrying"
                 feed.detail = f"{type(exc).__name__}: {exc}"[:160]
+                # Alternate transport on the next attempt, but only if there
+                # is another one to try.
+                if feed.rtsp_url and feed.hls_url:
+                    use_rtsp = not use_rtsp
             if feed._stop.is_set():
                 break
             # Wait, but stay interruptible so Stop is immediate.
@@ -166,8 +291,30 @@ class Wall:
         feed.status = "stopped"
 
 
-def _encode(frame) -> bytes:
-    img = Image.fromarray(frame.to_ndarray(format="rgb24"))
+def _to_image(frame):
+    return Image.fromarray(frame.to_ndarray(format="rgb24"))
+
+
+# A block-decode failure (see the thread_type note above) reads as one flat
+# colour filling an implausibly large, contiguous share of the frame -- a
+# real scene, day or night, headlight glare or all, does not. Checked on a
+# cheap downsampled copy so this costs nothing next to the JPEG encode it
+# guards.
+_CORRUPT_FRACTION = 0.30
+_CORRUPT_SAMPLE = (80, 45)
+
+
+def _looks_corrupt(img) -> bool:
+    small = img.resize(_CORRUPT_SAMPLE)
+    colours = small.getcolors(maxcolors=_CORRUPT_SAMPLE[0] * _CORRUPT_SAMPLE[1])
+    if not colours:
+        return False
+    dominant = max(colours, key=lambda c: c[0])
+    return dominant[0] / (_CORRUPT_SAMPLE[0] * _CORRUPT_SAMPLE[1]) > _CORRUPT_FRACTION
+
+
+def _encode(img) -> bytes:
+    img = img.copy()
     img.thumbnail(THUMB)
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=JPEG_QUALITY)

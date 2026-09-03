@@ -8,6 +8,8 @@ Endpoints:
     GET  /api/wall               wall state (per-camera status, ages)
     POST /api/wall/start         {"ids": [...]} or {} for all
     POST /api/wall/stop          same shape
+    GET  /api/v1/<path>          the core API, called as the console's own
+                                 account -- the operator never sees a login
     GET  /tile/<id>.jpg          cached frame, served instantly
     GET  /grid/<path>            proxy past the Cloudflare gate
     GET  /web/...                static files
@@ -24,8 +26,10 @@ import argparse
 import http.server
 import io
 import json
+import os
 import socketserver
 import sys
+import time
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
@@ -37,9 +41,107 @@ sys.path.insert(0, str(ROOT))
 from services.gateway.wall import Wall  # noqa: E402
 from services.gateway.probe import safe_url  # noqa: E402
 
-GRID_BASE = "https://live.corp8.cloud"
+GRID_BASE = "https://cctv.corp8.cloud"  # current CDN host per the integrator's guide
 SEED = ROOT / "data" / "cameras.seed.json"
 GEO = ROOT / "data" / "camera_geo.json"
+
+# The console holds the credential server-side so the operator never meets a
+# login form: [C10] scope is still enforced by the API on every call, it is
+# just carried by this process rather than typed into the browser. The account
+# is a normal scoped user -- point these at the posting the console runs as.
+API_BASE = os.environ.get("PRAHARI_API", "http://localhost:8000").rstrip("/")
+API_USER = os.environ.get("PRAHARI_CONSOLE_USER", "field")
+API_PASS = os.environ.get("PRAHARI_CONSOLE_PASSWORD", "sentinel123")
+
+# Only these API prefixes are reachable through the console proxy. Anything the
+# console does not draw stays unreachable from the browser.
+API_ALLOW = ("cameras", "alerts", "watchlist", "route", "admin/audit", "healthz")
+
+_TOKEN: dict = {"value": None, "exp": 0.0}
+
+# The sandbox grid moved behind a sign-in: every stream and the catalogue now
+# 302 to cctv.corp8.cloud/auth/login, whose form takes a single access key.
+# Supply it as GRID_KEY and the console signs in once and keeps the cookie;
+# without it the wall cannot open a single feed, and the UI says exactly that
+# rather than showing thirty tiles stuck on "connecting".
+GRID_AUTH = os.environ.get("GRID_AUTH", "https://cctv.corp8.cloud/auth/login")
+GRID_KEY = os.environ.get("GRID_KEY", "").strip()
+
+GRID = {"state": "no key" if not GRID_KEY else "not tried", "cookie": None, "detail": ""}
+
+
+def grid_login() -> bool:
+    """Sign in to the grid once and keep the cookie. False when it cannot."""
+    if not GRID_KEY:
+        GRID.update(state="no key", cookie=None,
+                    detail="Set GRID_KEY to the access key issued for this grid.")
+        return False
+    sess = _session()
+    try:
+        r = sess.post(GRID_AUTH, data={"password": GRID_KEY}, timeout=12, allow_redirects=True)
+    except requests.RequestException as exc:
+        GRID.update(state="unreachable", cookie=None, detail=f"{type(exc).__name__}")
+        return False
+    jar = "; ".join(f"{c.name}={c.value}" for c in sess.cookies)
+    # A rejected key lands back on the login form rather than erroring.
+    if "auth/login" in r.url or "name=\"password\"" in r.text[:4000]:
+        GRID.update(state="rejected", cookie=None, detail="The grid did not accept GRID_KEY.")
+        return False
+    if not jar:
+        GRID.update(state="no cookie", cookie=None, detail="Sign-in returned no session cookie.")
+        return False
+    GRID.update(state="signed in", cookie=jar, detail="")
+    return True
+
+
+def grid_headers() -> str | None:
+    return f"Cookie: {GRID['cookie']}\r\n" if GRID.get("cookie") else None
+
+
+def api_token(force: bool = False) -> str | None:
+    """A cached access token for the console's own account. None when the API is down."""
+    now = time.time()
+    if not force and _TOKEN["value"] and now < _TOKEN["exp"]:
+        return _TOKEN["value"]
+    try:
+        r = _session().post(f"{API_BASE}/api/auth/login",
+                            json={"username": API_USER, "password": API_PASS}, timeout=6)
+        if r.status_code != 200:
+            return None
+        tok = r.json().get("access")
+    except (requests.RequestException, ValueError):
+        return None
+    # The API issues a 15 minute access token; refresh a minute early.
+    _TOKEN["value"], _TOKEN["exp"] = tok, now + 14 * 60
+    return tok
+
+
+def api_call(method: str, path: str, query: str = "", body: dict | None = None):
+    """Forward one call to the core API as the console's account. Returns (status, payload)."""
+    if not any(path == p or path.startswith(p + "/") or path.startswith(p + "?")
+               for p in API_ALLOW):
+        return 404, {"detail": "not proxied"}
+    token = api_token()
+    if token is None:
+        return 503, {"detail": "core API unreachable", "api": API_BASE}
+    url = f"{API_BASE}/api/{path}" + (f"?{query}" if query else "")
+    for attempt in (1, 2):
+        try:
+            r = _session().request(method, url, timeout=12,
+                                   headers={"Authorization": f"Bearer {token}"},
+                                   json=body if method == "POST" else None)
+        except requests.RequestException as exc:
+            return 502, {"detail": f"{type(exc).__name__} talking to the core API"}
+        if r.status_code == 401 and attempt == 1:
+            token = api_token(force=True)     # token aged out mid-shift; mint once more
+            if token is None:
+                return 503, {"detail": "core API unreachable"}
+            continue
+        try:
+            return r.status_code, r.json()
+        except ValueError:
+            return r.status_code, {"detail": r.text[:400]}
+    return 502, {"detail": "core API did not answer"}
 
 # Thread-local session: requests.Session is not thread-safe and
 # http.server.ThreadingHTTPServer spawns one thread per request.
@@ -99,6 +201,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if path.startswith("/api/v1/"):
+            status, payload = api_call("POST", path[len("/api/v1/"):], body=self._body())
+            return self._json(payload, status)
         if path == "/api/wall/start":
             self._json(WALL.start(self._body().get("ids")))
         elif path == "/api/wall/stop":
@@ -107,7 +212,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_error(404)
 
     def do_GET(self):
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
+        if path.startswith("/api/v1/"):
+            status, payload = api_call("GET", path[len("/api/v1/"):], query=parsed.query)
+            return self._json(payload, status)
+        if path == "/api/grid":
+            return self._json({"state": GRID["state"], "detail": GRID["detail"],
+                               "auth_url": GRID_AUTH, "key_set": bool(GRID_KEY)})
         if path == "/api/cameras":
             return self._json(load_cameras())
         if path == "/api/wall":
@@ -119,6 +231,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if path == "/":
             self.send_response(302)
             self.send_header("Location", "/web/home.html")
+            self.end_headers()
+            return
+        if path == "/console":
+            self.send_response(302)
+            self.send_header("Location", "/web/app.html")
             self.end_headers()
             return
         return super().do_GET()
@@ -195,8 +312,14 @@ def main() -> int:
     args = ap.parse_args()
 
     cameras = load_cameras()
-    WALL = Wall(cameras, interval=args.interval)
-    print(f"cameras with an HLS url: {len(WALL.feeds)}/{len(cameras)}")
+    ok = grid_login()
+    print(f"grid HLS sign-in (fallback transport): {GRID['state']}" +
+          (f" — {GRID['detail']}" if GRID["detail"] else ""))
+    WALL = Wall(cameras, interval=args.interval, headers=grid_headers())
+    print(f"cameras with a wall transport: {len(WALL.feeds)}/{len(cameras)} "
+          f"(RTSP direct to the grid's public IP, no key needed; HLS as fallback)")
+    if not ok:
+        print("  HLS fallback is not signed in, but RTSP needs no key -- video still starts")
     if args.autostart:
         WALL.start()
         print("wall: starting all pullers")
