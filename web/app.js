@@ -1210,10 +1210,7 @@ function render(opts) {
 
   const c = counts();
   $('#healthPill').textContent = `${c.LIVE}/${c.all} live`;
-  const badge = $('#alertBadge');
-  const open = (S.alerts.rows || []).filter((r) => (r.state || '').toUpperCase() === 'NEW').length;
-  badge.style.display = open ? 'flex' : 'none';
-  badge.textContent = open;
+  paintBadge();
 
   const html = { map: viewMap, wall: viewWall, trace: viewTrace, alerts: viewAlerts, watchlist: viewWatchlist, admin: viewAdmin }[S.view]();
   root.innerHTML = gridBanner() + html;
@@ -1427,6 +1424,37 @@ function refreshLive() {
   if (S.view === 'wall' || (S.view === 'admin' && S.admin.tab === 'health')) render();
 }
 
+function paintBadge() {
+  const badge = $('#alertBadge');
+  if (!badge) return;
+  const open = (S.alerts.rows || []).filter((r) => (r.state || '').toUpperCase() === 'NEW').length;
+  badge.style.display = open ? 'flex' : 'none';
+  badge.textContent = open;
+}
+
+/* Alerts were loaded once, at boot. A console left open through a shift then
+ * showed the alerts that existed when the page loaded and nothing since -- the
+ * one thing an operator is watching for is the one thing that never arrived.
+ * Poll, but re-render only when the answer actually changed, and never pull the
+ * cursor out of a field someone is typing in: a plate half-entered in Trace and
+ * silently reset is its own kind of wrong answer. */
+async function pollAlerts() {
+  let rows;
+  try {
+    rows = await getJSON('/api/v1/alerts');
+  } catch (e) {
+    return;                       // keep the last good list rather than blanking it
+  }
+  if (!Array.isArray(rows)) return;
+  const stamp = (list) => (list || []).map((r) => `${r.id}:${r.state}`).join(',');
+  if (stamp(rows) === stamp(S.alerts.rows)) return;
+  S.alerts.rows = rows;
+  S.alerts.error = null;
+  const typing = document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
+  if (typing && S.view !== 'alerts') { paintBadge(); return; }
+  render();
+}
+
 async function loadAlerts() {
   S.alerts.error = null;
   try {
@@ -1584,4 +1612,5 @@ async function loadGrid() {
   loadWatchlist();
   pollWall();
   setInterval(pollWall, 2000);
+  setInterval(pollAlerts, 5000);
 })();

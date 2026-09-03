@@ -568,7 +568,7 @@ changing one without a line here breaks somebody else's lane silently.
 - 08-29 | G1 | scripts/probe_grid.py, data/cameras.seed.json, data/catalogue/ingest.json.bootstrap | seed built and verified (`--check`); grid host was 502, used salvaged catalogue as bootstrap
 
 ### lane D
-- 09-03 | merge | web/app.*, web/home.html, scripts/console_serve.py, services/gateway/wall.py, tests/test_g_console_shape.py | QA_testing's console merged into main fast-forward; audit tab given its own SYSTEM_ADMIN proxy account; 304 tests pass against live services
+- 09-03 | merge | web/app.*, web/home.html, scripts/console_serve.py, services/gateway/wall.py, tests/test_g_console_shape.py | QA_testing's console merged into main fast-forward; audit tab given its own SYSTEM_ADMIN proxy account; alerts polled every 5 s so the badge stops going stale; 304 tests pass against live services
 - 08-29 | D1 | db/schema.sql, db/migrate.sql, scripts/load_registry.py, tests/test_d_{schema,registry}.py | schema applies twice with no errors on a throwaway timescaledb-ha:pg16; loader upserts 3 fixture cameras, and a missing camera_geo.json no longer wipes stored coordinates
 - 08-29 | D3 | services/api/watchlist.py, services/api/feeds.py, tests/test_d_watchlist.py | all-or-nothing CSV import reports both bad rows by line number and writes nothing; VAHAN and e-GujCop stubs carry request/response shapes and label every row STUB
 - 08-29 | D2 | scripts/fake_sightings.py, services/api/{store,persister}.py, tests/test_d_{generator,persister}.py | 14991 rows at 49.5/s for 5 min, pending stayed 0; redelivery, poisoned message and dead-consumer reclaim covered by tests
