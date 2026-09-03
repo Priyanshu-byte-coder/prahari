@@ -6,6 +6,12 @@ should fold old changelog lines into `## 7. Archived`) · patched after **every*
 
 ## 0. Now
 
+- 2026-09-03. `QA_testing` fast-forwarded into `main` (`2f86d67`): the whole new console
+  (`web/app.html`, `web/app.js`, `web/app.css`, `web/home.html`), the console server's API
+  proxy and lane G's wall changes. `main` was an ancestor, so nothing of `main`'s was
+  overwritten. `pytest tests/` against live Postgres/Redis: **304 passed, 6 skipped**.
+  The console now proxies the audit tab under a second, admin-only account — one account
+  cannot serve both halves of [C10].
 - 2026-09-03. `QA_testing` merged with `main` (11 commits: the three lane PRs plus #42/#43/#46/#47/
   #49 below). 13 files conflicted, all add/add from the earlier `Restart`; resolved by taking
   `main`'s version for anything QA_testing's own session hadn't touched, and hand-merging
@@ -328,6 +334,13 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
   `db/migrate.sql` runs on it unchanged — plain `postgres:16` needs all three installed by hand.
   Useful for G5: that image is the one lane D verified against.
 
+- `[D]` The console proxies the API under a service account, and [C10] means it needs **two**:
+  `admin:audit` is SYSTEM_ADMIN-only and SYSTEM_ADMIN may not see live data, so one account
+  makes the Admin view 403 forever. `console_serve.account_for()` picks per path.
+- `[D]` `tests/test_d_route.py` fails on a laptop whose Postgres still holds demo rows for
+  `GJ01AB1234` on cameras 1-5: the route query finds them and the hop list stops matching.
+  Delete those rows, not the test.
+
 ## 4. Decisions
 
 - 2026-08-29 — Timeline follows the portal (submit 7 Sep, event 10–11 Sep), not the plan's §16 sprints
@@ -555,6 +568,7 @@ changing one without a line here breaks somebody else's lane silently.
 - 08-29 | G1 | scripts/probe_grid.py, data/cameras.seed.json, data/catalogue/ingest.json.bootstrap | seed built and verified (`--check`); grid host was 502, used salvaged catalogue as bootstrap
 
 ### lane D
+- 09-03 | merge | web/app.*, web/home.html, scripts/console_serve.py, services/gateway/wall.py, tests/test_g_console_shape.py | QA_testing's console merged into main fast-forward; audit tab given its own SYSTEM_ADMIN proxy account; 304 tests pass against live services
 - 08-29 | D1 | db/schema.sql, db/migrate.sql, scripts/load_registry.py, tests/test_d_{schema,registry}.py | schema applies twice with no errors on a throwaway timescaledb-ha:pg16; loader upserts 3 fixture cameras, and a missing camera_geo.json no longer wipes stored coordinates
 - 08-29 | D3 | services/api/watchlist.py, services/api/feeds.py, tests/test_d_watchlist.py | all-or-nothing CSV import reports both bad rows by line number and writes nothing; VAHAN and e-GujCop stubs carry request/response shapes and label every row STUB
 - 08-29 | D2 | scripts/fake_sightings.py, services/api/{store,persister}.py, tests/test_d_{generator,persister}.py | 14991 rows at 49.5/s for 5 min, pending stayed 0; redelivery, poisoned message and dead-consumer reclaim covered by tests

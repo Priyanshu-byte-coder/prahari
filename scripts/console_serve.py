@@ -53,11 +53,23 @@ API_BASE = os.environ.get("PRAHARI_API", "http://localhost:8000").rstrip("/")
 API_USER = os.environ.get("PRAHARI_CONSOLE_USER", "field")
 API_PASS = os.environ.get("PRAHARI_CONSOLE_PASSWORD", "sentinel123")
 
+# Two accounts, not one, and [C10] is the reason. The audit log is admin:audit,
+# which only SYSTEM_ADMIN holds -- and SYSTEM_ADMIN is the one role that may not
+# see live data at all. So no single account can draw both the map and the audit
+# tab: with one, the Admin view answered 403 on a console that was working fine.
+# Each view is proxied under the account that legitimately holds its capability,
+# and the API still enforces both. Leave the admin password unset and the audit
+# tab says the console has no audit account rather than showing a wrong refusal.
+ADMIN_USER = os.environ.get("PRAHARI_CONSOLE_ADMIN_USER", "console-audit")
+ADMIN_PASS = os.environ.get("PRAHARI_CONSOLE_ADMIN_PASSWORD", "")
+
+ACCOUNTS = {"live": (API_USER, API_PASS), "audit": (ADMIN_USER, ADMIN_PASS)}
+
 # Only these API prefixes are reachable through the console proxy. Anything the
 # console does not draw stays unreachable from the browser.
 API_ALLOW = ("cameras", "alerts", "watchlist", "route", "admin/audit", "healthz")
 
-_TOKEN: dict = {"value": None, "exp": 0.0}
+_TOKENS: dict = {name: {"value": None, "exp": 0.0} for name in ("live", "audit")}
 
 # The sandbox grid moved behind a sign-in: every stream and the catalogue now
 # 302 to cctv.corp8.cloud/auth/login, whose form takes a single access key.
@@ -98,21 +110,30 @@ def grid_headers() -> str | None:
     return f"Cookie: {GRID['cookie']}\r\n" if GRID.get("cookie") else None
 
 
-def api_token(force: bool = False) -> str | None:
-    """A cached access token for the console's own account. None when the API is down."""
+def account_for(path: str) -> str:
+    """Which console account a proxied path is called under."""
+    return "audit" if path.startswith("admin/") else "live"
+
+
+def api_token(account: str = "live", force: bool = False) -> str | None:
+    """A cached access token for one console account. None when it cannot log in."""
     now = time.time()
-    if not force and _TOKEN["value"] and now < _TOKEN["exp"]:
-        return _TOKEN["value"]
+    cached = _TOKENS[account]
+    if not force and cached["value"] and now < cached["exp"]:
+        return cached["value"]
+    username, password = ACCOUNTS[account]
+    if not password:
+        return None
     try:
         r = _session().post(f"{API_BASE}/api/auth/login",
-                            json={"username": API_USER, "password": API_PASS}, timeout=6)
+                            json={"username": username, "password": password}, timeout=6)
         if r.status_code != 200:
             return None
         tok = r.json().get("access")
     except (requests.RequestException, ValueError):
         return None
     # The API issues a 15 minute access token; refresh a minute early.
-    _TOKEN["value"], _TOKEN["exp"] = tok, now + 14 * 60
+    cached["value"], cached["exp"] = tok, now + 14 * 60
     return tok
 
 
@@ -121,8 +142,13 @@ def api_call(method: str, path: str, query: str = "", body: dict | None = None):
     if not any(path == p or path.startswith(p + "/") or path.startswith(p + "?")
                for p in API_ALLOW):
         return 404, {"detail": "not proxied"}
-    token = api_token()
+    account = account_for(path)
+    token = api_token(account)
     if token is None:
+        if account == "audit" and not ADMIN_PASS:
+            return 503, {"detail": "this console has no audit account: set "
+                                   "PRAHARI_CONSOLE_ADMIN_USER and "
+                                   "PRAHARI_CONSOLE_ADMIN_PASSWORD"}
         return 503, {"detail": "core API unreachable", "api": API_BASE}
     url = f"{API_BASE}/api/{path}" + (f"?{query}" if query else "")
     for attempt in (1, 2):
@@ -133,7 +159,7 @@ def api_call(method: str, path: str, query: str = "", body: dict | None = None):
         except requests.RequestException as exc:
             return 502, {"detail": f"{type(exc).__name__} talking to the core API"}
         if r.status_code == 401 and attempt == 1:
-            token = api_token(force=True)     # token aged out mid-shift; mint once more
+            token = api_token(account, force=True)   # aged out mid-shift; mint once more
             if token is None:
                 return 503, {"detail": "core API unreachable"}
             continue

@@ -32,3 +32,21 @@ def test_the_nested_geo_block_is_still_there():
     assert "geo" in camera
     if camera["geo"].get("lat") is not None:
         assert camera["lat"] == camera["geo"]["lat"]
+
+
+def test_the_audit_tab_is_proxied_under_the_admin_account():
+    # [C10] splits these: admin:audit is SYSTEM_ADMIN only, and SYSTEM_ADMIN may not see live
+    # data. One account for both is a console whose Admin view answers 403 forever.
+    assert console_serve.account_for("admin/audit") == "audit"
+    assert console_serve.account_for("admin/audit/verify") == "audit"
+    assert console_serve.account_for("cameras") == "live"
+    assert console_serve.account_for("route?plate=GJ01AB1234") == "live"
+
+
+def test_no_admin_password_means_a_clear_answer_not_a_wrong_403(monkeypatch):
+    monkeypatch.setattr(console_serve, "ADMIN_PASS", "")
+    monkeypatch.setitem(console_serve.ACCOUNTS, "audit", ("console-audit", ""))
+    monkeypatch.setitem(console_serve._TOKENS, "audit", {"value": None, "exp": 0.0})
+    status, payload = console_serve.api_call("GET", "admin/audit")
+    assert status == 503
+    assert "audit account" in payload["detail"]
