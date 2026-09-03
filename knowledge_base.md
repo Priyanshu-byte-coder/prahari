@@ -6,6 +6,15 @@ should fold old changelog lines into `## 7. Archived`) · patched after **every*
 
 ## 0. Now
 
+- 2026-09-03, evening. A-Z pass on merged `main`. **Working**: auth + refresh, the [C10] role
+  matrix on cameras/alerts/watchlist/audit, alert state machine (`to_state`), watchlist add and
+  CSV import, CSV *and* PDF export (`fmt=pdf`), audit chain verify (221 entries, ok), WebSocket
+  push (injected alert arrived, seq 52), console proxy incl. the admin account, wall pulling
+  live HLS, worker selftest reading `GJ25BJ8377` in 0.61 s. **Broken, filed**: #51 route
+  endpoints unauthenticated (P0), #52 golden-set report crashes, #53 selftest import path,
+  #54 one OCR reader only, #55 route tests not DB-isolated, #56 RTSP 401 + HLS downscaled,
+  #57 wall retry waste, #58 alert 409-not-422. CI was red six runs on a version-fragile
+  minAreaRect angle in my deskew test; fixed and green again.
 - 2026-09-03. `QA_testing` fast-forwarded into `main` (`2f86d67`): the whole new console
   (`web/app.html`, `web/app.js`, `web/app.css`, `web/home.html`), the console server's API
   proxy and lane G's wall changes. `main` was an ancestor, so nothing of `main`'s was
@@ -384,6 +393,11 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
   854x480 over HLS, cam25 1280x960 -> 640x480, cam26 2560x1440 HEVC -> 854x480 H.264. That is
   half the plate pixels. Use RTSP for anything ANPR; HLS is for the wall.
 
+- `[D]` `cv2.minAreaRect` reports its angle in (0, 90] on OpenCV 4.5+ and [-90, 0) on older
+  builds. Fold it with `% 90` then subtract 90 above 45 before using it, or a level plate reads
+  as 90 degrees of tilt on the CI runner and 0 on a laptop - six red CI runs came from exactly
+  that.
+
 ## 4. Decisions
 
 - 2026-08-29 — Timeline follows the portal (submit 7 Sep, event 10–11 Sep), not the plan's §16 sprints
@@ -656,6 +670,7 @@ changing one without a line here breaks somebody else's lane silently.
 - 08-29 | G1 | scripts/probe_grid.py, data/cameras.seed.json, data/catalogue/ingest.json.bootstrap | seed built and verified (`--check`); grid host was 502, used salvaged catalogue as bootstrap
 
 ### lane D
+- 09-03 | a-z | services/worker/preprocess.py, tests/test_i_preprocess.py | full A-Z test of main; CI unblocked (minAreaRect angle convention); 8 issues filed #51-#58 and put on the board as Todo
 - 09-03 | grid-live | scripts/console_serve.py, services/gateway/wall.py, run_demo_env.sh | grid sign-in fixed (email+key) and UA passed as its own PyAV option; wall pulls real HLS video, 6 cameras live in the console
 - 09-03 | grid+ocr | services/worker/preprocess.py, scripts/grid_survey.py, data/grid_survey.json, tests/test_i_preprocess.py | 30 cameras probed (18x1080p, 5x720p, 4x1280x960, 1x960x576, 1x1440p, cam30 unreachable; 23 h264 / 6 hevc; 25 fps mostly). Plate feasibility gate + tiling + crop enhancement + multi-frame fusion, 24 tests green
 - 09-03 | merge | web/app.*, web/home.html, scripts/console_serve.py, services/gateway/wall.py, tests/test_g_console_shape.py | QA_testing's console merged into main fast-forward; audit tab given its own SYSTEM_ADMIN proxy account; alerts polled every 5 s so the badge stops going stale; 304 tests pass against live services
