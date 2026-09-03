@@ -38,7 +38,12 @@ VEHICLE_WEIGHTS = os.getenv("PRAHARI_VEHICLE_WEIGHTS", str(WEIGHTS_DIR / "yolov8
 PLATE_WEIGHTS = os.getenv("PRAHARI_PLATE_WEIGHTS", "")     # I11 fills this in; empty = classical
 MAX_BATCH = 16
 FLUSH_MS = 20.0
-CONF = 0.25          # matches ByteTrack's track_thresh: the tracker sees the low band too
+# CONF matches ByteTrack's track_thresh: the tracker sees the low band too. IMGSZ 640 is the
+# YOLO default; on the real grid's wide night junctions a 1280 (or 1536) inference size finds
+# several times more vehicles - measured on cam12, 2 dets -> 11 - at a linear cost in latency.
+# Both env-tunable per deployment: an ANPR-sited camera wants 640/0.25, a wide-area feed 1280/0.2.
+CONF = float(os.getenv("PRAHARI_DETECT_CONF", "0.25"))
+IMGSZ = int(os.getenv("PRAHARI_DETECT_IMGSZ", "640"))
 
 # The seven classes the brief names.
 CLASSES = ("two_wheeler", "three_wheeler", "car", "lcv", "bus", "truck", "tractor")
@@ -87,7 +92,7 @@ class LocalBackend:
     free, because the tests, the metrics endpoint and `--help` all import it."""
 
     def __init__(self, vehicle_weights=VEHICLE_WEIGHTS, plate_weights=PLATE_WEIGHTS,
-                 device=None, conf=CONF, imgsz=640, half=None):
+                 device=None, conf=CONF, imgsz=IMGSZ, half=None):
         self.vehicle_weights = str(vehicle_weights)
         self.plate_weights = str(plate_weights or "")
         self.conf = conf
