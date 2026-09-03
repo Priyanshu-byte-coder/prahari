@@ -560,6 +560,16 @@ changing one without a line here breaks somebody else's lane silently.
 `MM-DD | ticket | files | outcome` — newest at the top of **your own** lane's block.
 
 ### lane I
+- 09-03 | cross-lane request D→I, PARTIAL (lane G, owner-directed — Neal006 to verify on the grid) |
+  services/worker/run.py, tests/test_i_run_preprocess_wiring.py | wired 2 of the 4 asks from
+  `preprocess.py`: `prepare_frame()` now conditions each frame before `backend.detect`
+  (`_detector_images`, never resizes), and `feasibility()` gates the OCR pass (`_ocr_feasible`) -
+  a vehicle box whose glyph would be < 8 px is tracked but not sent to OCR, logged once per
+  track as "plate not resolvable here". Both default on, kill-switches `PRAHARI_PREPROCESS_FRAMES=0`
+  / `PRAHARI_FEASIBILITY_GATE=0`. **Still not wired:** frame tiling (needs native-res frames,
+  decode.py scales to 960 first) and `prepare_for_ocr`/fusion in the OCR path (needs a per-track
+  crop buffer in sighting.py). Not runnable here - no cv2/numpy; Neal006 run the worker on a
+  grid camera + `scripts/grid_survey.py` to confirm the gate's threshold is right.
 - 09-03 | #45 #48 (lane G, owner-directed cross-lane — review welcome, Neal006) |
   requirements.txt, requirements-ci.txt, services/worker/selftest.py | pinned
   `ultralytics>=8.3.0,<8.4` (I7 numbers are 8.3; the both-version fallback in tracker.py stays);

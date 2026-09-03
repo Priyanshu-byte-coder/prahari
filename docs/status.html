@@ -1,0 +1,343 @@
+<title>Prahari Build Status</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --ground:#f4f5f7; --surface:#ffffff; --surface-2:#eceef1;
+    --line:#d3d7dd; --line-strong:#b6bcc6;
+    --ink:#1b1f27; --ink-2:#454b57; --ink-3:#6b7280;
+    --accent:#b5731a; --accent-bg:#f7ead6;
+    --ok:#1f7a3d; --ok-bg:#e3f2e6;
+    --warn:#9a6a12; --warn-bg:#f7ead6;
+    --crit:#b23020; --crit-bg:#f6e3df;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:#0c0e12; --surface:#14171d; --surface-2:#1b1f27;
+      --line:#272c36; --line-strong:#3a4150;
+      --ink:#e7e9ee; --ink-2:#b3b9c4; --ink-3:#7f8794;
+      --accent:#e0a24a; --accent-bg:#2b2114;
+      --ok:#4cc46a; --ok-bg:#14231a;
+      --warn:#d7a53f; --warn-bg:#2b2114;
+      --crit:#ef6b56; --crit-bg:#2a1613;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#0c0e12; --surface:#14171d; --surface-2:#1b1f27;
+    --line:#272c36; --line-strong:#3a4150;
+    --ink:#e7e9ee; --ink-2:#b3b9c4; --ink-3:#7f8794;
+    --accent:#e0a24a; --accent-bg:#2b2114;
+    --ok:#4cc46a; --ok-bg:#14231a;
+    --warn:#d7a53f; --warn-bg:#2b2114;
+    --crit:#ef6b56; --crit-bg:#2a1613;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin:0; background:var(--ground); color:var(--ink);
+    font-family:"IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size:15.5px; line-height:1.6; -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:54rem; margin:0 auto; padding:clamp(1.25rem,4vw,3.5rem); }
+
+  h1,h2,h3 { font-family:"Archivo","IBM Plex Sans",sans-serif; margin:0; line-height:1.15; letter-spacing:-0.015em; text-wrap:balance; }
+  .mono { font-family:"IBM Plex Mono", ui-monospace, monospace; }
+
+  /* header */
+  header { border-bottom:2px solid var(--accent); padding-bottom:1.5rem; margin-bottom:2.5rem; }
+  .eyebrow { font-family:"IBM Plex Mono",monospace; font-size:0.72rem; letter-spacing:0.28em; text-transform:uppercase; color:var(--accent); }
+  header h1 { font-size:clamp(2.1rem,6vw,3.4rem); font-weight:800; margin:0.6rem 0 0; letter-spacing:-0.03em; }
+  .subhead { color:var(--ink-2); margin:0.6rem 0 0; font-size:1.02rem; }
+  .stamp { display:flex; flex-wrap:wrap; gap:0.5rem 1.75rem; margin-top:1.25rem; font-family:"IBM Plex Mono",monospace; font-size:0.78rem; color:var(--ink-3); }
+  .stamp b { color:var(--ink-2); font-weight:500; }
+
+  /* verdict banner */
+  .verdict {
+    background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--accent);
+    border-radius:3px; padding:1.25rem 1.4rem; margin-bottom:2.5rem;
+  }
+  .verdict p { margin:0; }
+  .verdict p + p { margin-top:0.6rem; }
+  .verdict strong { font-family:"Archivo",sans-serif; }
+
+  section { margin-bottom:2.75rem; }
+  .sec-h {
+    display:flex; align-items:baseline; gap:0.75rem;
+    border-bottom:1px solid var(--line); padding-bottom:0.5rem; margin-bottom:1.25rem;
+  }
+  .sec-h h2 { font-size:1.35rem; font-weight:700; }
+  .sec-h .count { font-family:"IBM Plex Mono",monospace; font-size:0.78rem; color:var(--ink-3); margin-left:auto; }
+
+  /* item rows */
+  .item { display:grid; grid-template-columns:5.5rem 1fr; gap:0.9rem; padding:0.8rem 0; border-bottom:1px solid var(--line); }
+  .item:last-child { border-bottom:none; }
+  .item__body h3 { font-size:0.98rem; font-weight:600; }
+  .item__body p { margin:0.3rem 0 0; color:var(--ink-2); font-size:0.9rem; }
+  .item__body .next { margin-top:0.45rem; font-size:0.86rem; color:var(--ink); }
+  .item__body .next b { font-family:"IBM Plex Mono",monospace; font-size:0.68rem; letter-spacing:0.08em; text-transform:uppercase; color:var(--accent); display:inline-block; margin-right:0.4rem; }
+  .item__body code { font-family:"IBM Plex Mono",monospace; font-size:0.83rem; background:var(--surface-2); padding:0.05rem 0.3rem; border-radius:2px; }
+
+  .tag {
+    display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:0.64rem; font-weight:600;
+    letter-spacing:0.04em; text-transform:uppercase; padding:0.2rem 0.45rem; border-radius:2px;
+    white-space:nowrap; align-self:start;
+  }
+  .tag--done { background:var(--ok-bg); color:var(--ok); }
+  .tag--wip  { background:var(--warn-bg); color:var(--warn); }
+  .tag--todo { background:var(--crit-bg); color:var(--crit); }
+  .tag--p1   { background:var(--surface-2); color:var(--ink-3); }
+
+  /* done — compact list */
+  .done-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(15rem,1fr)); gap:1rem; }
+  .done-card { background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:1rem 1.1rem; }
+  .done-card h3 { font-size:0.82rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--accent); font-weight:700; }
+  .done-card ul { margin:0.6rem 0 0; padding-left:1.05rem; }
+  .done-card li { font-size:0.87rem; color:var(--ink-2); margin:0.3rem 0; }
+  .done-card li b { color:var(--ink); font-weight:600; }
+
+  /* metrics strip */
+  .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(8rem,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:3px; overflow:hidden; margin-top:1rem; }
+  .metrics div { background:var(--surface); padding:0.85rem 1rem; }
+  .metrics .n { font-family:"Archivo",sans-serif; font-weight:800; font-size:1.4rem; font-variant-numeric:tabular-nums; }
+  .metrics .l { font-size:0.72rem; color:var(--ink-3); text-transform:uppercase; letter-spacing:0.06em; margin-top:0.15rem; }
+
+  /* timeline */
+  .tl { display:grid; gap:0; }
+  .tl__row { display:grid; grid-template-columns:6.5rem 1fr; gap:1rem; padding:0.7rem 0; border-bottom:1px solid var(--line); align-items:baseline; }
+  .tl__row:last-child { border-bottom:none; }
+  .tl__d { font-family:"Archivo",sans-serif; font-weight:700; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--accent); }
+  .tl__row--now .tl__d { color:var(--crit); }
+  .tl__t { font-size:0.9rem; color:var(--ink-2); }
+  .tl__t b { color:var(--ink); }
+
+  ol.risks { margin:0; padding-left:1.3rem; }
+  ol.risks li { margin:0.55rem 0; color:var(--ink-2); font-size:0.92rem; }
+  ol.risks li b { color:var(--ink); }
+
+  a { color:var(--accent); }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  @media (max-width:32rem){ .item,.tl__row{ grid-template-columns:1fr; gap:0.35rem; } }
+
+  @media print {
+    body { background:#fff; }
+    .verdict, .done-card, .metrics div { break-inside:avoid; }
+    section { break-inside:avoid-page; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Prahari · Sentinel 2026 · internal</div>
+    <h1>Build Status</h1>
+    <p class="subhead">Where the CCTV-federation platform stands, what is moving, and what still has to happen before the portal closes.</p>
+    <div class="stamp">
+      <span><b>As of</b> 3 Sep 2026</span>
+      <span><b>Submit target</b> 6 Sep, 14:00 IST</span>
+      <span><b>Portal closes</b> 7 Sep</span>
+      <span><b>Live event</b> 10–11 Sep, Gandhinagar</span>
+    </div>
+  </header>
+
+  <div class="verdict">
+    <p><strong>The platform is built and runs end to end.</strong> Every lane's core tickets are done; the stack does onboarding → ANPR → watchlist match → alert → route on 30 seeded cameras, with RBAC and a verifying audit chain.</p>
+    <p><strong>Three things stand between here and a submission</strong>, and none of them is code: the <b>demo video</b>, a set of <b>measured numbers</b> for the deck and model card, and a <b>hosted URL with role logins</b>. Everything else is rehearsal and packaging.</p>
+  </div>
+
+  <!-- ================= DONE ================= -->
+  <section>
+    <div class="sec-h"><h2>Done</h2><span class="count">platform + all P0 lane tickets</span></div>
+
+    <div class="metrics">
+      <div><div class="n">304</div><div class="l">tests pass</div></div>
+      <div><div class="n">6</div><div class="l">skipped</div></div>
+      <div><div class="n">30</div><div class="l">cameras seeded</div></div>
+      <div><div class="n">897</div><div class="l">sightings persisted</div></div>
+      <div><div class="n">5</div><div class="l">alerts over WS</div></div>
+      <div><div class="n">0</div><div class="l">open bugs</div></div>
+    </div>
+
+    <div class="done-grid" style="margin-top:1.5rem">
+      <div class="done-card">
+        <h3>Inference — Lane I</h3>
+        <ul>
+          <li><b>Decode</b> 5 fps + motion gate, 10 cams, 0 drops</li>
+          <li><b>Detect + track</b> YOLOv8s batched, ByteTrack per camera</li>
+          <li><b>Plate</b> detect → EasyOCR + PaddleOCR → grammar → 2/3 vote, 0 confident-wrong</li>
+          <li><b>Publish</b> [C1]-validated rows → Redis + MinIO + metrics</li>
+          <li><b>Selftest</b> one command, plate on the stream in 0.43 s</li>
+          <li><b>Re-ID</b> + bonus analytics (crowd, stopped, wrong-way, loitering)</li>
+        </ul>
+      </div>
+      <div class="done-card">
+        <h3>Edge + Console — Lane G</h3>
+        <ul>
+          <li><b>Gateway</b> 4 drivers — mediamtx / rtsp / onvif live, vms-stub interface-complete</li>
+          <li><b>Transport probe</b> RTSP→HLS fallback, 27/30 resolve</li>
+          <li><b>Health monitor</b> sole producer of <code>camera.health</code></li>
+          <li><b>Console</b> Leaflet map, layers, wedges, events slider, WS client</li>
+          <li><b>Video wall</b> WHEP + HLS, admin drivers page</li>
+          <li><b>Route view</b> numbered pins, plausibility, CSV</li>
+        </ul>
+      </div>
+      <div class="done-card">
+        <h3>Core — Lane D</h3>
+        <ul>
+          <li><b>Schema</b> + registry loader on Timescale</li>
+          <li><b>Persister</b> soak: 14,991 rows @ 49.5/s, 0 pending</li>
+          <li><b>Watchlist</b> + CSV + VAHAN / eGujCop feed stubs</li>
+          <li><b>Matcher</b> banded + alert state machine</li>
+          <li><b>WebSocket</b> fanout with scope filter + resume backfill</li>
+          <li><b>Route API</b> + plausibility + audited export <span class="tag tag--done" style="font-size:0.58rem">D6</span></li>
+          <li><b>RBAC + audit</b> SQL row-level security, hash-chained log, verify endpoint</li>
+          <li><b>Cross-dept grants</b> — case no., 72 h cap, approval, logged</li>
+        </ul>
+      </div>
+      <div class="done-card">
+        <h3>Docs written</h3>
+        <ul>
+          <li><b>HLD</b> <code>docs/hld.md</code> — 13 sections, gaps named</li>
+          <li><b>Model card</b> <code>docs/model-card.md</code> — licences, scope, refusals</li>
+          <li><b>Demo script</b> — 8-min run sheet + 4 chaos drills</li>
+          <li><b>Submission plan</b> — deliverables, gate, timeline</li>
+          <li><b>Deck</b> <code>docs/deck.html</code> — 10 slides, print → PDF <span class="tag tag--wip" style="font-size:0.58rem">numbers pending</span></li>
+        </ul>
+      </div>
+      <div class="done-card">
+        <h3>Fixed &amp; closed this week</h3>
+        <ul>
+          <li><b>#44</b> console bypassed RBAC on <code>/api/cameras</code> — now scoped</li>
+          <li><b>#45</b> ultralytics pinned to 8.3 (tracker signature)</li>
+          <li><b>#48</b> selftest published to the real <code>sightings</code> stream — moved off it</li>
+          <li>Closed 7 done-but-open tracker issues</li>
+        </ul>
+      </div>
+      <div class="done-card">
+        <h3>Infra</h3>
+        <ul>
+          <li><code>make up</code> verified on real Docker — postgres, redis, minio healthy, 16 h+ uptime</li>
+          <li><code>infra/docker-compose.yml</code> — full stack, OSRM behind a profile</li>
+          <li>CI: pytest workflow + GitGuardian</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= IN PROGRESS ================= -->
+  <section>
+    <div class="sec-h"><h2>In progress</h2><span class="count">3 open · submission-critical</span></div>
+
+    <div class="item">
+      <span class="tag tag--wip">WIP · #9</span>
+      <div class="item__body">
+        <h3>I9 — Solution deck</h3>
+        <p>All 10 slides built as <code>docs/deck.html</code>, one per scoring point. Structure, copy and diagrams are done.</p>
+        <p class="next"><b>next</b> run 4 commands on the live stack, paste 6 numbers into the amber chips (accuracy per band + refusal rate, detector throughput, decode throughput, sighting→alert latency, driver camera counts, audit verify), then export PPT + PDF from the browser.</p>
+      </div>
+    </div>
+
+    <div class="item">
+      <span class="tag tag--wip">WIP · #8</span>
+      <div class="item__body">
+        <h3>I7 — Golden set + accuracy report</h3>
+        <p>Report runs green on 198 <em>synthetic</em> rows — an upper bound. The deck and model card need the <b>hand-labelled</b> numbers.</p>
+        <p class="next"><b>next</b> pull ~30 real vehicle passes off the grid (RTSP-direct, no key), crop the plates, hand-label per <code>fixtures/golden/README.md</code> (unreadable → <code>null</code>, ~13% expected), then <code>python scripts/accuracy_report.py --golden fixtures/golden/</code>. Needs a person reading plates.</p>
+      </div>
+    </div>
+
+    <div class="item">
+      <span class="tag tag--wip">WIP · #35</span>
+      <div class="item__body">
+        <h3>J1 — Integration test + chaos drills + rehearsals</h3>
+        <p>Test code hardened: legs 2–3 now authenticate and correlate the alert by watchlist id. Leg 1 green; legs 2–4 need the live API.</p>
+        <p class="next"><b>next</b> <code>make up</code>, export a test credential, run all 4 legs green; then the 4 chaos drills and 2 timed rehearsals — steps and expected behaviour are already in <code>docs/demo-script.md</code>, just execute and fill the result tables.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= NOT STARTED ================= -->
+  <section>
+    <div class="sec-h"><h2>Left to do</h2><span class="count">not started</span></div>
+
+    <div class="item">
+      <span class="tag tag--todo">TODO</span>
+      <div class="item__body">
+        <h3>Demo video — 2–3 min, own feed</h3>
+        <p>The highest-weight missing deliverable, and the one that can't be faked — the portal explicitly rejects mock-ups. Screen capture of the running system: onboard a camera → live detection → watchlist match + alert → route with an IMPLAUSIBLE hop → audit verify. Sequence is in <code>docs/submission.md</code>. Keep a <code>/metrics</code> terminal visible in one shot.</p>
+      </div>
+    </div>
+
+    <div class="item">
+      <span class="tag tag--todo">TODO</span>
+      <div class="item__body">
+        <h3>Hosted URL + 3 role logins</h3>
+        <p>Deploy the stack somewhere reachable from outside the dev network. Three accounts — <code>demo.investigator</code>, <code>demo.operator</code>, <code>demo.admin</code> — so the jury can verify scope is really enforced. Test all three from a phone on mobile data. Credentials go in the form, never the repo.</p>
+      </div>
+    </div>
+
+    <div class="item">
+      <span class="tag tag--todo">TODO</span>
+      <div class="item__body">
+        <h3>Government-feed live demo</h3>
+        <p>Onboard the ~50 provided cameras, run analytics, produce the timestamped detection report. Happens with the real feeds — rehearse the flow now against the sandbox grid so nothing is new on the day.</p>
+      </div>
+    </div>
+
+    <div class="item">
+      <span class="tag tag--todo">TODO</span>
+      <div class="item__body">
+        <h3>Packaging</h3>
+        <p>Deck → PDF at print resolution (check the diagram doesn't rasterise to mush). Repo hygiene checklist in <code>docs/submission.md</code> — no <code>.env</code> in history, nothing over 10 MB, clean-clone run instructions, model licences listed.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= P1 ================= -->
+  <section>
+    <div class="sec-h"><h2>Parked — P1, not for the submission</h2><span class="count">event only</span></div>
+    <div class="item">
+      <span class="tag tag--p1">P1 · #11</span>
+      <div class="item__body">
+        <h3>I11 — Fine-tune + TensorRT</h3>
+        <p>ONNX export + parity green. Fine-tune needs a labelled dataset; scheduled for the 8–9 Sep event window, not the submission.</p>
+      </div>
+    </div>
+    <div class="item">
+      <span class="tag tag--p1">P1 · #24</span>
+      <div class="item__body">
+        <h3>G12 — Grafana dashboard</h3>
+        <p>Not started. Operational polish — the metrics endpoint already exists; a dashboard on top is a nice-to-have for the finale.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TIMELINE ================= -->
+  <section>
+    <div class="sec-h"><h2>Timeline to submit</h2><span class="count">from docs/submission.md</span></div>
+    <div class="tl">
+      <div class="tl__row tl__row--now"><span class="tl__d">3 Sep · now</span><span class="tl__t">Platform done. Deck + test scaffolding done. Start the demo-video dry run and the plate labelling.</span></div>
+      <div class="tl__row"><span class="tl__d">5 Sep</span><span class="tl__t"><b>Feature freeze.</b> After this, only fixes that make the gate green. Run the 4 chaos drills, timed.</span></div>
+      <div class="tl__row"><span class="tl__d">5–6 Sep</span><span class="tl__t">Two timed rehearsals of the 8-minute script.</span></div>
+      <div class="tl__row"><span class="tl__d">6 Sep AM</span><span class="tl__t">Final accuracy report → deck numbers replaced → deck to PDF. Hosted URL + logins live and phone-tested.</span></div>
+      <div class="tl__row"><span class="tl__d">6 Sep PM</span><span class="tl__t">Record the demo video, cut it, check playback on a phone.</span></div>
+      <div class="tl__row tl__row--now"><span class="tl__d">6 Sep · 14:00</span><span class="tl__t"><b>Submit everything.</b> The 7th is a buffer, not the plan.</span></div>
+      <div class="tl__row"><span class="tl__d">7 Sep</span><span class="tl__t">Portal closes.</span></div>
+      <div class="tl__row"><span class="tl__d">10–11 Sep</span><span class="tl__t">Live event, i-Hub Gandhinagar.</span></div>
+    </div>
+  </section>
+
+  <!-- ================= RISKS ================= -->
+  <section>
+    <div class="sec-h"><h2>Top risks</h2><span class="count">watch these</span></div>
+    <ol class="risks">
+      <li><b>Uploading on the last evening.</b> The portal is slow when everyone does it — hence the 6 Sep 14:00 target.</li>
+      <li><b>A video that looks like a mock-up.</b> Explicitly rejected. Record the real thing even if it's uglier, with <code>/metrics</code> on screen.</li>
+      <li><b>A deck number nobody can reproduce.</b> Every figure traces to a command, or it comes off the slide.</li>
+      <li><b>Credentials that don't work from outside the network.</b> Test the hosted URL and all three logins from mobile data.</li>
+      <li><b>Route coordinates still LOW-confidence</b> (geocoded, not surveyed). Fine for the demo — say so out loud rather than let a judge find it.</li>
+    </ol>
+  </section>
+
+</div>

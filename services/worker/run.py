@@ -42,6 +42,24 @@ MIN_CROP_PX = 48         # a vehicle box smaller than this has no readable plate
 OCR_QUEUE = 4            # crops waiting to be read; full means the budget is spent, skip one
 OCR_DRAIN_S = 2.0        # how long a closing sighting waits for its outstanding reads
 
+# --- grid-measured preprocessing (services/worker/preprocess.py) ----------------------------
+# On the real grid a lot of cameras give a vehicle box too small for a readable plate, and the
+# 960->640 detector letterbox loses the small ones entirely. `prepare_frame` conditions the
+# frame for the detector; `feasibility` refuses an OCR pass whose glyphs were never sampled -
+# tracking the vehicle and saying "plate not resolvable here" beats four confident characters
+# of noise. Both are on by default and each has an env kill-switch in case they regress.
+_PREP_FRAMES = os.getenv("PRAHARI_PREPROCESS_FRAMES", "1").strip().lower() not in ("0", "false", "no")
+_FEAS_GATE = os.getenv("PRAHARI_FEASIBILITY_GATE", "1").strip().lower() not in ("0", "false", "no")
+
+try:
+    from services.worker.preprocess import feasibility as _feasibility
+    from services.worker.preprocess import prepare_frame as _prepare_frame
+except Exception as _exc:                     # pragma: no cover - preprocess deps missing
+    _feasibility = _prepare_frame = None
+    logging.getLogger("prahari.worker.run").warning(
+        "preprocess.py not importable (%s) - frame conditioning and the feasibility gate are off",
+        _exc)
+
 
 class OcrPool:
     """OCR on its own threads, with a per-sighting wait for the close path.
@@ -202,10 +220,24 @@ class Worker:
                 batch = self.batcher.add(frame) or batch
         return batch or self.batcher.due()
 
+    def _detector_images(self, frames):
+        """Frame images conditioned for the detector. Never resizes - the backend owns scaling."""
+        if not (_PREP_FRAMES and _prepare_frame is not None):
+            return [f.image for f in frames]
+        out = []
+        for f in frames:
+            try:
+                out.append(_prepare_frame(f.image))
+            except Exception as exc:          # a filter must never take the pipeline down
+                logger.debug("prepare_frame failed on cam %s (%s) - using the raw frame",
+                             f.camera_id, exc)
+                out.append(f.image)
+        return out
+
     def process(self, frames):
         """Detect, track, build sightings, spend the OCR budget, publish what closed."""
         with metrics.timed("detect"):
-            detections = self.backend.detect([f.image for f in frames])
+            detections = self.backend.detect(self._detector_images(frames))
         self.last_frame_wall = max(f.wall_clock for f in frames)
         for frame, dets in zip(frames, detections):
             builder = self.builders[frame.camera_id]
@@ -228,7 +260,34 @@ class Worker:
         sighting = builder.observe(track, crop=crop, wall_clock=frame.wall_clock)
         if min(crop.shape[:2]) < MIN_CROP_PX or not sighting.wants_ocr:
             return
+        if not self._ocr_feasible(sighting, x2 - x1):
+            return
         self.ocr.submit(sighting, sighting.claim_ocr())
+
+    def _ocr_feasible(self, sighting, vehicle_w_px):
+        """The grid-measured gate: is a plate on a vehicle this wide readable at all?
+
+        `verdict == "no"` means the glyph strokes were never sampled at this camera - we keep
+        tracking the vehicle (the sighting still publishes, plate_band NONE) but spend no OCR
+        pass guessing. Logged once per track so the demo can point at the honest refusal.
+        """
+        if not (_FEAS_GATE and _feasibility is not None):
+            return True
+        try:
+            verdict = _feasibility(vehicle_w_px)
+        except Exception:
+            return True
+        if verdict.readable:
+            return True
+        if not getattr(sighting, "_feasibility_logged", False):
+            logger.info("sighting %s cam=%s track=%s: plate not resolvable here (%s) - "
+                        "tracking without OCR", sighting.sighting_id[:10], sighting.camera_id,
+                        sighting.track_id, verdict.reason)
+            try:
+                sighting._feasibility_logged = True
+            except Exception:
+                pass
+        return False
 
     def _publish(self, sighting):
         self.ocr.drain(sighting)
