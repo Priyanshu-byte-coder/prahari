@@ -602,4 +602,5 @@ Append one line here instead of editing another lane's code. The owner deletes t
 
 | Date | From | To | Request | State |
 |---|---|---|---|---|
+| 2026-09-03 | D | I | Wire `services/worker/preprocess.py` into the worker: `prepare_frame()` before the detector, `tiles()`/`tile_plan()` on the wide-area cameras (a 55px vehicle is 18px after a 640 letterbox), `feasibility()` as the gate before an OCR pass, and `prepare_for_ocr(track_crops)` in place of `plate.upscale` in the OCR worker. Module + tests are written and green; no lane I file was touched. | OPEN |
 | | | | | |

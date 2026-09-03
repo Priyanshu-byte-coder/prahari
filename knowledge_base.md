@@ -198,6 +198,9 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
   lat/lon to the top level too — the legacy `web/map.js` reads it there) + `/tile/<id>.jpg`.
 
 ### lane D
+- `services/worker/preprocess.py` — frame + crop conditioning for OCR (written by D, for lane I to wire; see TASK.md cross-lane) — `measure`, `feasibility`, `prepare_frame`, `tiles`/`tile_plan`, `enhance_plate_crop`, `fuse`, `best_of`, `detail`, `prepare_for_ocr`.
+- `scripts/grid_survey.py` — what each grid camera delivers and whether its plates are readable — `catalogue`, `probe_one`, `grab_frames`, `measure_frames`, `verdict`.
+- `data/grid_survey.json` — ffprobe output for all 30 grid cameras, 2026-09-03.
 - `db/schema.sql` — [C3] verbatim, the copy a reviewer diffs against the contract — 9 tables, hypertable, 5 sighting indexes.
 - `db/migrate.sql` — the file that actually runs: same objects, IF NOT EXISTS, named indexes, `if_not_exists => TRUE`.
 - `scripts/load_registry.py` — joins `cameras.seed.json` + `camera_geo.json` into `cameras` — `read_json`, `build_rows`, `UPSERT`.
@@ -340,6 +343,25 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 - `[D]` `tests/test_d_route.py` fails on a laptop whose Postgres still holds demo rows for
   `GJ01AB1234` on cameras 1-5: the route query finds them and the hop list stops matching.
   Delete those rows, not the test.
+
+- `[D]` Grid access, measured 2026-09-03: RTSP on `103.250.160.189:8554/stream/<id>` needs no
+  key but is rate limited — 30 cameras probed in parallel and every stream answered 401
+  afterwards, for hours. Probe 4 at a time (`grid_survey.py --workers 4`). The CDN is a form
+  POST to `/auth/login` with a single `password` field; the key belongs in `GRID_KEY`, never
+  in the repo.
+- `[D]` Plate pixel maths, the number that decides everything: glyph height is about 0.043 x
+  the vehicle box width (500x120 mm plate, 1800 mm vehicle, glyphs 0.65 of the plate). A
+  vehicle box under ~325 px wide cannot yield a 14 px glyph, and no upscale recovers a stroke
+  that was never sampled. cam04 measured 55 px median -> 2.4 px glyph.
+- `[D]` Variance of Laplacian as a focus measure is fooled twice: a downscaled crop aliases
+  and scores higher than a clean big one, and pure noise scores highest of all. Subtract the
+  noise floor (`20 * sigma^2` for the 3x3 Laplacian) and weight by pixel count —
+  `preprocess.detail()`. Picking a reference frame without this made fusion average six good
+  crops onto a noisy one.
+- `[D]` Before blaming OCR, look at the crop. cam17 scores 'ok' on plate geometry and reads
+  nothing because the scene is parked motorcycles at night, seen from above — no plate faces
+  the camera. The RLVD/enforcement cameras (cam14 'Delight RLVD') are the ones aimed at
+  plates; sample those before quoting an accuracy number.
 
 ## 4. Decisions
 
@@ -506,6 +528,12 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
   The scope test has to go through HTTP with a real token, and that needs an app with the [C4]
   endpoints on it; D3 and D4 deliberately stopped at the repository layer.
 
+- 2026-09-03 — OCR stays EasyOCR + PaddleOCR + Tesseract voting rather than a plate-specific
+  net (fast-plate-ocr/FastALPR): the vote is already built and tested, and the grid's limit
+  is glyph pixels, not recogniser quality. Recorded as the upgrade path, not a change.
+- 2026-09-03 — Super-resolution is multi-frame fusion (ECC align + average), not a generative
+  SR model. A GAN can and does invent characters; averaging real frames cannot.
+
 ## 5. Contract changes
 
 `YYYY-MM-DD — [Cx] what changed — who was told`. Nothing yet. Contracts in `TASK.md §C` are frozen;
@@ -568,6 +596,7 @@ changing one without a line here breaks somebody else's lane silently.
 - 08-29 | G1 | scripts/probe_grid.py, data/cameras.seed.json, data/catalogue/ingest.json.bootstrap | seed built and verified (`--check`); grid host was 502, used salvaged catalogue as bootstrap
 
 ### lane D
+- 09-03 | grid+ocr | services/worker/preprocess.py, scripts/grid_survey.py, data/grid_survey.json, tests/test_i_preprocess.py | 30 cameras probed (18x1080p, 5x720p, 4x1280x960, 1x960x576, 1x1440p, cam30 unreachable; 23 h264 / 6 hevc; 25 fps mostly). Plate feasibility gate + tiling + crop enhancement + multi-frame fusion, 24 tests green
 - 09-03 | merge | web/app.*, web/home.html, scripts/console_serve.py, services/gateway/wall.py, tests/test_g_console_shape.py | QA_testing's console merged into main fast-forward; audit tab given its own SYSTEM_ADMIN proxy account; alerts polled every 5 s so the badge stops going stale; 304 tests pass against live services
 - 08-29 | D1 | db/schema.sql, db/migrate.sql, scripts/load_registry.py, tests/test_d_{schema,registry}.py | schema applies twice with no errors on a throwaway timescaledb-ha:pg16; loader upserts 3 fixture cameras, and a missing camera_geo.json no longer wipes stored coordinates
 - 08-29 | D3 | services/api/watchlist.py, services/api/feeds.py, tests/test_d_watchlist.py | all-or-nothing CSV import reports both bad rows by line number and writes nothing; VAHAN and e-GujCop stubs carry request/response shapes and label every row STUB
