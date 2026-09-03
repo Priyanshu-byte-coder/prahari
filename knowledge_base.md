@@ -292,6 +292,14 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
   put). `Publisher.warm()` probes once at startup and a failed PUT opens a 60 s circuit.
 - `[I]` A synthetic fixture's plate must be stamped inside the *detector's* box, not just inside
   the image - at 0.86 of the photo's height it lands on the pavement and the crop has no plate.
+- `[I]` **The grid cameras are wide-area traffic/surveillance PTZ views, not ANPR positions.**
+  Ran the worker on real footage from cam01/04/05/13/14/17/21/25 (key 5HW4-N6KY-B64Q, HLS over
+  the CDN with AES-128 segments - see scratchpad/grabgrid.py). Across 8 cameras: **0 CONFIRMED,
+  0 grammar-valid reads.** Glyph heights 2-8 px; the feasibility gate correctly refuses. Decoding
+  at native 1920 instead of 960 changes nothing (band counts identical) - the plate is small in
+  the frame regardless of pixel count. The only "reads" were bus livery ("GSRTC") and single
+  chars. Route/watchlist for the demo will lean on the few close passes + re-ID between them, or
+  we ask the organisers which cameras are ANPR-sited.
 - `[I]` A rogue `opencv-python 5.x` (ultralytics depends on plain `opencv-python`, and pip will
   take a 5.0.0.x pre-release if nothing pins it) changes `cv2.minAreaRect` angle convention and
   broke `test_deskew_levels_a_tilted_plate` - `deskew()` under-rotated. No code bug; with cv2
@@ -579,6 +587,10 @@ changing one without a line here breaks somebody else's lane silently.
 `MM-DD | ticket | files | outcome` — newest at the top of **your own** lane's block.
 
 ### lane I
+- 09-03 | vote shape gate (lane G, owner-directed - Neal006 review) | services/worker/vote.py,
+  tests/test_i_vote_shape_gate.py | a read the readers agree on but that isn't plate-shaped
+  (len 9-11 or grammar-valid) now returns POSSIBLE (crop + null), not PROBABLE. Real-grid runs
+  surfaced `plate_text="GSRTC" [PROBABLE]` from bus livery. 158 lane-I tests + selftest green.
 - 09-03 | deps (lane G, owner-directed) | requirements.txt, requirements-ci.txt | ran the ANPR
   pipeline for real in a py3.11 venv: **`selftest --assert-xadd` green — GJ25BJ8377 CONFIRMED,
   0.5 s, conf 0.94 with easyocr+paddleocr voting.** All 132 lane-I tests pass. The lone

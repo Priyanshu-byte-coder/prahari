@@ -123,6 +123,11 @@ class PlateVote:
         if agreement < self.majority or reads < MIN_READS_FOR_TEXT:
             # Enough evidence that something was there, not enough to name it.
             return None, round(conf, 3), "POSSIBLE"
+        if not (valid or 9 <= len(plate) <= 11):
+            # Corroborated across readers, but not a plate-shaped string: bus livery ("GSRTC"),
+            # a shop board, a road sign the whole-vehicle candidate happened to catch. Seen on
+            # every wide-area grid camera. Publish the crop and a null plate, not a PROBABLE.
+            return None, round(conf, 3), "POSSIBLE"
         if valid and reads >= MIN_READS_FOR_CONFIRMED:
             return plate, round(conf, 3), "CONFIRMED"
         return plate, round(conf, 3), "PROBABLE"
