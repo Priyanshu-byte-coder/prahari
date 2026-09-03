@@ -295,22 +295,39 @@ def _to_image(frame):
     return Image.fromarray(frame.to_ndarray(format="rgb24"))
 
 
-# A block-decode failure (see the thread_type note above) reads as one flat
-# colour filling an implausibly large, contiguous share of the frame -- a
-# real scene, day or night, headlight glare or all, does not. Checked on a
-# cheap downsampled copy so this costs nothing next to the JPEG encode it
-# guards.
+# First cut here was "one colour fills an implausibly large share of the
+# frame" -- wrong. A grid full of night footage has cameras whose frame is
+# legitimately 60-80% near-black road and sky (verified: two "flagged"
+# cameras were real, fine footage of a dark road and a dark intersection,
+# just stuck because every subsequent honest frame kept tripping the same
+# over-broad test). What the actual corruption looked like -- confirmed by
+# saving and inspecting the raw decode -- was a specific, narrow signature:
+# a block of flat, brightly saturated magenta/cyan/green that a real camera,
+# lit however dimly or however glaringly, does not produce. Night footage's
+# large uniform regions are dark and low-saturation; corruption's is neither.
+# Checked on a cheap downsampled copy so this costs nothing next to the JPEG
+# encode it guards.
+# Calibrated against real samples, not guessed: the confirmed-corrupt frame's
+# dominant colour (255,126,255) has saturation 0.51; two confirmed-legitimate
+# dark-scene frames that the first cut mis-flagged sit at 0.09 and 0.14. The
+# threshold sits at the midpoint of that gap, not at either edge.
 _CORRUPT_FRACTION = 0.30
+_CORRUPT_MIN_SAT = 0.35   # 0-1; real low-light flat regions measured well under this
+_CORRUPT_MIN_VAL = 0.35   # 0-1; corruption showed bright, not the dark end of the frame
 _CORRUPT_SAMPLE = (80, 45)
 
 
 def _looks_corrupt(img) -> bool:
+    import colorsys
     small = img.resize(_CORRUPT_SAMPLE)
     colours = small.getcolors(maxcolors=_CORRUPT_SAMPLE[0] * _CORRUPT_SAMPLE[1])
     if not colours:
         return False
-    dominant = max(colours, key=lambda c: c[0])
-    return dominant[0] / (_CORRUPT_SAMPLE[0] * _CORRUPT_SAMPLE[1]) > _CORRUPT_FRACTION
+    count, (r, g, b) = max(colours, key=lambda c: c[0])
+    if count / (_CORRUPT_SAMPLE[0] * _CORRUPT_SAMPLE[1]) <= _CORRUPT_FRACTION:
+        return False
+    _, sat, val = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+    return sat >= _CORRUPT_MIN_SAT and val >= _CORRUPT_MIN_VAL
 
 
 def _encode(img) -> bytes:
