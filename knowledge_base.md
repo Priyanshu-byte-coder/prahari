@@ -595,6 +595,13 @@ changing one without a line here breaks somebody else's lane silently.
   flipped `USING_I5` True on import, so its fallback half can be deleted
 
 ### lane G
+- 09-03 | #35 J1 | tests/test_integration.py, docs/demo-script.md | legs 2-3 could never
+  pass — every core route is behind `requires(...)` and `_http` sent no token, so they
+  always skipped. Added `_access_token()` (PRAHARI_TEST_JWT, or PRAHARI_TEST_USER/PASSWORD
+  → /api/auth/login) threaded through `_http`; leg 2 now correlates the alert by the
+  `watchlist_id` it just created (not "any CONFIRMED alert" — that passed vacuously on a
+  stale row) and its window is `max(BUDGET_S, 5s)` to cover persist+match. Still skips
+  cleanly with a clear reason when no credential/API. Collects green (6 skipped, no import err).
 - 09-03 | #44 | scripts/console_serve.py, tests/test_g_console_shape.py | console's
   `/api/cameras` was an unauthed read of the full seed — bypassed D7/[C10]. Now
   `scoped_cameras()` uses the API's scoped list as the allow-list (geo/landmark shaping

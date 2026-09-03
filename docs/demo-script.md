@@ -4,11 +4,15 @@
 before anyone opens a browser:
 
 ```bash
+# legs 2-3 need an investigator credential - without it they skip, they never pass vacuously:
+export PRAHARI_TEST_USER=<investigator> PRAHARI_TEST_PASSWORD=<pw>   # or PRAHARI_TEST_JWT=<token>
 PRAHARI_INTEGRATION=1 pytest tests/test_integration.py -v     # every leg green or explicitly skipped
 python scripts/accuracy_report.py --golden fixtures/golden/   # regenerates docs/accuracy-report.md
 ```
 
-If either is red, the demo is the fix, not the presentation.
+If either is red, the demo is the fix, not the presentation. A run where legs 2-3 **skip** is
+not a green run for demo purposes — chase the skip reason (API down, wrong role, no credential)
+until all four legs are green.
 
 ---
 

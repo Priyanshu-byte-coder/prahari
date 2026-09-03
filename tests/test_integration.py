@@ -39,22 +39,54 @@ pytestmark = pytest.mark.skipif(
     not INTEGRATION, reason="set PRAHARI_INTEGRATION=1 to run the cross-lane integration test")
 
 
-def _http(path, method="GET", body=None, timeout=3.0):
-    """One tiny urllib call - the API is another lane's, so this test owns no client code."""
+def _http(path, method="GET", body=None, timeout=3.0, token=None):
+    """One tiny urllib call - the API is another lane's, so this test owns no client code.
+
+    Returns (status, payload). status is None when the host did not answer at all (connection
+    refused / DNS / timeout); an HTTP error code otherwise, with payload None.
+    """
     import urllib.error
     import urllib.request
 
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     request = urllib.request.Request(
         f"{API_BASE}{path}", method=method,
         data=None if body is None else json.dumps(body).encode(),
-        headers={"Content-Type": "application/json"})
+        headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return response.status, json.loads(response.read() or b"null")
     except urllib.error.HTTPError as exc:
-        return exc.code, None
+        try:
+            return exc.code, json.loads(exc.read() or b"null")
+        except Exception:
+            return exc.code, None
     except Exception:
         return None, None
+
+
+def _access_token():
+    """A bearer token for legs 2-3, or None when the run has not been given a credential.
+
+    Every core-API route is behind `requires(...)`, so an unauthenticated integration run can
+    only ever *skip* legs 2 and 3 - it can never exercise them. Provide one of:
+      PRAHARI_TEST_JWT                        - a ready access token, or
+      PRAHARI_TEST_USER + PRAHARI_TEST_PASSWORD - logged in here via /api/auth/login
+    The account needs watchlist:write and alerts:read (an investigator role, not a viewer).
+    """
+    jwt = os.getenv("PRAHARI_TEST_JWT")
+    if jwt:
+        return jwt
+    user, password = os.getenv("PRAHARI_TEST_USER"), os.getenv("PRAHARI_TEST_PASSWORD")
+    if not (user and password):
+        return None
+    status, payload = _http("/api/auth/login", "POST",
+                            {"username": user, "password": password})
+    if status == 200 and payload:
+        return payload.get("access")
+    return None
 
 
 @pytest.fixture(scope="module")
@@ -106,29 +138,51 @@ def api():
     return API_BASE
 
 
-def test_the_plate_raises_a_confirmed_alert(api, replay):
-    """Leg 2: the watchlist entry is added here so the test is self-contained."""
+@pytest.fixture(scope="module")
+def token(api):
+    tok = _access_token()
+    if not tok:
+        pytest.skip("no credential for legs 2-3: set PRAHARI_TEST_JWT, or "
+                    "PRAHARI_TEST_USER + PRAHARI_TEST_PASSWORD for an investigator account")
+    return tok
+
+
+def test_the_plate_raises_a_confirmed_alert(token, replay):
+    """Leg 2: add the watchlist entry here (self-contained), then wait for *its* alert.
+
+    Correlation is by watchlist_id, not "any CONFIRMED alert on the system" - a stale alert
+    from a previous run would make that pass vacuously.
+    """
     from common.plate import canon, normalise
 
     plate = normalise(replay["plate_injected"])
-    status, _ = _http("/api/watchlist", "POST",
-                      {"kind": "plate", "plate_norm": plate, "plate_canon": canon(plate),
-                       "category": "integration-test", "severity": "LOW",
-                       "reason": "J1 integration test"})
-    if status not in (200, 201):
-        pytest.skip(f"could not add a watchlist entry (HTTP {status}) - D3/D4 not up")
+    status, payload = _http("/api/watchlist", "POST",
+                            {"kind": "plate", "plate_norm": plate, "plate_canon": canon(plate),
+                             "category": "integration-test", "severity": "LOW",
+                             "reason": "J1 integration test"}, token=token)
+    if status == 401:
+        pytest.skip("the test credential lacks watchlist:write - use an investigator account")
+    assert status in (200, 201), f"could not add a watchlist entry: HTTP {status} {payload}"
+    watchlist_id = (payload or {}).get("id")
+    assert watchlist_id, f"watchlist POST returned no id: {payload}"
 
-    deadline = time.time() + BUDGET_S
+    deadline = time.time() + max(BUDGET_S, 5.0)   # leg 2 spans persist + match, not just publish
+    seen_bands = set()
     while time.time() < deadline:
-        status, alerts = _http(f"/api/alerts?limit=50")
-        if alerts and any(a.get("band") == "CONFIRMED" for a in alerts):
-            return
+        status, alerts = _http("/api/alerts?limit=100", token=token)
+        assert status != 401, "the test credential lacks alerts:read"
+        for a in alerts or []:
+            if a.get("watchlist_id") == watchlist_id:
+                seen_bands.add(a.get("band"))
+                if a.get("band") == "CONFIRMED":
+                    return
         time.sleep(0.2)
-    pytest.fail(f"no CONFIRMED alert for {plate} within {BUDGET_S}s")
+    pytest.fail(f"no CONFIRMED alert for watchlist {watchlist_id} (plate {plate}) within "
+                f"{max(BUDGET_S, 5.0)}s; bands seen: {seen_bands or 'none'}")
 
 
-def test_the_alert_reaches_a_websocket_client(api):
-    """Leg 3: D5's fanout. One message inside the budget, any type - the socket is alive."""
+def test_the_alert_reaches_a_websocket_client(token):
+    """Leg 3: D5's fanout. One well-formed frame inside the budget - the socket is alive."""
     try:
         from websockets.sync.client import connect
     except ImportError:
@@ -136,7 +190,7 @@ def test_the_alert_reaches_a_websocket_client(api):
     url = API_BASE.replace("http", "ws") + "/ws"
     try:
         with connect(url, open_timeout=2) as socket:
-            socket.send(json.dumps({"token": os.getenv("PRAHARI_TEST_JWT", "")}))
+            socket.send(json.dumps({"token": token}))
             message = json.loads(socket.recv(timeout=BUDGET_S))
     except Exception as exc:
         pytest.skip(f"no WebSocket at {url} ({exc}) - leg 3 not exercised")
