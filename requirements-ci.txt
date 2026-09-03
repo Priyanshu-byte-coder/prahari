@@ -20,8 +20,8 @@ requests
 
 # lane I — decode, detect and track. No OCR engines: see the note above.
 av
-opencv-python-headless
-numpy
+opencv-python-headless>=4.10,<4.11   # pinned: OpenCV 5.x shifts cv2 geometry conventions
+numpy<2.4
 ultralytics>=8.3.0,<8.4   # pinned: see requirements.txt / #45
 lap
 

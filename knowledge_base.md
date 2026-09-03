@@ -283,6 +283,11 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
   put). `Publisher.warm()` probes once at startup and a failed PUT opens a 60 s circuit.
 - `[I]` A synthetic fixture's plate must be stamped inside the *detector's* box, not just inside
   the image - at 0.86 of the photo's height it lands on the pavement and the crop has no plate.
+- `[I]` A rogue `opencv-python 5.x` (ultralytics depends on plain `opencv-python`, and pip will
+  take a 5.0.0.x pre-release if nothing pins it) changes `cv2.minAreaRect` angle convention and
+  broke `test_deskew_levels_a_tilted_plate` - `deskew()` under-rotated. No code bug; with cv2
+  resolved to 4.10 all 24 preprocess tests + the ANPR selftest pass. Now pinned
+  `opencv-python-headless>=4.10,<4.11` and `numpy<2.4` in both requirements files.
 - `[I]` `ultralytics` >= 8.4 dropped `BYTETracker(args, frame_rate=...)` — it now takes `args`
   only and uses `track_buffer` directly with no `frame_rate/30` scaling, where 8.3 scaled it by
   `frame_rate/30`. `tracker.py` tries the 8.3 call and falls back on `TypeError` to the 8.4 one
@@ -560,6 +565,13 @@ changing one without a line here breaks somebody else's lane silently.
 `MM-DD | ticket | files | outcome` — newest at the top of **your own** lane's block.
 
 ### lane I
+- 09-03 | deps (lane G, owner-directed) | requirements.txt, requirements-ci.txt | ran the ANPR
+  pipeline for real in a py3.11 venv: **`selftest --assert-xadd` green — GJ25BJ8377 CONFIRMED,
+  0.5 s, conf 0.94 with easyocr+paddleocr voting.** All 132 lane-I tests pass. The lone
+  `test_deskew` failure was a rogue `opencv-python 5.0.0.x` (pulled by ultralytics when nothing
+  pins it) changing `minAreaRect` — pinned `opencv-python-headless>=4.10,<4.11` + `numpy<2.4`.
+  No `deskew()` code change needed. PaddleOCR 3.7 loads PP-OCRv6 fine (the mkldnn gotcha is
+  already handled in plate.py).
 - 09-03 | cross-lane request D→I, PARTIAL (lane G, owner-directed — Neal006 to verify on the grid) |
   services/worker/run.py, tests/test_i_run_preprocess_wiring.py | wired 2 of the 4 asks from
   `preprocess.py`: `prepare_frame()` now conditions each frame before `backend.detect`

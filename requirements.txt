@@ -6,8 +6,12 @@ requests
 
 # lane I -- decode, detect, track, OCR
 av
-opencv-python-headless
-numpy
+# Pinned to the 4.10 line: OpenCV 5.x changes cv2.minAreaRect / findContours return
+# conventions, which silently shifts deskew() and the plate proposal. Same reasoning as
+# the ultralytics pin (#45) - a CV change between now and the demo invalidates I7's numbers.
+# ultralytics pulls plain opencv-python too; keep both on the same 4.10 line.
+opencv-python-headless>=4.10,<4.11
+numpy<2.4
 # Pinned to 8.3: 8.4 dropped BYTETracker's `frame_rate` arg and changed how `track_buffer`
 # maps to max_frames_lost (#45). tracker.py tolerates both, but the I7 accuracy numbers were
 # measured on 8.3 and a silent detector/tracker change before the demo would invalidate them.
