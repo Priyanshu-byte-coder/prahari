@@ -47,7 +47,8 @@ central VMS (M4) — that is the model that requires ripping out what department
 |---|---|---|
 | Ingest from RTSP / HLS / ONVIF, transport probing, per-camera health | working | `services/gateway/` |
 | Decode on PTS, motion gate, YOLOv8s detection, ByteTrack per camera | working | `services/worker/` |
-| Plate read: 3-reader vote (EasyOCR · PaddleOCR · fast-plate-ocr) + Indian-plate grammar | working | `services/worker/plate.py`, `common/plate.py` |
+| Plate read: 4-reader vote (PaddleOCR · EasyOCR · fast-plate-ocr · Tesseract) + Indian-plate grammar | working | `services/worker/plate.py`, `common/plate.py` |
+| Trained plate detector (YOLOv9-t ONNX), multi-frame super-resolution, per-character majority vote | working | `services/worker/{mfsr,mvcp}.py` |
 | Frame + crop conditioning, per-camera OCR feasibility gate, multi-frame fusion | working | `services/worker/preprocess.py` |
 | Sightings → Redis Streams → TimescaleDB hypertable, at-least-once with dead-letter | working | `services/api/persister.py` |
 | Watchlist match with confusion-class canonicalisation and banded confidence | working | `services/api/matcher.py` |
@@ -172,34 +173,49 @@ important line of engineering in this repo.
 **Pipeline latency** (`python services/worker/selftest.py`): decode → detect → track → OCR →
 publish in **0.61 s** against a 3.0 s budget, plate read back exactly.
 
-**Accuracy**, from `python scripts/accuracy_report.py --make-synthetic 60` →
-[`docs/accuracy-report.md`](docs/accuracy-report.md), 60 crops over 20 tracks, all three readers
-loaded:
+**Accuracy** — `python scripts/accuracy_report.py` → [`docs/accuracy-report.md`](docs/accuracy-report.md).
+120 crops over 40 tracks, all four readers:
 
 | reader | exact match | CER | refused |
 |---|---|---|---|
-| paddleocr | 78.3% | 0.166 | 5.0% |
-| easyocr | 65.0% | 0.240 | 3.3% |
-| fast-plate-ocr | 16.7% | 0.280 | 0.0% |
+| paddleocr | 79.2% | 0.121 | 5.0% |
+| easyocr | 70.0% | 0.221 | 5.0% |
+| fast-plate-ocr | 55.0% | 0.241 | 1.7% |
+| tesseract | 42.5% | 0.257 | 7.5% |
 | **fused vote (what the pipeline emits)** | **95.0%** | **0.050** | 5.0% |
 
-| band | share | precision | wrong |
-|---|---|---|---|
-| CONFIRMED | 85.0% | 100.0% | **0** |
-| PROBABLE | 10.0% | 100.0% | 0 |
-| POSSIBLE | 5.0% | — | 0 |
+CONFIRMED covers 95% of tracks at **100% precision — zero confidently-wrong reads**. The vote
+beats its best single reader by 16 points, which is the whole argument for four architectures
+instead of one. *This corpus is synthetic and therefore an upper bound*; the report prints which
+corpus it scored on every run and refuses to print a number when it has none.
 
-Two things worth reading twice. The vote beats its best single reader by 17 points — that is the
-entire argument for running three architectures instead of one. And **zero confidently-wrong
-reads**: everything the system marked CONFIRMED was correct, and the 5% it could not read it
-refused to name rather than guessing.
+**Low-resolution behaviour** — [`docs/lr-benchmark.md`](docs/lr-benchmark.md), measured against
+the published UFPR-SR-Plates benchmark (Nascimento et al., JBCS 31:1, 2025), whose low-resolution
+plates are 18–21 px tall, like the grid's:
 
-**This corpus is synthetic and therefore an upper bound** — rendered glyphs, no perspective, less
-motion blur than a junction at night. The report prints which corpus it scored on every run and
-refuses to print a number at all when it has no crops. fast-plate-ocr scores worst here precisely
-*because* it is the plate-specific model: it was trained on photographed plates and is least at
-home on rendered ones. On real crops that ordering is expected to move, which is why the number
-that ships must come from hand-labelled grid crops (issue #52).
+| condition | recognition |
+|---|---|
+| low-res crop straight to OCR | 1.7 – 2.2% |
+| + best single-image super-resolution | 29.9 – 31.1% |
+| + majority vote by character position over several reconstructions | **42.3 – 44.7%** |
+
+That last row is the design: `mfsr.py` builds several reconstructions and `mvcp.py` decides per
+character position. Worth knowing that the paper *excluded night footage* because infrared made
+plates unreadable even at high resolution — and the Sentinel grid is night footage.
+
+**On the live grid, we read zero plates** ([`docs/plate-ocr-grid-report.md`](docs/plate-ocr-grid-report.md)).
+All 30 feeds, hundreds of vehicle detections and tracks per camera, no plate resolvable — cam30
+276 detections / 0 plates, cam04 123 / 0, cam05 107 / 0. That is the same conclusion the pixel
+arithmetic above reaches from the other end, and it is stated here rather than buried: **these
+cameras are placed for scene overview, not plate capture.** What would change it is an
+enforcement-framed camera or the operators' own RLVD plate snapshots, neither of which is in the
+public feed. Everything else in this system — tracking, correlation, routes, alerts, audit —
+works on the grid today; ANPR needs a camera pointed at a plate.
+
+**Latency** — `python services/worker/selftest.py`: decode → detect → track → OCR → publish in
+**0.68 s** against a 3.0 s budget, plate read back exactly, band CONFIRMED. The expensive paths
+(multi-frame super-resolution, multi-reconstruction voting) escalate only when two readers have
+not already agreed, so a hard plate gets all of it and an easy one is not made to wait for it.
 
 **Tests**: `pytest tests/ -q` → **348 passed, 6 skipped**. CI runs the same suite against real
 Postgres and Redis service containers on every push.
@@ -236,6 +252,8 @@ Read [`docs/hld.md` §8–9](docs/hld.md) for the full model, including the priv
 | [`docs/video-script.md`](docs/video-script.md) | The 3-minute submission video, shot by shot |
 | [`docs/demo-script.md`](docs/demo-script.md) | The live 8-minute demo, with the drills |
 | [`docs/model-card.md`](docs/model-card.md) | Models used, training provenance, known failure modes |
+| [`docs/lr-benchmark.md`](docs/lr-benchmark.md) | What a 20 px plate can and cannot yield, against the published benchmark |
+| [`docs/plate-ocr-grid-report.md`](docs/plate-ocr-grid-report.md) | The full 30-camera run: what was detected, what was readable, and why |
 | [`docs/submission.md`](docs/submission.md) | Deliverables checklist and what remains |
 | [`docs/deck.html`](docs/deck.html) | The 10-slide presentation |
 
