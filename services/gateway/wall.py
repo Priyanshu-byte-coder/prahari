@@ -229,6 +229,7 @@ class Wall:
         # that blocks 8554) and back to RTSP on the one after that, rather
         # than latching onto whichever failed first.
         use_rtsp = feed.rtsp_url is not None
+        rtsp_denied = 0
         while not feed._stop.is_set():
             try:
                 feed.status = "connecting"
@@ -252,6 +253,8 @@ class Wall:
                     stream.codec_context.thread_count = 1
                     feed.status = "live"
                     feed.detail = ""
+                    if transport == "rtsp":
+                        rtsp_denied = 0        # credentials work again; resume alternating
                     feed.transport = transport
                     feed.codec = stream.codec_context.name
                     feed.resolution = f"{stream.codec_context.width}x{stream.codec_context.height}"
@@ -290,14 +293,41 @@ class Wall:
                 feed.detail = f"{type(exc).__name__}: {exc}"[:160]
                 # Alternate transport on the next attempt, but only if there
                 # is another one to try.
+                if use_rtsp and _is_auth_failure(exc):
+                    rtsp_denied += 1
+                elif use_rtsp:
+                    rtsp_denied = 0
                 if feed.rtsp_url and feed.hls_url:
-                    use_rtsp = not use_rtsp
+                    if rtsp_denied >= RTSP_AUTH_GIVE_UP:
+                        # RTSP is not failing, it is refusing: the grid answered 401 this many
+                        # times running. Alternating into it anyway spends half of every retry
+                        # cycle on a guaranteed rejection, and a 30-tile wall then takes minutes
+                        # to fill while a judge watches grey boxes. Stay on HLS; one successful
+                        # RTSP open (after a credential arrives) clears the counter and the
+                        # alternation resumes.
+                        use_rtsp = False
+                        feed.detail = (f"RTSP refused {rtsp_denied}x (401); staying on HLS. "
+                                       f"Last: {type(exc).__name__}")[:160]
+                    else:
+                        use_rtsp = not use_rtsp
             if feed._stop.is_set():
                 break
             # Wait, but stay interruptible so Stop is immediate.
             feed._stop.wait(backoff)
             backoff = min(backoff * 2, BACKOFF_MAX_S)
         feed.status = "stopped"
+
+
+RTSP_AUTH_GIVE_UP = 2       # consecutive 401s after which a feed stops retrying RTSP
+
+# ffmpeg reports the refusal differently depending on build: a 401 status in the message, or
+# PyAV's HTTPUnauthorizedError / a bare "Unauthorized". Matching on the text is unlovely but it
+# is the only thing all three have in common.
+_AUTH_MARKERS = ("401", "unauthorized", "authorization failed")
+
+
+def _is_auth_failure(exc):
+    return any(marker in f"{type(exc).__name__}: {exc}".lower() for marker in _AUTH_MARKERS)
 
 
 def _to_image(frame):

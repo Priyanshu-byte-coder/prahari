@@ -36,6 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from common.plate_compat import canon, normalise                   # noqa: E402
+from scope import DEPARTMENT_PREDICATE, apply_session_scope         # noqa: E402
 
 log = logging.getLogger("route")
 
@@ -45,6 +46,9 @@ OSRM_TIMEOUT_S = 3.0
 DEFAULT_WINDOW = timedelta(hours=24)
 FUZZY_LABEL = "fuzzy match; verify plate"
 
+# Every route query carries the [C7] department predicate. A route is the most sensitive read in
+# the system - it is one person's movements - so the filter lives in the SQL rather than in a
+# comprehension after the fetch: rows another department may not see are never in this process.
 EXACT_SQL = """
 SELECT s.sighting_id, s.camera_id, c.name AS camera_name, c.lat, c.lon,
        s.pts_first, s.pts_last, s.plate_norm, s.plate_band, s.plate_conf, s.crop_uri
@@ -52,6 +56,7 @@ FROM sightings s
 JOIN cameras c ON c.camera_id = s.camera_id
 WHERE s.plate_norm = %(plate)s
   AND s.pts_first >= %(since)s AND s.pts_first <= %(until)s
+  AND """ + DEPARTMENT_PREDICATE.replace("owner_dept_id", "c.owner_dept_id") + """
 ORDER BY s.pts_first
 """
 
@@ -64,6 +69,7 @@ FROM sightings s
 JOIN cameras c ON c.camera_id = s.camera_id
 WHERE (s.plate_canon = %(canon)s OR similarity(s.plate_norm, %(plate)s) >= %(floor)s)
   AND s.pts_first >= %(since)s AND s.pts_first <= %(until)s
+  AND """ + DEPARTMENT_PREDICATE.replace("owner_dept_id", "c.owner_dept_id") + """
 ORDER BY s.pts_first
 """
 
@@ -190,24 +196,35 @@ class RouteBuilder:
     def __init__(self, store):
         self.store = store
 
-    def _query(self, sql, params):
+    def _query(self, sql, params, scope=None):
         with self.store.conn as conn, conn.cursor() as cur:
+            if scope is not None:
+                apply_session_scope(cur, scope)     # RLS backstop, per [C7]
             cur.execute(sql, params)
             cols = [c.name for c in cur.description]
             return [dict(zip(cols, r)) for r in cur.fetchall()]
 
-    def build(self, plate, since=None, until=None, osrm_url=None):
-        """[C4] RouteResponse for one plate over one window."""
+    def build(self, plate, since=None, until=None, osrm_url=None, scope=None):
+        """[C4] RouteResponse for one plate over one window, confined to the caller's scope.
+
+        `scope` is not optional in production - the router always passes one. It defaults to None
+        so the unit tests can build a route without standing up an auth stack, and that default
+        is statewide, which is why the router never relies on it.
+        """
         plate = normalise(plate or "")
         until = until or datetime.now(timezone.utc)
         since = since or (until - DEFAULT_WINDOW)
+        confine = (scope.department_filter() if scope is not None
+                   else {"all_departments": True, "departments": []})
 
-        rows = self._query(EXACT_SQL, {"plate": plate, "since": since, "until": until})
+        rows = self._query(EXACT_SQL, {"plate": plate, "since": since, "until": until, **confine},
+                           scope=scope)
         fuzzy = False
         if not rows:
             rows = self._query(FUZZY_SQL, {"plate": plate, "canon": canon(plate),
                                            "floor": TRIGRAM_FLOOR,
-                                           "since": since, "until": until})
+                                           "since": since, "until": until, **confine},
+                               scope=scope)
             fuzzy = bool(rows)
 
         hops = flag_implausible(collapse(rows))
@@ -249,10 +266,19 @@ class RouteBuilder:
         }
 
 
+def _as_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def build_router(store):
     """The [C4] route endpoints, mounted by the app in ws.create_app."""
-    from fastapi import APIRouter, HTTPException, Query
+    from fastapi import APIRouter, Depends, HTTPException, Query
     from fastapi.responses import Response
+
+    from auth import requires
 
     import export as export_module
 
@@ -270,21 +296,28 @@ def build_router(store):
     @router.get("/route")
     def get_route(plate: str = Query(..., min_length=4),
                   since: str = Query(None, alias="from"),
-                  until: str = Query(None, alias="to")):
+                  until: str = Query(None, alias="to"),
+                  scope=Depends(requires("route"))):
+        # A route is one vehicle's movements over a day. It was the last endpoint in the app
+        # still answering an anonymous caller, and it is the one that most needed not to.
         start, end = _window(since, until)
-        return builder.build(plate, since=start, until=end)
+        return builder.build(plate, since=start, until=end, scope=scope)
 
     @router.get("/route/export")
     def export_route(plate: str = Query(..., min_length=4), fmt: str = "csv",
                      since: str = Query(None, alias="from"),
                      until: str = Query(None, alias="to"),
-                     user_id: int = None, dept_id: int = None):
+                     scope=Depends(requires("export"))):
+        # user_id and dept_id used to be query parameters, which meant the caller wrote their own
+        # name into the export audit row. An audit log the subject can forge is worse than none,
+        # so both now come from the token and nowhere else.
         if fmt not in ("csv", "pdf"):
             raise HTTPException(status_code=400, detail="fmt must be csv or pdf")
         start, end = _window(since, until)
-        route = builder.build(plate, since=start, until=end)
+        route = builder.build(plate, since=start, until=end, scope=scope)
         body, content_type = export_module.render(route, fmt)
-        export_module.record_export(store, route, fmt, user_id=user_id, dept_id=dept_id)
+        export_module.record_export(store, route, fmt, user_id=_as_int(scope.user_id),
+                                    dept_id=scope.dept_id)
         filename = f"route-{route['plate']}.{fmt}"
         return Response(content=body, media_type=content_type,
                         headers={"Content-Disposition": f'attachment; filename="{filename}"'})

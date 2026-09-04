@@ -80,3 +80,14 @@ def test_no_admin_password_means_a_clear_answer_not_a_wrong_403(monkeypatch):
     status, payload = console_serve.api_call("GET", "admin/audit")
     assert status == 503
     assert "audit account" in payload["detail"]
+
+
+def test_a_refused_rtsp_stops_being_retried():
+    # [#57] The grid answers 401 on RTSP for our IP. Alternating into it anyway spends half of
+    # every retry cycle on a guaranteed rejection, and the wall takes minutes to fill.
+    from services.gateway.wall import RTSP_AUTH_GIVE_UP, _is_auth_failure
+
+    assert _is_auth_failure(RuntimeError("Server returned 401 Unauthorized")) is True
+    assert _is_auth_failure(Exception("HTTPUnauthorizedError: authorization failed")) is True
+    assert _is_auth_failure(TimeoutError("Connection timed out")) is False
+    assert RTSP_AUTH_GIVE_UP >= 1

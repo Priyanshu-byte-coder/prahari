@@ -258,6 +258,46 @@ class PaddleReader(_Reader):
         return best
 
 
+class FastPlateReader(_Reader):
+    """fast-plate-ocr: a CTC recogniser trained on plates rather than on scene text.
+
+    The third architecture in the vote, and the one that is actually about this problem. EasyOCR
+    and PaddleOCR are general scene-text models that happen to be pointed at a plate; this one
+    was trained on plate crops, ships as a 2 MB ONNX file, and reads a crop in single-digit
+    milliseconds on CPU - which matters because it can be asked for a second opinion on every
+    candidate rather than only the best one.
+
+    It is here because the demo box could only ever load EasyOCR: paddlepaddle does not install
+    on this machine and Tesseract needs a system binary. A "vote" of one reader is a single read
+    wearing a vote's confidence, and that is the thing the accuracy target must not be built on.
+    """
+
+    name = "fastplate"
+
+    def _load(self):
+        from fast_plate_ocr import LicensePlateRecognizer
+
+        # xs is the small model: 2 MB, and the accuracy difference against `cct-s` on plates this
+        # size is inside the noise of the crops the grid gives us.
+        return LicensePlateRecognizer(os.getenv("PRAHARI_FASTPLATE_MODEL",
+                                                "cct-xs-v1-global-model"))
+
+    def _read(self, crop):
+        # The ONNX graph takes 3-channel input; a greyscale crop raises a dimension error rather
+        # than being promoted, so the conversion has to happen here.
+        if crop.ndim == 2:
+            crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR)
+        results = self.engine().run(crop, return_confidence=True)
+        if not results:
+            return "", 0.0
+        best = results[0]
+        probs = getattr(best, "char_probs", None)
+        # The *minimum* character probability, not the mean. A plate is only as right as its
+        # worst character, and a mean lets eight confident characters carry one that is a guess.
+        conf = float(min(probs)) if probs is not None and len(probs) else 0.0
+        return getattr(best, "plate", "") or "", conf
+
+
 class TesseractReader(_Reader):
     """A classical engine as a third opinion. Weakest of the three on dirty plates, and
     deliberately so - it fails differently, which is what a vote wants."""
@@ -279,7 +319,7 @@ class TesseractReader(_Reader):
         return text, (sum(confs) / len(confs) / 100.0 if confs else 0.0)
 
 
-_AVAILABLE = (EasyOCRReader, PaddleReader, TesseractReader)
+_AVAILABLE = (EasyOCRReader, PaddleReader, FastPlateReader, TesseractReader)
 _READERS = None
 _READERS_LOCK = threading.Lock()
 
@@ -315,7 +355,7 @@ def _load_readers():
                 logger.info("reader %s unavailable: %s", cls.name, str(exc).split("\n")[0])
         if len(found) < 2:
             logger.warning("only %d OCR reader(s) available (%s) - the multi-reader vote is "
-                           "degraded; install paddleocr or tesseract for the accuracy target",
+                           "degraded; install fast-plate-ocr, paddleocr or tesseract for the accuracy target",
                            len(found), ", ".join(r.name for r in found) or "none")
         _READERS = found
     return _READERS

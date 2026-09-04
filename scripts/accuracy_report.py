@@ -237,6 +237,13 @@ def _pct(value):
     return "-" if value is None else f"{value:.1%}"
 
 
+def _manifest_len(golden):
+    manifest = Path(golden) / "labels.jsonl"
+    if not manifest.exists():
+        return 0
+    return sum(1 for line in manifest.read_text(encoding="utf-8").splitlines() if line.strip())
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="[I7] golden set accuracy report")
     ap.add_argument("--golden", default=str(GOLDEN))
@@ -255,9 +262,25 @@ def main(argv=None):
         print(f"wrote {n} synthetic crops to {args.golden}")
 
     rows = load(args.golden)[: args.limit]
+    if not rows:
+        manifest = _manifest_len(args.golden)
+        raise SystemExit(
+            "no labelled crops found under " + str(args.golden) + ".\n"
+            "labels.jsonl lists " + str(manifest) + " rows, but the images they name are not "
+            "there - crops are not committed to this repo.\n"
+            "Either drop the hand-labelled crops into that directory, or generate a synthetic "
+            "stand-in:\n"
+            "    python scripts/accuracy_report.py --make-synthetic 40\n"
+            "A report scored over zero crops is not a low number, it is no number, and the deck "
+            "must not quote one.")
     engines = readers()
     if not engines:
         raise SystemExit("no OCR reader available - install easyocr or paddleocr")
+    if len(engines) < 2:
+        logging.getLogger("prahari.accuracy").warning(
+            "scoring with a single reader (%s): this measures one read, not the 2-of-3 vote the "
+            "pipeline ships. The report says so, and so must the deck.",
+            ", ".join(e.name for e in engines))
     report = score(rows, engines)
     markdown = render(report, rows, engines)
 

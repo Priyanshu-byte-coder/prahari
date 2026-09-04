@@ -127,8 +127,17 @@ def build_router(store):
     @router.post("/alerts/{alert_id}/state")
     def set_alert_state(alert_id: int, body: dict,
                         scope=Depends(requires("alerts:write"))):
+        # A body without `to_state` used to fall through as an empty string and come back as
+        # "NEW ->  is not a legal transition" - a 409 that reads like the state machine is
+        # broken. Missing input is 422; 409 is reserved for a transition that is genuinely
+        # illegal.
+        to_state = (body.get("to_state") or "").strip().upper()
+        if not to_state:
+            raise HTTPException(status_code=422,
+                                detail="to_state is required, one of "
+                                       "ACKNOWLEDGED / ACTIONED / DISMISSED")
         try:
-            return alerts.transition(alert_id, (body.get("to_state") or "").upper(),
+            return alerts.transition(alert_id, to_state,
                                      by_user=_as_int(scope.user_id), dept_id=scope.dept_id,
                                      reason=body.get("reason"))
         except IllegalTransition as exc:

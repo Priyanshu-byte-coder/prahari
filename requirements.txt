@@ -17,8 +17,17 @@ numpy<2.4
 # measured on 8.3 and a silent detector/tracker change before the demo would invalidate them.
 ultralytics>=8.3.0,<8.4
 lap
-paddleocr
+
+# OCR readers. plate.py loads whichever of these import and votes across them; none is required
+# for the service to start, and every one that is missing is logged at startup rather than
+# assumed. Install at least two - a "vote" of one reader is a single read wearing a vote's
+# confidence, which is exactly the number the accuracy target must not be built on.
+easyocr                     # CRAFT detector + CRNN recogniser, scene text
+fast-plate-ocr[onnx]        # CTC recogniser trained on plates, 2 MB ONNX, CPU-fast
+paddleocr                   # DB + SVTR, a third architecture
 paddlepaddle
+# pytesseract               # a fourth opinion; needs the Tesseract binary installed separately,
+#                             so it is off by default rather than a broken import at startup.
 
 # lane D -- persistence, matching, RBAC, export
 psycopg2-binary

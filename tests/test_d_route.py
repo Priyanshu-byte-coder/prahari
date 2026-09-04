@@ -30,7 +30,15 @@ DSN = os.environ.get("TEST_POSTGRES_DSN",
 REDIS_URL = os.environ.get("TEST_REDIS_URL",
                            os.environ.get("REDIS_URL", "redis://localhost:6379/0"))
 
-ROUTE_PLATE = fs.ROUTE_PLATE
+# Not `fs.ROUTE_PLATE`. The generator scripts that exact plate across cameras 1-5, so on any
+# laptop that has run the demo these tests were asserting on their own rows *plus* however many
+# thousand the generator had left in the table - seven failures that said nothing about the code.
+# A per-run plate keeps the shape the grammar expects while belonging to this run alone.
+ROUTE_PLATE = "GJ01ZZ" + f"{uuid.uuid4().int % 10000:04d}"
+# The same plate with one confusion-class edit (Z and 2 collapse to the same canon key),
+# which is what the fuzzy fallback exists to catch. Derived rather than hardcoded so it
+# tracks ROUTE_PLATE instead of silently testing nothing when that changes.
+MISREAD_PLATE = ROUTE_PLATE.replace("Z", "2", 1)
 
 # Four cameras along CG Road in Ahmedabad, then one in Surat. The Surat hop is 200 km away
 # roughly a minute later: physically impossible, and exactly the misread the flag exists for.
@@ -138,7 +146,7 @@ def test_a_misread_plate_falls_back_to_fuzzy_and_says_so(rig):
     # retries on the canon key - and the result set is labelled, because an unlabelled fuzzy
     # match is how somebody stops the wrong car.
     store, _tag, cameras = rig
-    lay_route(store, cameras, plate="GJ01A81234")
+    lay_route(store, cameras, plate=MISREAD_PLATE)
     route = RouteBuilder(store).build(ROUTE_PLATE, since=datetime.now(fs.IST) - timedelta(days=1))
 
     assert route["fuzzy"] is True
@@ -267,17 +275,20 @@ def test_every_export_writes_an_audit_row(rig):
     lay_route(store, cameras)
     route = RouteBuilder(store).build(ROUTE_PLATE, since=datetime.now(fs.IST) - timedelta(days=1))
 
+    # Counted for this plate only. `max(object_id)` over the whole table picked up exports from
+    # every previous run, whose plates sort unpredictably against this run's.
     with store.conn as conn, conn.cursor() as cur:
-        cur.execute("SELECT count(*) FROM audit_log WHERE action = 'route.export'")
+        cur.execute("""SELECT count(*) FROM audit_log
+                       WHERE action = 'route.export' AND object_id = %s""", (ROUTE_PLATE,))
         before = cur.fetchone()[0]
 
     export.record_export(store, route, "csv", user_id=None, dept_id=None)
 
     with store.conn as conn, conn.cursor() as cur:
-        cur.execute("""SELECT count(*), max(object_id) FROM audit_log
-                       WHERE action = 'route.export'""")
-        after, object_id = cur.fetchone()
-    assert after == before + 1 and object_id == ROUTE_PLATE
+        cur.execute("""SELECT count(*) FROM audit_log
+                       WHERE action = 'route.export' AND object_id = %s""", (ROUTE_PLATE,))
+        after = cur.fetchone()[0]
+    assert after == before + 1
 
 
 def test_the_export_audit_row_stays_on_the_alert_chain(rig):
@@ -300,7 +311,7 @@ def test_render_rejects_a_format_nobody_asked_for():
 def test_a_fuzzy_route_is_labelled_in_the_export_itself(rig):
     # The label has to survive the export: the CSV is what gets attached to a case file.
     store, _tag, cameras = rig
-    lay_route(store, cameras, plate="GJ01A81234")
+    lay_route(store, cameras, plate=MISREAD_PLATE)
     route = RouteBuilder(store).build(ROUTE_PLATE, since=datetime.now(fs.IST) - timedelta(days=1))
     body = export.to_csv(route).decode("utf-8")
     assert "fuzzy - verify plate" in body
@@ -309,16 +320,52 @@ def test_a_fuzzy_route_is_labelled_in_the_export_itself(rig):
 
 # --- the HTTP surface -------------------------------------------------------------------------
 
-def api_client(store):
-    """Plain HTTP, so starlette's TestClient is fine here - no server-pushed frames involved."""
+def api_client(store, role="INVESTIGATOR", dept_id=None):
+    """Plain HTTP, so starlette's TestClient is fine here - no server-pushed frames involved.
+
+    Both route endpoints are scoped ([C10]), so the client carries a token by default. Pass
+    `role=None` to get an anonymous client - which is what the refusal tests want.
+    """
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
     from route import build_router
+    from ws import issue_token
 
     app = FastAPI()
     app.include_router(build_router(store))
-    return TestClient(app)
+    client = TestClient(app)
+    if role:
+        client.headers["Authorization"] = f"Bearer {issue_token(1, role, dept_id=dept_id)}"
+    return client
+
+
+def test_an_anonymous_caller_gets_nothing_from_route(rig):
+    # This endpoint answers with one vehicle's movements. It was the last one in the app still
+    # serving an anonymous caller, complete with presigned crop URLs.
+    store, _tag, _cameras = rig
+    assert api_client(store, role=None).get(
+        "/api/route", params={"plate": ROUTE_PLATE}).status_code == 401
+    assert api_client(store, role=None).get(
+        "/api/route/export", params={"plate": ROUTE_PLATE}).status_code == 401
+
+
+def test_a_system_admin_cannot_read_a_route(rig):
+    # [C10]: the most privileged account is not the most visible one. Config and audit only.
+    store, _tag, _cameras = rig
+    assert api_client(store, role="SYSTEM_ADMIN").get(
+        "/api/route", params={"plate": ROUTE_PLATE}).status_code == 403
+
+
+def test_an_operator_outside_the_department_sees_no_hops(rig):
+    # The rig's cameras carry no owner_dept_id, so a department-confined operator matches none
+    # of them. Withholding is the right default - the alternative is showing another
+    # department's vehicle and apologising after the frame is already on screen.
+    store, _tag, cameras = rig
+    lay_route(store, cameras)
+    body = api_client(store, role="OPERATOR", dept_id=4242).get(
+        "/api/route", params={"plate": ROUTE_PLATE}).json()
+    assert body["hops"] == []
 
 
 def test_the_route_endpoint_answers_c4(rig):
