@@ -91,3 +91,33 @@ def test_a_refused_rtsp_stops_being_retried():
     assert _is_auth_failure(Exception("HTTPUnauthorizedError: authorization failed")) is True
     assert _is_auth_failure(TimeoutError("Connection timed out")) is False
     assert RTSP_AUTH_GIVE_UP >= 1
+
+
+def test_the_wall_holds_a_bounded_number_of_connections():
+    # The grid gives every client its own copy of the stream and enforces one session per IP.
+    # Asking it for thirty at once got most of them refused - which read as "22 cameras down"
+    # and was really us being rude. Probed one at a time, all thirty answer.
+    from services.gateway.wall import WALL_MAX_OPEN, WALL_SLOT_S, WALL_STAGGER_S
+
+    assert 1 <= WALL_MAX_OPEN <= 12, "a whole 30-camera wall at once is what broke this"
+    assert WALL_SLOT_S > 0 and WALL_STAGGER_S >= 0
+
+
+def test_the_wall_can_re_authenticate_mid_run():
+    # One session per IP means somebody else signing in takes ours, and a wall holding the dead
+    # cookie retries forever against a session the server has forgotten. Headers are therefore
+    # resolved per connection, not captured once at startup.
+    from services.gateway.wall import Wall
+
+    calls = []
+
+    def headers():
+        calls.append(1)
+        return f"Cookie: session-{len(calls)}\r\n"
+
+    wall = Wall([], headers=headers)
+    assert wall.headers != wall.headers, "a callable must be re-resolved on every connection"
+    assert len(calls) >= 2
+
+    static = Wall([], headers="Cookie: fixed\r\n")
+    assert static.headers == "Cookie: fixed\r\n"

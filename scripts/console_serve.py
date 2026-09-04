@@ -134,6 +134,19 @@ def grid_login() -> bool:
     return True
 
 
+def grid_headers_fresh() -> str | None:
+    """Headers for a media fetch, signing in again first if our session has gone.
+
+    The grid permits one session per IP. Somebody else signing in - or a debugging `curl` -
+    takes ours, and every wall tile then retries against a cookie the server has forgotten. So
+    the wall asks for headers per connection and this re-authenticates when the cookie is
+    missing, rather than failing quietly for the rest of the run.
+    """
+    if not GRID.get("cookie"):
+        grid_login()
+    return grid_headers()
+
+
 def grid_headers() -> str | None:
     return f"Cookie: {GRID['cookie']}\r\n" if GRID.get("cookie") else None
 
@@ -401,7 +414,7 @@ def main() -> int:
     ok = grid_login()
     print(f"grid HLS sign-in (fallback transport): {GRID['state']}" +
           (f" — {GRID['detail']}" if GRID["detail"] else ""))
-    WALL = Wall(cameras, interval=args.interval, headers=grid_headers(),
+    WALL = Wall(cameras, interval=args.interval, headers=grid_headers_fresh,
                 user_agent=GRID_UA)
     print(f"cameras with a wall transport: {len(WALL.feeds)}/{len(cameras)} "
           f"(RTSP direct to the grid's public IP, no key needed; HLS as fallback)")

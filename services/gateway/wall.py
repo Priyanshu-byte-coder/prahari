@@ -29,6 +29,7 @@ without hard-coding which one a given network allows.
 from __future__ import annotations
 
 import io
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -53,6 +54,20 @@ STALE_AFTER_S = 90.0
 # A dedicated subdomain (stream.corp8.cloud) is mentioned as an alternative
 # in the guide but not required; the IP is stable and needs no DNS trust.
 GRID_PUBLIC_IP = "103.250.160.189"
+
+RTSP_AUTH_GIVE_UP = 2       # consecutive 401s after which a feed stops retrying RTSP
+
+# How many cameras we hold open at the same time, and how long a feed keeps its slot before
+# offering it to the next camera.
+#
+# The grid gives every connected client its own copy of the stream and enforces one session per
+# IP; asking it for thirty at once got most of them refused, which looked like "22 cameras down"
+# and was really us being rude. Probed one at a time, all thirty answer. So the wall holds a few
+# slots, rotates through the roster, and each tile keeps showing its last good frame with an age
+# while it waits its turn - which is what a physical video wall does anyway.
+WALL_MAX_OPEN = int(os.getenv("PRAHARI_WALL_MAX_OPEN", "6"))
+WALL_SLOT_S = float(os.getenv("PRAHARI_WALL_SLOT_S", "45"))
+WALL_STAGGER_S = float(os.getenv("PRAHARI_WALL_STAGGER_S", "1.5"))
 RTSP_PORT = 8554
 # The CDN host for the HLS fallback. The catalogue's own transports.hls field
 # (data/cameras.seed.json, from an earlier probe of live.corp8.cloud) predates
@@ -132,12 +147,20 @@ class Wall:
     """Owns one puller thread per camera. Start and stop are idempotent."""
 
     def __init__(self, cameras: list[dict], interval: float = 2.0, headers: str | None = None,
-                 user_agent: str | None = None):
+                 user_agent: str | None = None, max_open: int | None = None):
         self.interval = interval
+        # Slots, not a free-for-all: see WALL_MAX_OPEN.
+        self._slots = threading.Semaphore(max_open or WALL_MAX_OPEN)
+        self.max_open = max_open or WALL_MAX_OPEN
         # Extra HTTP headers handed to PyAV on an HLS open, as one
         # CRLF-terminated block -- only used on the HLS fallback path; the
         # RTSP path needs no session at all.
-        self.headers = headers
+        # Either a header block or a callable returning one. A callable is what the console
+        # passes: the grid allows **one session per IP**, so any other login - a teammate's
+        # browser, a curl while debugging - silently invalidates ours, and a wall holding the
+        # dead cookie retries forever against a session that no longer exists. Asking for the
+        # headers per connection lets the console re-authenticate underneath us.
+        self._headers = headers
         # The User-Agent has to travel as its own option, not as a line inside
         # `headers`: ffmpeg appends its own UA to the request either way, and
         # Cloudflare in front of the grid answers 403 to the pair. Passed
@@ -173,7 +196,8 @@ class Wall:
                 feed.status = "connecting"
                 feed.detail = ""
                 feed._thread = threading.Thread(
-                    target=self._pull, args=(feed,), daemon=True, name=f"wall-{cid}"
+                    target=self._pull, args=(feed, len(started) * WALL_STAGGER_S),
+                    daemon=True, name=f"wall-{cid}"
                 )
                 feed._thread.start()
                 started.append(cid)
@@ -215,14 +239,28 @@ class Wall:
             return av.open(feed.rtsp_url, timeout=OPEN_TIMEOUT_S, options=opts), "rtsp"
         if feed.hls_url:
             opts = {"multiple_requests": "1"}
-            if self.headers:
-                opts["headers"] = self.headers
+            headers = self.headers
+            if headers:
+                opts["headers"] = headers
             if self.user_agent:
                 opts["user_agent"] = self.user_agent
             return av.open(feed.hls_url, timeout=OPEN_TIMEOUT_S, options=opts), "hls"
         raise RuntimeError("no transport available for this camera")
 
-    def _pull(self, feed: CameraFeed) -> None:
+    @property
+    def headers(self) -> str | None:
+        """Current header block, re-resolved each connection when a callable was supplied."""
+        if callable(self._headers):
+            try:
+                return self._headers()
+            except Exception:            # never let a re-auth failure kill a puller thread
+                return None
+        return self._headers
+
+    def _pull(self, feed: CameraFeed, delay: float = 0.0) -> None:
+        if delay and feed._stop.wait(delay):
+            feed.status = "stopped"
+            return
         backoff = BACKOFF_START_S
         # Prefer RTSP -- it needs no session at all. A feed alternates to
         # HLS on the retry right after an RTSP failure (covering a network
@@ -231,6 +269,12 @@ class Wall:
         use_rtsp = feed.rtsp_url is not None
         rtsp_denied = 0
         while not feed._stop.is_set():
+            if not self._slots.acquire(timeout=WALL_SLOT_S * 4):
+                feed.status = "queued"
+                feed.detail = (f"waiting for one of {self.max_open} connection slots; "
+                               "showing the last frame")[:160]
+                continue
+            slot_expires = time.time() + WALL_SLOT_S
             try:
                 feed.status = "connecting"
                 container, transport = self._open(feed, use_rtsp)
@@ -263,6 +307,12 @@ class Wall:
 
                     for packet in container.demux(stream):
                         if feed._stop.is_set():
+                            break
+                        if time.time() > slot_expires and feed.frames:
+                            # Time is up and this tile has a picture; hand the slot on. The tile
+                            # keeps showing its last frame with an age rather than going blank.
+                            feed.status = "holding"
+                            feed.detail = "last frame held while another camera uses the slot"
                             break
                         # Keyframes only: a fraction of the real frame rate is
                         # plenty for a wall of stills, and DON'T assume a
@@ -310,15 +360,22 @@ class Wall:
                                        f"Last: {type(exc).__name__}")[:160]
                     else:
                         use_rtsp = not use_rtsp
+            finally:
+                self._slots.release()
             if feed._stop.is_set():
                 break
-            # Wait, but stay interruptible so Stop is immediate.
-            feed._stop.wait(backoff)
-            backoff = min(backoff * 2, BACKOFF_MAX_S)
+            # Wait, but stay interruptible so Stop is immediate. A feed that got its picture and
+            # simply ran out of slot time should not back off as if it had failed.
+            if feed.status == "holding":
+                feed._stop.wait(WALL_SLOT_S)
+                backoff = BACKOFF_START_S
+            else:
+                feed._stop.wait(backoff)
+                backoff = min(backoff * 2, BACKOFF_MAX_S)
         feed.status = "stopped"
 
 
-RTSP_AUTH_GIVE_UP = 2       # consecutive 401s after which a feed stops retrying RTSP
+
 
 # ffmpeg reports the refusal differently depending on build: a 401 status in the message, or
 # PyAV's HTTPUnauthorizedError / a bare "Unauthorized". Matching on the text is unlovely but it
