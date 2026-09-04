@@ -314,12 +314,14 @@ def main() -> int:
                 if r:
                     vote.add(r, sharpness=sh)
             text, conf, band = vote.result()
-            if text and band in ("CONFIRMED", "PROBABLE"):
+            # CONFIRMED only, and never a substring of the camera's burned-in name overlay
+            # (cam01 reads "01 Chiman bhai Bridge" off the caption as "CH1MAN8HA").
+            name_chars = re.sub(r"[^A-Z0-9]", "", names.get(cid, "").upper())
+            if text and band == "CONFIRMED" and text not in name_chars:
                 h = hits.setdefault(text, {"conf": 0.0, "band": band, "tracks": 0})
                 h["conf"] = max(h["conf"], round(float(conf), 3))
-                h["band"] = band if band == "CONFIRMED" else h["band"]
                 h["tracks"] += 1
-        per_cam[cid] = {g: {"conf": v["conf"], "band": v["band"], "seen": v["tracks"]}
+        per_cam[cid] = {g: {"conf": v["conf"], "band": "CONFIRMED", "seen": v["tracks"]}
                         for g, v in hits.items()}
         print(f"  [{cid}] {len(frames)} frames, {vehicles} vehicle dets, "
               f"{len(tracks)} tracks, {len(hits)} plate(s), {time.time()-t0:.0f}s", flush=True)
