@@ -26,6 +26,11 @@ easyocr                     # CRAFT detector + CRNN recogniser, scene text
 fast-plate-ocr[onnx]        # CTC recogniser trained on plates, 2 MB ONNX, CPU-fast
 paddleocr                   # DB + SVTR, a third architecture
 paddlepaddle
+# trained licence-plate *detector* (YOLOv9-t, ONNX) for the plate-localisation step -- finds
+# the small / skewed / low-contrast plates the classical blackhat proposal misses. Optional:
+# plate.py falls back to propose() when it is not installed.
+open-image-models
+onnxruntime
 # pytesseract               # a fourth opinion; needs the Tesseract binary installed separately,
 #                             so it is off by default rather than a broken import at startup.
 

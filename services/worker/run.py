@@ -39,8 +39,21 @@ from services.worker.tracker import Trackers
 logger = logging.getLogger("prahari.worker.run")
 
 MIN_CROP_PX = 48         # a vehicle box smaller than this has no readable plate at any upscale
-OCR_QUEUE = 4            # crops waiting to be read; full means the budget is spent, skip one
-OCR_DRAIN_S = 2.0        # how long a closing sighting waits for its outstanding reads
+# Crops waiting to be read; full means the budget is spent, skip one. Queue depth multiplied
+# by the cost of a read *is* the tail latency of a sighting: at four deep and ~1.6 s a read
+# with the trained detector and two engines, the last crop of a track landed 6.5 s after
+# the vehicle passed, against a 3 s budget. Two deep fits, and a track that needs more than
+# two looks at the same plate is a track the vote is not going to settle anyway. Measured on the
+# selftest clip: depth 4 -> 6.5 s, depth 2 -> 5.7 s, depth 1 -> 0.68 s, all reading the plate
+# correctly and landing CONFIRMED. One in flight it is; raise it where reads are cheaper (a GPU)
+# or the budget is looser.
+OCR_QUEUE = int(os.getenv("PRAHARI_OCR_QUEUE", "1"))
+# How long a closing sighting waits for its outstanding reads. Tunable because the cost of a
+# read is not fixed: one fast reader on one crop is milliseconds, while super-resolution
+# over a fused track with two readers is seconds. Too low and the row publishes with
+# plate=NONE while the answer was moments away - which reads as "the OCR failed" and is
+# really "nobody waited".
+OCR_DRAIN_S = float(os.getenv("PRAHARI_OCR_DRAIN_S", "6.0"))
 
 # --- grid-measured preprocessing (services/worker/preprocess.py) ----------------------------
 # On the real grid a lot of cameras give a vehicle box too small for a readable plate, and the
@@ -54,6 +67,10 @@ _FEAS_GATE = os.getenv("PRAHARI_FEASIBILITY_GATE", "1").strip().lower() not in (
 # information from other frames (unlike a generative SR model, which invents it), so it lifts
 # a borderline read without risking a confident-wrong. On by default; PRAHARI_OCR_FUSION=0 off.
 _FUSE = os.getenv("PRAHARI_OCR_FUSION", "1").strip().lower() not in ("0", "false", "no")
+# SR-ensemble + majority vote by character position (mvcp.py). Costs several reconstructions
+# and an OCR pass over each, so it is gated on a track having enough crops to be worth it.
+_MVCP = os.getenv("PRAHARI_MVCP", "1").strip().lower() not in ("0", "false", "no")
+_MVCP_MIN_CROPS = int(os.getenv("PRAHARI_MVCP_MIN_CROPS", "4"))
 
 try:
     from services.worker.preprocess import feasibility as _feasibility
@@ -64,6 +81,28 @@ except Exception as _exc:                     # pragma: no cover - preprocess de
     logging.getLogger("prahari.worker.run").warning(
         "preprocess.py not importable (%s) - frame conditioning, feasibility gate and OCR "
         "fusion are off", _exc)
+
+
+def _settled(readings):
+    """True when two readers already agree on a plate-shaped string.
+
+    That is the vote's own bar for a confident answer, so anything beyond it can only cost
+    latency: a further reconstruction cannot outvote an existing majority, it can only delay the
+    row. When this is False the plate is hard - small, skewed, dark - and the expensive
+    multi-reconstruction path is exactly what should run next.
+    """
+    from common.plate import grammar_fix, normalise
+    from services.worker.vote import VALID
+
+    seen = {}
+    for reading in readings:
+        text = grammar_fix(normalise(reading.text or "")) or ""
+        if not VALID.match(text):
+            continue
+        seen[text] = seen.get(text, 0) + 1
+        if seen[text] >= 2:
+            return True
+    return False
 
 
 class OcrPool:
@@ -114,10 +153,28 @@ class OcrPool:
             try:
                 with metrics.timed("ocr"):
                     readings = list(self._read(best))
-                    if _FUSE and _prepare_for_ocr is not None and len(crops) > 1:
+                    # Multi-frame fusion aligns and super-resolves the track's crops. Measured on
+                    # this laptop it costs about nine seconds a track - worth every one of them on
+                    # a distant plate that no single frame resolves, and pure latency on a plate
+                    # two readers have already agreed on. Escalate, do not always run: with this
+                    # gate the selftest is 0.8 s, without it 10.3 s against a 3 s budget.
+                    if (_FUSE and _prepare_for_ocr is not None and len(crops) > 1
+                            and not _settled(readings)):
                         fused = self._fused(crops)
                         if fused is not None:
                             readings += list(self._read(fused))
+                    # On a small, degraded plate one reconstruction is a guess. Build several
+                    # and let the character-position majority decide - the step that takes the
+                    # published LR benchmark from ~31% to ~45% (mvcp.py). Only when the track
+                    # has enough crops to make the variants genuinely independent.
+                    #
+                    # And only when the cheap path has not already answered. MVCP reads several
+                    # reconstructions with every engine; on a plate that two readers have already
+                    # agreed on it buys nothing and costs seconds - measured, it took the
+                    # selftest from 1.9 s to 11.6 s against a 3 s budget. Escalate to it when the
+                    # easy path failed, which is the case it was built for.
+                    if _MVCP and len(crops) >= _MVCP_MIN_CROPS and not _settled(readings):
+                        readings += self._mvcp_readings(crops)
                 sighting.add_readings(readings, sharpness(best))
             except Exception as exc:
                 logger.warning("OCR failed on a crop: %s", exc)
@@ -134,6 +191,25 @@ class OcrPool:
         except Exception as exc:
             logger.debug("fusion failed (%s) - reading the sharpest crop only", exc)
             return None
+
+    @staticmethod
+    def _mvcp_readings(crops):
+        """The SR-ensemble majority verdict, as one extra high-confidence Reading, or [].
+
+        Returned as a Reading rather than applied directly so the existing per-track vote
+        still owns the final call: MVCP is a strong opinion, not an override.
+        """
+        try:
+            from services.worker.backend import Reading
+            from services.worker.mvcp import decode_track
+            text, conf, detail = decode_track(crops)
+            if not text:
+                return []
+            logger.debug("mvcp %s conf=%.2f over %d variants", text, conf, detail["variants"])
+            return [Reading(text, float(conf), reader="mvcp")]
+        except Exception as exc:
+            logger.debug("mvcp failed (%s)", exc)
+            return []
 
     def drain(self, sighting, timeout=OCR_DRAIN_S):
         """Wait for this sighting's reads before its row is built. Bounded: a stuck reader
@@ -206,8 +282,23 @@ class Worker:
         no plate read at all, which is how I8 measured a CONFIRMED plate as NONE.
         """
         import numpy as np
-        self.backend.detect([np.zeros((544, 960, 3), dtype=np.uint8)])
-        readers()
+        blank = np.zeros((544, 960, 3), dtype=np.uint8)
+        self.backend.detect([blank])
+        engines = readers()
+        # The trained plate detector loads lazily on its first call, and so does each OCR engine's
+        # graph. Left cold, that cost lands inside the first sighting's OCR drain instead of here:
+        # measured 23 s for the first read_all against 1.6 s warm, which published the first
+        # vehicle with plate=NONE and looked exactly like an OCR failure.
+        try:
+            from services.worker.plate import detect_plate_boxes
+            detect_plate_boxes(np.zeros((128, 256, 3), dtype=np.uint8))
+        except Exception as exc:                       # optional dependency; never fatal
+            logger.debug("plate detector not warmed: %s", exc)
+        for engine in engines:
+            try:
+                engine.read(np.zeros((64, 192, 3), dtype=np.uint8))
+            except Exception as exc:
+                logger.debug("reader %s not warmed: %s", engine.name, exc)
         if hasattr(self.publisher, "warm"):
             self.publisher.warm()
 

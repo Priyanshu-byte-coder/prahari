@@ -242,3 +242,32 @@ def test_readers_are_ordered_cheapest_first():
 
     costs = [c.cost_ms for c in _AVAILABLE]
     assert costs == sorted(costs)
+
+
+# --- the latency budget -----------------------------------------------------------------
+
+def test_the_expensive_paths_only_run_when_the_cheap_one_did_not_settle_it():
+    # Multi-frame fusion and the multi-reconstruction vote are what read a distant plate, and
+    # they cost seconds. On a plate two readers already agree on they buy nothing: measured, the
+    # selftest went 0.68 s -> 10.3 s with them always on. `_settled` is the gate.
+    from services.worker.run import _settled
+
+    class R:
+        def __init__(self, text):
+            self.text = text
+
+    assert _settled([R("GJ01AB1234"), R("GJ01AB1234")]) is True
+    assert _settled([R("GJ01AB1234"), R("GJ01AB1235")]) is False, "a disagreement must escalate"
+    assert _settled([R("GJ01AB1234")]) is False, "one reader is not a majority"
+    assert _settled([R("NOTAPLATE"), R("NOTAPLATE")]) is False, "agreement on junk is not a read"
+    assert _settled([]) is False
+
+
+def test_the_ocr_queue_depth_fits_the_latency_budget():
+    # Queue depth times the cost of a read is the tail latency of a sighting. With the trained
+    # detector and two engines a read is ~1.6 s, so depth 4 put the row 6.5 s behind the vehicle
+    # against a 3 s budget.
+    from services.worker.run import OCR_DRAIN_S, OCR_QUEUE
+
+    assert OCR_QUEUE >= 1
+    assert OCR_QUEUE * 1.6 <= OCR_DRAIN_S, "a full queue must drain inside the drain window"

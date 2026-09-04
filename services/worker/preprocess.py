@@ -40,6 +40,7 @@ import logging
 import math
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -59,7 +60,11 @@ GLYPH_H_FRACTION = PLATE_W_FRACTION * (PLATE_H_MM / PLATE_W_MM) * GLYPH_FRACTION
 # Recogniser floors. EasyOCR's CRNN and PaddleOCR's SVTR are trained on 32-48 px text lines;
 # below ~14 px of *native* glyph the upscale is interpolating strokes that were never sampled.
 GLYPH_OK_PX = 14.0
-GLYPH_MARGINAL_PX = 8.0
+# Measured, not guessed: scripts/lr_benchmark.py at night severity puts the cliff between a
+# 20 px plate (13 px glyph, 65 % exact with the MVCP ensemble) and a 16 px plate (10 px glyph,
+# 5 %). Below ~10 px of glyph the multi-frame path stops recovering characters, so that is
+# where "marginal" ends and "do not guess" begins.
+GLYPH_MARGINAL_PX = 10.0
 TARGET_GLYPH_PX = 32.0           # what we upscale to before handing a crop to a reader
 MAX_UPSCALE = 4.0                # past 4x the interpolation invents more than it recovers
 MIN_ALIGN_CC = 0.55              # ECC correlation below which a frame is not this plate
@@ -299,29 +304,59 @@ def upscale_to_glyph(crop, glyph_px=None, target=TARGET_GLYPH_PX):
     return cv2.resize(crop, None, fx=factor, fy=factor, interpolation=cv2.INTER_LANCZOS4)
 
 
-def superres(crop, scale=2):
-    """EDSR/FSRCNN/ESPCN through cv2.dnn_superres when a model is on disk, else Lanczos.
+_ROOT = Path(__file__).resolve().parents[2]
+_SR_DEFAULT = _ROOT / "models" / "FSRCNN_x4.pb"
+_SR_CACHE = {}
+SR_BELOW_PX = int(os.getenv("PRAHARI_SR_BELOW_PX", "40"))   # crop height under which SR earns its cost
 
-    Optional on purpose: the model file is a few MB we will not commit, and a plate crop is
-    small enough that FSRCNN_x2 costs about 6 ms on CPU. Point PRAHARI_SR_MODEL at an .pb to
-    turn it on; without it this is a plain resize and nothing downstream changes.
+
+def _sr_model():
+    """Cached cv2.dnn_superres model + its scale, or None. Non-generative EDSR/FSRCNN/ESPCN."""
+    if "m" in _SR_CACHE:
+        return _SR_CACHE["m"]
+    path = os.environ.get("PRAHARI_SR_MODEL", "") or (str(_SR_DEFAULT) if _SR_DEFAULT.exists() else "")
+    if not path or not os.path.exists(path) or not hasattr(cv2, "dnn_superres"):
+        _SR_CACHE["m"] = None
+        return None
+    try:
+        base = os.path.basename(path)
+        arch = base.split("_")[0].lower()
+        scale = int(base.split("_x")[1].split(".")[0]) if "_x" in base else 4
+        sr = cv2.dnn_superres.DnnSuperResImpl_create()
+        sr.readModel(path)
+        sr.setModel(arch, scale)
+        _SR_CACHE["m"] = (sr, scale)
+        logger.info("super-resolution: %s x%d", arch, scale)
+    except (cv2.error, ValueError, IndexError) as exc:
+        logger.info("super-resolution unavailable (%s); Lanczos in use", exc)
+        _SR_CACHE["m"] = None
+    return _SR_CACHE["m"]
+
+
+def superres(crop, scale=2):
+    """Upscale a small plate crop. Uses cv2.dnn_superres (non-generative) when a model is on
+    disk (models/FSRCNN_x4.pb by default, or PRAHARI_SR_MODEL), else Lanczos.
 
     # ponytail: a plate-specific SR net (LPSRGAN and friends) beats a generic one on glyph
     # strokes, but a generative SR model can and does invent characters that were never in
-    # the pixels. Generic, non-generative, bounded at 2x is the version that is safe to show
-    # a police officer.
+    # the pixels. Generic, non-generative is the version that is safe to show a police officer.
     """
-    path = os.environ.get("PRAHARI_SR_MODEL", "")
-    if not path or not os.path.exists(path) or not hasattr(cv2, "dnn_superres"):
+    if crop is None or crop.size == 0:
+        return crop
+    m = _sr_model()
+    if m is None:
         return cv2.resize(crop, None, fx=scale, fy=scale, interpolation=cv2.INTER_LANCZOS4)
+    sr, sscale = m
     try:
-        sr = cv2.dnn_superres.DnnSuperResImpl_create()
-        name = os.path.basename(path).split("_")[0].lower()
-        sr.readModel(path)
-        sr.setModel(name, scale)
-        return sr.upsample(crop)
-    except cv2.error as exc:
-        logger.info("super-resolution unavailable (%s); falling back to Lanczos", exc)
+        bgr = crop if crop.ndim == 3 else cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR)
+        out = sr.upsample(bgr)
+        if crop.ndim == 2:
+            out = cv2.cvtColor(out, cv2.COLOR_BGR2GRAY)
+        if sscale != scale:  # model fixed at sscale; correct to the asked ratio
+            f = scale / sscale
+            out = cv2.resize(out, None, fx=f, fy=f, interpolation=cv2.INTER_AREA if f < 1 else cv2.INTER_LANCZOS4)
+        return out
+    except cv2.error:
         return cv2.resize(crop, None, fx=scale, fy=scale, interpolation=cv2.INTER_LANCZOS4)
 
 
@@ -334,6 +369,30 @@ def flatten_plate_illumination(grey):
                                   cv2.getStructuringElement(cv2.MORPH_RECT, (k, k)))
     flat = cv2.divide(grey, background, scale=255)
     return flat
+
+
+DEBLUR = os.getenv("PRAHARI_DEBLUR", "").strip().lower() in ("1", "true", "yes")
+
+
+def motion_deblur(grey, k=9, angle=0.0, nsr=0.02):
+    """Bounded Wiener deconvolution against a linear motion kernel. Off by default
+    (PRAHARI_DEBLUR=1). Non-generative -- it inverts a blur, it does not synthesise strokes --
+    but it can ring on a wrong kernel, so it is opt-in and the vote still gates the result.
+    """
+    if grey is None or grey.size == 0 or min(grey.shape[:2]) < 12:
+        return grey
+    psf = np.zeros((k, k), np.float32)
+    psf[k // 2, :] = 1.0
+    M = cv2.getRotationMatrix2D((k / 2 - 0.5, k / 2 - 0.5), angle, 1.0)
+    psf = cv2.warpAffine(psf, M, (k, k))
+    psf /= psf.sum() or 1.0
+    g = grey.astype(np.float32) / 255.0
+    H = np.fft.fft2(psf, s=g.shape)
+    G = np.fft.fft2(g)
+    F = np.conj(H) / (np.abs(H) ** 2 + nsr)
+    out = np.real(np.fft.ifft2(G * F))
+    out = np.fft.fftshift(out)
+    return np.clip(out * 255.0, 0, 255).astype(np.uint8)
 
 
 def smooth_then_sharpen(grey, strength=1.4):
@@ -424,8 +483,14 @@ def enhance_plate_crop(crop, glyph_px=None, want_binary=False):
         return (crop, crop) if want_binary else crop
     face = unwarp(crop)
     grey = _grey(face)
+    # A genuinely small plate crop (distant CCTV) gains more from a learned x2/x4 than from
+    # Lanczos; run SR first, then upscale_to_glyph finishes to the exact target height.
+    if grey.shape[0] < SR_BELOW_PX:
+        grey = superres(grey, scale=2)
     grey = upscale_to_glyph(grey, glyph_px)
     grey = flatten_plate_illumination(grey)
+    if DEBLUR:
+        grey = motion_deblur(grey)
     grey = smooth_then_sharpen(grey)
     grey = deskew(grey)
     grey = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(4, 4)).apply(grey)
@@ -532,9 +597,27 @@ def fuse(crops, reference=None, max_frames=6):
     return np.clip(fused, 0, 255).astype(np.uint8)
 
 
+_MFSR = os.getenv("PRAHARI_MFSR", "1").strip().lower() not in ("0", "false", "no")
+_MFSR_MIN_FRAMES = int(os.getenv("PRAHARI_MFSR_MIN_FRAMES", "4"))
+
+
 def prepare_for_ocr(crops, glyph_px=None, want_binary=False):
-    """Track-level entry point: several crops of one vehicle in, one reader-ready image out."""
-    fused = fuse(crops)
+    """Track-level entry point: several crops of one vehicle in, one reader-ready image out.
+
+    With enough frames, multi-frame super-resolution (mfsr.super_resolve) reconstructs the
+    plate on a finer grid than any single frame sampled - the one operation that adds real
+    information on a distant CCTV plate. Falls back to the align+average `fuse` otherwise.
+    """
+    usable = [c for c in crops if c is not None and getattr(c, "size", 0)]
+    fused = None
+    if _MFSR and len(usable) >= _MFSR_MIN_FRAMES:
+        try:
+            from services.worker.mfsr import super_resolve
+            fused = super_resolve(usable)
+        except Exception as exc:            # pragma: no cover
+            logger.debug("mfsr failed (%s) - falling back to fuse()", exc)
+    if fused is None:
+        fused = fuse(usable)
     if fused is None:
         return None
     return enhance_plate_crop(fused, glyph_px=glyph_px, want_binary=want_binary)

@@ -122,25 +122,85 @@ def upscale(crop, min_h=OCR_MIN_H):
     return cv2.resize(crop, (max(1, int(w * factor)), min_h), interpolation=cv2.INTER_CUBIC)
 
 
+_PLATE_DET = {}
+_PLATE_DET_NAME = os.getenv("PRAHARI_PLATE_DETECTOR", "yolo-v9-t-512-license-plate-end2end")
+_PLATE_DET_CONF = float(os.getenv("PRAHARI_PLATE_DETECTOR_CONF", "0.20"))
+
+
+def _plate_detector():
+    """Cached open-image-models YOLOv9 licence-plate detector, or None.
+
+    A model trained on plates finds the small, skewed, low-contrast ones the classical
+    blackhat proposal misses. Off with PRAHARI_PLATE_DETECTOR=off; falls back to propose().
+    """
+    if "d" in _PLATE_DET:
+        return _PLATE_DET["d"]
+    if _PLATE_DET_NAME.lower() in ("", "off", "none", "0"):
+        _PLATE_DET["d"] = None
+        return None
+    try:
+        from open_image_models import create_detector
+        _PLATE_DET["d"] = create_detector(_PLATE_DET_NAME, conf_thresh=_PLATE_DET_CONF)
+        logger.info("plate detector: %s", _PLATE_DET_NAME)
+    except Exception as exc:
+        logger.info("plate detector unavailable (%s); classical proposal in use",
+                    str(exc).split("\n")[0])
+        _PLATE_DET["d"] = None
+    return _PLATE_DET["d"]
+
+
+def detect_plate_boxes(crop):
+    """(x1,y1,x2,y2) plate boxes inside a vehicle crop from the trained detector, best first."""
+    det = _plate_detector()
+    if det is None or crop is None or crop.size == 0:
+        return []
+    try:
+        res = det.predict(crop)
+    except Exception:
+        return []
+    boxes = []
+    for r in res:
+        b = getattr(r, "bounding_box", None) or getattr(r, "bbox", None)
+        conf = float(getattr(r, "confidence", getattr(r, "conf", 0.0)))
+        if b is None:
+            continue
+        boxes.append((conf, (int(b.x1), int(b.y1), int(b.x2), int(b.y2))))
+    boxes.sort(reverse=True, key=lambda t: t[0])
+    return [xy for _, xy in boxes]
+
+
 def candidates(vehicle_crop, boxes=None):
     """Plate crops to read, best first, whole vehicle crop last. At most MAX_CANDIDATES.
 
-    `boxes` comes from a trained plate detector when there is one; otherwise `propose()`.
+    `boxes` is passed by a caller that already ran a plate detector; otherwise we try the
+    trained detector, then the classical `propose()`. Each localised plate is emitted twice:
+    the enhanced grey (unwarp / SR / illumination-flatten / deskew / CLAHE) that the CRNN
+    readers want, and the raw upscaled colour crop, because they fail differently.
     """
     if vehicle_crop is None or vehicle_crop.size == 0:
         return []
     if boxes is None:
-        boxes = propose(vehicle_crop)
+        boxes = detect_plate_boxes(vehicle_crop) or propose(vehicle_crop)
+    try:
+        from services.worker.preprocess import enhance_plate_crop
+    except Exception:
+        enhance_plate_crop = None
     out = []
-    for x1, y1, x2, y2 in boxes[:MAX_CANDIDATES - 1]:
+    h, w = vehicle_crop.shape[:2]
+    for x1, y1, x2, y2 in boxes[:2]:
         pad_x, pad_y = int((x2 - x1) * 0.06) + 2, int((y2 - y1) * 0.25) + 2
-        h, w = vehicle_crop.shape[:2]
         sub = vehicle_crop[max(0, int(y1) - pad_y): min(h, int(y2) + pad_y),
                            max(0, int(x1) - pad_x): min(w, int(x2) + pad_x)]
-        if sub.size:
-            out.append(upscale(sub))
+        if not sub.size:
+            continue
+        if enhance_plate_crop is not None:
+            try:
+                out.append(enhance_plate_crop(sub))
+            except Exception:
+                pass
+        out.append(upscale(sub))
     out.append(_fit(upscale(vehicle_crop, OCR_MIN_H * 2)))
-    return out[:MAX_CANDIDATES]
+    return out[:MAX_CANDIDATES + 2]
 
 
 def _fit(crop, max_w=MAX_CANDIDATE_W):
@@ -228,6 +288,27 @@ class EasyOCRReader(_Reader):
         return text, conf
 
 
+def _paddle_lines(page):
+    """(texts, scores) out of whichever result shape this PaddleOCR version shipped.
+
+    3.x `predict()` -> dict-like with `rec_texts` / `rec_scores`.
+    2.x `ocr()`     -> list of `[box, (text, conf)]`.
+    """
+    try:
+        if hasattr(page, "get") and page.get("rec_texts") is not None:
+            return list(page["rec_texts"]), list(page.get("rec_scores") or [])
+    except Exception:
+        pass
+    texts, scores = [], []
+    for ln in page or []:
+        try:
+            texts.append(ln[1][0])
+            scores.append(float(ln[1][1]))
+        except (IndexError, TypeError, ValueError):
+            continue
+    return texts, scores
+
+
 class PaddleReader(_Reader):
     """PaddleOCR - the ticket's second reader. Different architecture (DB + SVTR/CRNN) and a
     different training set from EasyOCR, which is the point: two readers that fail the same
@@ -251,6 +332,16 @@ class PaddleReader(_Reader):
                          enable_mkldnn=False)
 
     def _read(self, crop):
+        # A degenerate crop (1-2 px on a side, or a sliver aspect) makes PP-OCRv5/v6 raise
+        # "not enough values to unpack" deep in the PIR executor. It is caught upstream, but
+        # skipping it here keeps the log clean and costs nothing the reader would have found.
+        h, w = crop.shape[:2]
+        if h < 8 or w < 8 or max(h, w) / max(1, min(h, w)) > 30:
+            return "", 0.0
+        # PP-OCRv6's pipeline wants 3-channel BGR; a grey crop from the enhance chain is what
+        # trips "not enough values to unpack" deep in the PIR executor.
+        if crop.ndim == 2:
+            crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR)
         engine = self.engine()
         # Paddle's pipeline needs three channels. Handed a greyscale crop it raises
         # "not enough values to unpack (expected 3, got 2)" from inside its own predict(), which
@@ -260,60 +351,19 @@ class PaddleReader(_Reader):
         if crop.ndim == 2:
             crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR)
         # 3.x renamed ocr() to predict(); both ship in 3.x, only ocr() in 2.x.
-        result = engine.predict(crop) if hasattr(engine, "predict") else engine.ocr(crop)
+        try:
+            result = engine.predict(crop) if hasattr(engine, "predict") else engine.ocr(crop)
+        except (ValueError, IndexError):
+            return "", 0.0                       # PP-OCRv6 internal unpack on an awkward crop
         best = ("", 0.0)
         for page in result or []:
-            # Paddle has shipped two result shapes; handle both rather than pin a version.
-            lines = page.get("rec_texts", []) if isinstance(page, dict) else page or []
-            scores = page.get("rec_scores", []) if isinstance(page, dict) else []
-            pairs = (zip(lines, scores) if scores
-                     else ((ln[1][0], ln[1][1]) for ln in lines if len(ln) > 1))
-            for text, conf in pairs:
+            texts, scores = _paddle_lines(page)
+            if texts and len(scores) != len(texts):
+                scores = (scores + [0.0] * len(texts))[: len(texts)]
+            for text, conf in zip(texts, scores):
                 if (len(clean(text)), conf) > (len(clean(best[0])), best[1]):
-                    best = (text, conf)
+                    best = (text, float(conf))
         return best
-
-
-class FastPlateReader(_Reader):
-    """fast-plate-ocr: a CTC recogniser trained on plates rather than on scene text.
-
-    The third architecture in the vote, and the one that is actually about this problem. EasyOCR
-    and PaddleOCR are general scene-text models that happen to be pointed at a plate; this one
-    was trained on plate crops, ships as a 2 MB ONNX file, and reads a crop in single-digit
-    milliseconds on CPU - which matters because it can be asked for a second opinion on every
-    candidate rather than only the best one.
-
-    It is here because the demo box could only ever load EasyOCR: paddlepaddle does not install
-    on this machine and Tesseract needs a system binary. A "vote" of one reader is a single read
-    wearing a vote's confidence, and that is the thing the accuracy target must not be built on.
-    """
-
-    cost_ms = 10
-
-    name = "fastplate"
-
-    def _load(self):
-        from fast_plate_ocr import LicensePlateRecognizer
-
-        # xs is the small model: 2 MB, and the accuracy difference against `cct-s` on plates this
-        # size is inside the noise of the crops the grid gives us.
-        return LicensePlateRecognizer(os.getenv("PRAHARI_FASTPLATE_MODEL",
-                                                "cct-xs-v1-global-model"))
-
-    def _read(self, crop):
-        # The ONNX graph takes 3-channel input; a greyscale crop raises a dimension error rather
-        # than being promoted, so the conversion has to happen here.
-        if crop.ndim == 2:
-            crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR)
-        results = self.engine().run(crop, return_confidence=True)
-        if not results:
-            return "", 0.0
-        best = results[0]
-        probs = getattr(best, "char_probs", None)
-        # The *minimum* character probability, not the mean. A plate is only as right as its
-        # worst character, and a mean lets eight confident characters carry one that is a guess.
-        conf = float(min(probs)) if probs is not None and len(probs) else 0.0
-        return getattr(best, "plate", "") or "", conf
 
 
 class TesseractReader(_Reader):
@@ -339,7 +389,51 @@ class TesseractReader(_Reader):
         return text, (sum(confs) / len(confs) / 100.0 if confs else 0.0)
 
 
-# Cheapest first: see _Reader.cost_ms. Order is load order *and* vote order.
+class FastPlateReader(_Reader):
+    """fast-plate-ocr: a CCT (compact convolutional transformer) trained end to end on license
+    plates, not general scene text. No separate text detector - it wants a crop that is already
+    mostly plate, which is what `candidates()` hands it. Fast (ONNX, a few ms on CPU) and it
+    fails on a different axis from the scene-text readers: strong on skew and low light, weak
+    when the crop is the whole vehicle. That difference is exactly what the vote wants.
+
+    It is also the reader that makes the vote affordable. EasyOCR is ~300 ms a crop and
+    PaddleOCR ~2 s; at ten milliseconds this one can be asked about every candidate, which is
+    why the live path is built around it plus one scene-text reader.
+    """
+
+    name = "fastplate"
+    cost_ms = 10
+
+    def _load(self):
+        from fast_plate_ocr import LicensePlateRecognizer
+        model = os.getenv("PRAHARI_FASTPLATE_MODEL", "cct-s-v2-global-model")
+        try:
+            return LicensePlateRecognizer(model)
+        except Exception:
+            # v2 hub names move; the xs global model is always present.
+            logger.info("fast-plate-ocr model %s unavailable, using cct-xs-v1-global-model", model)
+            return LicensePlateRecognizer("cct-xs-v1-global-model")
+
+    def _read(self, crop):
+        # The ONNX graph takes three channels; a greyscale crop raises a dimension error rather
+        # than being promoted, and preprocessing hands on greyscale.
+        if crop.ndim == 2:
+            crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR)
+        preds = self.engine().run(crop, return_confidence=True)
+        if not preds:
+            return "", 0.0
+        best = max(preds, key=lambda p: (len(clean(p.plate)),
+                                         float(np.mean(p.char_probs)) if p.char_probs is not None else 0.0))
+        # The *minimum* character probability, not the mean. A plate is only as right as its
+        # worst character, and a mean lets eight confident characters carry one that is a guess -
+        # which is how a CONFIRMED band ends up on a plate with a wrong digit in it.
+        probs = best.char_probs
+        conf = float(np.min(probs)) if probs is not None and len(probs) else 0.0
+        return best.plate, conf
+
+
+# Cheapest first: see _Reader.cost_ms. Order is load order *and* vote order, so two cheap
+# readers that agree can settle the vote before an expensive engine is asked at all.
 _AVAILABLE = tuple(sorted((EasyOCRReader, PaddleReader, FastPlateReader,
                            TesseractReader), key=lambda cls: cls.cost_ms))
 _READERS = None
