@@ -176,7 +176,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--seconds", type=float, default=90.0, help="capture window per camera")
     ap.add_argument("--workers", type=int, default=6, help="cameras captured in parallel")
-    ap.add_argument("--fps", type=float, default=2.0, help="frames/sec sampled for OCR")
+    ap.add_argument("--fps", type=float, default=8.0,
+                    help="frames/sec sampled for OCR (higher = more frames per track for MFSR; "
+                         "0 = native)")
     ap.add_argument("--reuse", action="store_true", help="skip capture, use existing clips")
     ap.add_argument("--only", help="comma-separated camera ids")
     ap.add_argument("--clipdir", default=str(ROOT / "runs" / "grid_clips"))
@@ -230,7 +232,7 @@ def main() -> int:
     from services.worker.plate import read_all, readers
     from services.worker.sighting import sharpness
     from services.worker.vote import PlateVote
-    from services.worker.preprocess import prepare_frame
+    from services.worker.preprocess import prepare_frame, prepare_for_ocr
 
     VEHICLE = {"car", "truck", "bus", "motorcycle", "motorbike", "van", "vehicle"}
     imgsz = int(os.getenv("PRAHARI_DETECT_IMGSZ", "960"))
@@ -253,12 +255,13 @@ def main() -> int:
         t0 = time.time()
         framedir = Path(args.clipdir) / f"{cid}_frames"
         framedir.mkdir(exist_ok=True)
-        for old in framedir.glob("*.jpg"):
+        for old in framedir.glob("f*.jpg"):
             old.unlink()
+        vf = ["-vf", f"fps={args.fps}"] if args.fps and args.fps > 0 else []
         subprocess.run([FFMPEG, "-nostdin", "-loglevel", "error", "-y", "-i", str(clip),
-                        "-map", "0:v:0", "-vf", f"fps={args.fps}",
-                        str(framedir / "f%04d.jpg")], capture_output=True, timeout=180)
-        frames = sorted(framedir.glob("*.jpg"))
+                        "-map", "0:v:0", *vf, "-q:v", "2",
+                        str(framedir / "f%05d.jpg")], capture_output=True, timeout=240)
+        frames = sorted(framedir.glob("f*.jpg"))
 
         # frame -> conditioned frame -> vehicle detect -> IoU-link into tracks, keeping the
         # sharpest few crops per track (a vehicle is plate-readable for only 1-2 frames of
@@ -292,18 +295,24 @@ def main() -> int:
                     tracks.append(tr)
                 tr["box"], tr["last"] = box, fi
                 tr["crops"].append((sh, crop))
-                tr["crops"].sort(key=lambda sc: -sc[0])
-                tr["crops"] = tr["crops"][:4]
                 live.append(tr)
 
-        # vote each track's best crops
+        # per track: multi-frame super-resolve all its crops into one plate image, plus the
+        # sharpest few raw crops, and vote across the lot.
         hits: dict[str, dict] = {}
         for tr in tracks:
+            tr["crops"].sort(key=lambda sc: -sc[0])
+            raw = [c for _, c in tr["crops"][:6]]
             vote = PlateVote()
-            for sh, crop in tr["crops"]:
-                readings = read_all(crop)
-                if readings:
-                    vote.add(readings, sharpness=sh)
+            mf = prepare_for_ocr([c for _, c in tr["crops"]]) if len(tr["crops"]) >= 4 else None
+            if mf is not None:
+                r = read_all(mf)
+                if r:
+                    vote.add(r, sharpness=tr["crops"][0][0] * 2)   # weight the fused frame
+            for sh, crop in tr["crops"][:6]:
+                r = read_all(crop)
+                if r:
+                    vote.add(r, sharpness=sh)
             text, conf, band = vote.result()
             if text and band in ("CONFIRMED", "PROBABLE"):
                 h = hits.setdefault(text, {"conf": 0.0, "band": band, "tracks": 0})

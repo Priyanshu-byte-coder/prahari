@@ -593,9 +593,27 @@ def fuse(crops, reference=None, max_frames=6):
     return np.clip(fused, 0, 255).astype(np.uint8)
 
 
+_MFSR = os.getenv("PRAHARI_MFSR", "1").strip().lower() not in ("0", "false", "no")
+_MFSR_MIN_FRAMES = int(os.getenv("PRAHARI_MFSR_MIN_FRAMES", "4"))
+
+
 def prepare_for_ocr(crops, glyph_px=None, want_binary=False):
-    """Track-level entry point: several crops of one vehicle in, one reader-ready image out."""
-    fused = fuse(crops)
+    """Track-level entry point: several crops of one vehicle in, one reader-ready image out.
+
+    With enough frames, multi-frame super-resolution (mfsr.super_resolve) reconstructs the
+    plate on a finer grid than any single frame sampled - the one operation that adds real
+    information on a distant CCTV plate. Falls back to the align+average `fuse` otherwise.
+    """
+    usable = [c for c in crops if c is not None and getattr(c, "size", 0)]
+    fused = None
+    if _MFSR and len(usable) >= _MFSR_MIN_FRAMES:
+        try:
+            from services.worker.mfsr import super_resolve
+            fused = super_resolve(usable)
+        except Exception as exc:            # pragma: no cover
+            logger.debug("mfsr failed (%s) - falling back to fuse()", exc)
+    if fused is None:
+        fused = fuse(usable)
     if fused is None:
         return None
     return enhance_plate_crop(fused, glyph_px=glyph_px, want_binary=want_binary)
