@@ -162,6 +162,28 @@ red-light-violation camera).
   PLATES TRACKED: 0 across all cameras tested.
 
 ======================================================================
+4b. FULL 30-CAMERA RUN (robustness stack: trained plate detector +
+    super-resolution + night conditioning + per-track voting)
+======================================================================
+
+Captured 25 / 30 feeds (5 unreachable: cam11, 16, 18, 24, + intermittent).
+~1000 vehicle detections, ~350 tracks across the grid.
+
+  PLATES READ: 0 across all 25 cameras.
+
+Busiest feeds and their result:
+  cam30 GDM-Rambaugh   276 vehicle dets, 21 tracks, 0 plates
+  cam04 Paldi Circle   123 dets, 31 tracks, 0 plates
+  cam05 Visat teen     107 dets, 35 tracks, 0 plates
+  cam01 Chiman Bridge   75 dets, 25 tracks, 0 plates
+
+The trained licence-plate detector (YOLOv9-t) found no plate to localise in any
+feed. Direct visual inspection of 7 feeds confirms it: every camera is a
+night-time (~21:00) wide-area junction PTZ overview; the nearest vehicle's
+plate is ~20-30 px, dark, and motion-blurred. Not readable by the pipeline or
+by eye.
+
+======================================================================
 5. ROOT CAUSE — CAMERA, NOT CODE
 ======================================================================
 
