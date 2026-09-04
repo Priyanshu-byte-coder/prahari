@@ -1,93 +1,108 @@
-# Submission — SENTINEL 2026, due **7 Sep 2026**, not in the evening
+# Submission — SENTINEL 2026
 
-The portal closes on the 7th. Registration closing and the upload working are two different
+Portal closes **7 Sep 2026**. Registration closing and the upload working are two different
 things, and only one of them is under our control. **Target: everything uploaded by 14:00 IST on
 6 Sep**, so the 7th is a buffer day and not the plan.
 
-## What the portal wants
+Event: 10–11 Sep, i-Hub Gujarat, Gandhinagar.
 
-| # | Deliverable | Format | Owner | State |
-|---|---|---|---|---|
-| 1 | Presentation | PPT **and** PDF | I (deck), all (review) | outline in `docs/deck-outline.md` |
-| 2 | High-level design document | PDF | D (`D8`) | |
-| 3 | Demo video, 2–3 min | MP4, link | J1 | |
-| 4 | Hosted URL + test credentials | URL + 3 logins | G + D | |
-| 5 | Source repository | link | all | this repo |
+---
 
-Mock-ups and concept videos are **explicitly rejected** by the portal. Every frame of the video
-and every screenshot in the deck must be the running system on our own feed.
+## What the portal asks for, and where we are
 
-## The gate — nothing is submitted until these three pass, on the day
+| # | Deliverable | Format | State |
+|---|---|---|---|
+| 1 | Solution presentation — model chosen + justification, architecture, AI approach, scalability | PPT **and** PDF | **`docs/deck.html` built, needs export to PDF/PPT** |
+| 2 | High-level design document | PDF | **`docs/hld.md` written, needs export to PDF** |
+| 3 | Screen-recorded demo on **our own** feed, max 2–3 min | MP4 / link | **script ready (`docs/video-script.md`), not recorded** |
+| 4 | Live demo on Government feeds | in person, 10–11 Sep | runs today; see the ANPR caveat below |
+| 5 | Test case: registration number → full route history | shown in demo | **working** — `GET /api/route?plate=…`, or Trace in the console |
+| — | Hosted URL + test credentials | URL + logins | **not deployed** — currently localhost only |
+| — | Source repository | link | this repo, Apache-2.0, README complete |
+
+Mock-ups and concept videos are **explicitly rejected**. Every frame of the video and every
+screenshot in the deck must be the running system.
+
+---
+
+## What is left to do
+
+Ordered by what would cost us most if it were missed.
+
+### Blocking — the submission is incomplete without these
+
+1. **Export the deck to PDF and PPT.** `docs/deck.html` is 10 slides and renders; the portal
+   wants PPT *and* PDF. Print-to-PDF from the browser covers one; the PPT needs rebuilding in
+   Slides/PowerPoint or the portal accepting PDF alone — **check the portal's exact wording**.
+2. **Export the HLD to PDF.** `docs/hld.md` → PDF (pandoc, or print the rendered Markdown).
+3. **Record the demo video.** `docs/video-script.md` is shot-by-shot with narration and timings,
+   targeting 2:45. Needs one person, one screen, about an hour with retakes.
+4. **Screenshots for the README and the deck.** Placeholders are marked
+   `<!-- SCREENSHOT: … -->` in `README.md`. The console, the map with an alert, the route view.
+5. **Decide the hosting story.** Either deploy somewhere reachable with three test logins
+   (VIEWER, OPERATOR, INVESTIGATOR + a SYSTEM_ADMIN to show it *cannot* see video), or state in
+   the submission that the system is demonstrated live and by video. If deploying: it is four
+   processes and a compose file, but budget half a day for TLS, a domain, and locking the demo
+   accounts down.
+
+### Should be done
+
+6. **Say the ANPR result plainly in the deck.** We read zero plates across all 30 grid feeds
+   (`docs/plate-ocr-grid-report.md`), because the cameras are framed for scene overview and the
+   footage is at night. Everything else — tracking, correlation, routes, alerts, RBAC, audit —
+   works on those feeds today. Presented as a measurement with the pixel arithmetic behind it
+   (`preprocess.feasibility`, `docs/lr-benchmark.md`), this is a strength: it is the difference
+   between a team that measured and a team that assumed. Buried, it looks like a gap the judges
+   found for us.
+7. **Ask the organisers for a plate-capable feed** — an enforcement-framed camera or the
+   operators' own RLVD plate snapshots. An afternoon with either produces a real accuracy number
+   instead of a synthetic one.
+8. **RTSP access** (#56). We are on the downscaled HLS rendition because RTSP answers 401 for our
+   IP. Worth one email; it roughly doubles the pixels on a plate.
+9. **Rehearse the live demo twice, end to end, on the event laptop** — `docs/demo-script.md`.
+   Including the failure drills.
+
+### Optional
+
+10. Grafana dashboards (#24) — Prometheus metrics are already exported.
+11. TensorRT engine build (#11) — ONNX export and its parity gate exist.
+
+---
+
+## The gate — run this before anything is uploaded
+
+Nothing is submitted until all four are green, **on the machine that will be demonstrated**:
 
 ```bash
-PRAHARI_INTEGRATION=1 pytest tests/test_integration.py -v     # J1, every leg
-python scripts/accuracy_report.py                             # I7, regenerates the numbers
-make check                                                    # unit suites + the RBAC scope test
+pytest tests/ -q                                   # 362 passed, 6 skipped
+python services/worker/selftest.py                 # SELFTEST OK, 0.68 s, plate read back
+python scripts/run_stack.py start
+python scripts/verify_stack.py                     # 35/35 checks
+PRAHARI_INTEGRATION=1 pytest tests/test_integration.py -q   # 6 passed
+python scripts/accuracy_report.py                  # regenerates docs/accuracy-report.md
 ```
 
-Then, and only then, the deck's `‹markers›` get replaced with that run's output
-(`docs/deck-outline.md` lists which marker comes from which command).
+Last full run: **all green**, 2026-09-04.
 
-## Demo video — 2–3 minutes, recorded, not narrated live
+Then, and only then, the deck's `‹markers›` get replaced with that run's output —
+`docs/deck-outline.md` lists which marker comes from which command. Do not hand-write a number
+into the deck; if a number has no command, it does not go in.
 
-Recorded on our own running system, screen capture, one take per section, cut together. The
-sequence is the first half of `docs/demo-script.md`:
+---
 
-1. **0:00–0:20** onboarding: a camera added in the admin page, appearing on the map with health.
-2. **0:20–0:55** detection: live sightings on the map, one opened — crop, class, band, PTS.
-3. **0:55–1:30** watchlist match: the plate added to the watchlist, the alert firing, banded.
-4. **1:30–2:15** route: the plate typed in, hops drawn across cameras, one flagged IMPLAUSIBLE.
-5. **2:15–2:40** audit: the export that was just made, in the audit log, and `audit/verify` ok.
+## Judged on seven things — where we stand
 
-No slides in the video. No voice-over claims that the screen does not show. Keep the terminal
-with `/metrics` visible in one shot — it is the cheapest proof that this is a running system
-and not a click-through.
-
-Record at 1920×1080, 30 fps, and check it plays in a browser on a phone before uploading.
-
-## Hosted URL and test credentials
-
-Three logins, one per role we claim in [C10], because a jury that can only log in as an admin
-cannot check that scope is enforced:
-
-| role | username | what they should see |
-|---|---|---|
-| Investigator (Police) | `demo.investigator` | everything, statewide route, export |
-| Operator (dept) | `demo.operator` | own department only, no export |
-| Dept Admin | `demo.admin` | own department, users in dept, audit |
-
-Credentials go in the submission form, never in this repo. Rotate them after the event.
-
-## Repository hygiene before the link is submitted
-
-- [ ] `.env` is not in git and never was (`git log --all --full-history -- .env` is empty).
-- [ ] No weights, no video, no crops (`.gitignore` covers `models/`, `fixtures/clips/`).
-- [ ] `git ls-files | xargs ls -l | sort -k5 -n | tail` shows nothing over 10 MB.
-- [ ] `README`/`AGENTS.md` say how to run it from a clean clone: `make up`, `make seed`,
-      `make check`, then the three service commands.
-- [ ] Licences of every model listed (`docs/model-card.md`) — the contest is open source only,
-      and the YOLOv8 AGPL question is stated openly rather than hidden.
-
-## Timeline
-
-| when | what |
+| Criterion | Where we are |
 |---|---|
-| **5 Sep** | feature freeze. After this, only fixes that make the gate green. |
-| 5 Sep | chaos drills, all four, timed (`docs/demo-script.md`) |
-| 5–6 Sep | two timed rehearsals of the 8-minute script |
-| 6 Sep AM | final accuracy report; deck markers replaced with real numbers; deck → PDF |
-| 6 Sep PM | record the demo video, cut, check playback on a phone |
-| **6 Sep 14:00** | **submit everything** |
-| 7 Sep | buffer. Portal closes. |
-| 10–11 Sep | live event, i-Hub Gandhinagar |
+| Gov-feed test case success | Route history works end to end. ANPR on the grid returns no plate, honestly and by design (`feasibility` refuses rather than guesses) |
+| Presentation clarity | Deck built; needs the PDF/PPT export and the honest ANPR slide |
+| Technical / architecture soundness | Hybrid M1+M2+M3, sighting-as-atom, full HLD, contracts frozen |
+| Platform maturity | 362 tests, CI on every push, 35-check stack verification, audit chain, failure playbook |
+| Analytics output quality | PTS timestamps throughout, banded confidence, zero confidently-wrong reads, per-reader accuracy published |
+| Scalability & PoC readiness | Three scale tiers costed in the HLD; runs on one node today |
+| Submission completeness | The five items above |
 
-## Things that have sunk submissions before, in order of likelihood
-
-1. **Uploading on the last evening.** The portal is slow when everyone does this. Hence the 6th.
-2. **A video that shows a mock-up.** Explicitly rejected. Record the real thing, even if uglier.
-3. **A number in the deck that nobody can reproduce.** Every figure traces to a command
-   (`docs/deck-outline.md`), or it comes off the slide.
-4. **Credentials that do not work from outside our network.** Test the hosted URL and all three
-   logins from a phone on mobile data, not from the dev laptop.
-5. **A PDF export that rasterises the architecture diagram into mush.** Export at print
-   resolution and open the PDF on someone else's machine.
+Bonus criteria we can claim: hybrid architecture, multi-camera tracking, analytics beyond ANPR
+(crowd, stopped vehicle, wrong-way, re-identification), edge/bandwidth thinking (sightings cross
+the boundary, not video), cybersecurity and auditability (hash-chained log, RLS, grants), and
+operational dashboards (the console's admin view).

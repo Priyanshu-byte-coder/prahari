@@ -6,6 +6,14 @@ should fold old changelog lines into `## 7. Archived`) · patched after **every*
 
 ## 0. Now
 
+- 2026-09-04. **Repo is submission-shaped.** README + LICENSE (Apache-2.0) added, planning docs
+  moved under `docs/`, `scripts/run_stack.py` (start/stop/status) and `scripts/verify_stack.py`
+  (35 end-to-end checks, 35/35) added. Issues #51-#55, #57, #58 fixed and closed; #56 needs the
+  organisers. Lane I's plate-OCR branch merged: trained plate detector, multi-frame SR, MVCP,
+  LR benchmark, and the 30-camera grid report (**zero plates readable on the live grid** - the
+  cameras are scene-overview, at night). Suite: **362 passed, 6 skipped**; integration 6/6;
+  selftest 0.68 s CONFIRMED. Left for submission: deck+HLD to PDF, record the 2:45 video,
+  screenshots, hosting decision - `docs/submission.md`.
 - 2026-09-03, evening. A-Z pass on merged `main`. **Working**: auth + refresh, the [C10] role
   matrix on cameras/alerts/watchlist/audit, alert state machine (`to_state`), watchlist add and
   CSV import, CSV *and* PDF export (`fmt=pdf`), audit chain verify (221 entries, ok), WebSocket
@@ -406,6 +414,18 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
   as 90 degrees of tilt on the CI runner and 0 on a laptop - six red CI runs came from exactly
   that.
 
+- `[D]` The cost of an OCR read is not fixed, and three constants assumed it was. Queue depth x
+  read cost *is* a sighting's tail latency (depth 4 x 1.6 s = 6.5 s against a 3 s budget); the
+  drain must exceed one read; and `warm()` must warm every engine *and* the plate detector or
+  the first read pays 23 s of model loading inside the budget. All three now measured, tunable
+  and commented in `services/worker/run.py`.
+- `[D]` PaddleOCR needs a 3-channel crop. Handed greyscale it raises inside `predict()`, which
+  `_Reader.read` catches and turns into an empty reading - so the best reader on the golden set
+  contributed nothing to the live vote, silently, for as long as it was installed.
+- `[D]` Expensive accuracy paths (multi-frame SR, multi-reconstruction voting) belong behind an
+  escalation gate, not always-on: run them when two readers have *not* agreed. Same accuracy on
+  the hard plates, 10.3 s -> 0.68 s on the easy ones.
+
 ## 4. Decisions
 
 - 2026-08-29 — Timeline follows the portal (submit 7 Sep, event 10–11 Sep), not the plan's §16 sprints
@@ -691,6 +711,7 @@ changing one without a line here breaks somebody else's lane silently.
 - 08-29 | G1 | scripts/probe_grid.py, data/cameras.seed.json, data/catalogue/ingest.json.bootstrap | seed built and verified (`--check`); grid host was 502, used salvaged catalogue as bootstrap
 
 ### lane D
+- 09-04 | submission | README.md, LICENSE, docs/{api,operations,video-script,submission}.md, scripts/{run_stack,verify_stack}.py | repo made submission-shaped; 7 issues fixed and closed; lane I's OCR branch merged and its latency brought back inside the budget
 - 09-03 | a-z | services/worker/preprocess.py, tests/test_i_preprocess.py | full A-Z test of main; CI unblocked (minAreaRect angle convention); 8 issues filed #51-#58 and put on the board as Todo
 - 09-03 | grid-live | scripts/console_serve.py, services/gateway/wall.py, run_demo_env.sh | grid sign-in fixed (email+key) and UA passed as its own PyAV option; wall pulls real HLS video, 6 cameras live in the console
 - 09-03 | grid+ocr | services/worker/preprocess.py, scripts/grid_survey.py, data/grid_survey.json, tests/test_i_preprocess.py | 30 cameras probed (18x1080p, 5x720p, 4x1280x960, 1x960x576, 1x1440p, cam30 unreachable; 23 h264 / 6 hevc; 25 fps mostly). Plate feasibility gate + tiling + crop enhancement + multi-frame fusion, 24 tests green
