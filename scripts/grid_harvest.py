@@ -28,6 +28,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+import cv2
 import requests
 
 import scripts.console_serve as console
@@ -174,15 +175,25 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--seconds", type=float, default=90.0, help="capture window per camera")
     ap.add_argument("--workers", type=int, default=6, help="cameras captured in parallel")
+    ap.add_argument("--fps", type=float, default=2.0, help="frames/sec sampled for OCR")
+    ap.add_argument("--reuse", action="store_true", help="skip capture, use existing clips")
     ap.add_argument("--only", help="comma-separated camera ids")
     ap.add_argument("--clipdir", default=str(ROOT / "runs" / "grid_clips"))
     ap.add_argument("--out", default=str(ROOT / "runs" / "grid_plates.json"))
     args = ap.parse_args()
 
+    Path(args.clipdir).mkdir(parents=True, exist_ok=True)
+    cat_cache = Path(args.clipdir) / "cameras.json"
     sess = requests.Session()
-    cookie, ua = sign_in()
-    print(f"[+] signed in; cookie {cookie[:32]}...", flush=True)
-    cams = catalogue(sess, cookie, ua)
+    if args.reuse and cat_cache.exists():
+        cookie, ua = "", ""
+        cams = json.loads(cat_cache.read_text())
+        print(f"[+] reuse: {len(cams)} cameras from cache", flush=True)
+    else:
+        cookie, ua = sign_in()
+        print(f"[+] signed in; cookie {cookie[:32]}...", flush=True)
+        cams = catalogue(sess, cookie, ua)
+        cat_cache.write_text(json.dumps(cams))
     if args.only:
         want = set(args.only.split(","))
         cams = [c for c in cams if c["id"] in want]
@@ -192,86 +203,110 @@ def main() -> int:
 
     Path(args.clipdir).mkdir(parents=True, exist_ok=True)
     clips: dict[str, Path] = {}
-    with ThreadPoolExecutor(max_workers=args.workers) as ex:
-        futs = {ex.submit(capture_hls, c["id"], cookie, ua, args.seconds, args.clipdir): c["id"]
-                for c in cams}
-        for fut in as_completed(futs):
-            cid = futs[fut]
-            try:
-                p = fut.result()
-                if p:
-                    clips[cid] = p
-            except Exception as exc:
-                print(f"  [{cid}] capture crashed: {exc}", flush=True)
+    if args.reuse:
+        for c in cams:
+            p = Path(args.clipdir) / f"{c['id']}.ts"
+            if p.exists() and p.stat().st_size > 8192:
+                clips[c["id"]] = p
+        print(f"[+] reusing {len(clips)} existing clips", flush=True)
+    else:
+        with ThreadPoolExecutor(max_workers=args.workers) as ex:
+            futs = {ex.submit(capture_hls, c["id"], cookie, ua, args.seconds,
+                              args.clipdir): c["id"] for c in cams}
+            for fut in as_completed(futs):
+                cid = futs[fut]
+                try:
+                    p = fut.result()
+                    if p:
+                        clips[cid] = p
+                except Exception as exc:
+                    print(f"  [{cid}] capture crashed: {exc}", flush=True)
 
-    print(f"\n[+] captured {len(clips)}/{len(cams)} cameras; running pipeline", flush=True)
+    print(f"\n[+] captured {len(clips)}/{len(cams)} cameras; running detect + OCR", flush=True)
 
-    try:
-        import fakeredis
-        client = fakeredis.FakeRedis()
-    except ImportError:
-        raise SystemExit("pip install fakeredis")
-    stream = "sightings-grid"
-    from services.worker.publish import Publisher
+    import numpy as np
     from services.worker.backend import LocalBackend
-    publisher = Publisher(redis_client=client, stream=stream)
-    backend = LocalBackend()
+    from services.worker.plate import read_all, readers
+    from services.worker.vote import VALID
+    from common.plate import grammar_fix, normalise
 
-    from services.worker.run import Worker
-    per_cam: dict[str, list[dict]] = defaultdict(list)
-    seen_ids: set[str] = set()
-    warmed = False
+    VEHICLE = {"car", "truck", "bus", "motorcycle", "motorbike", "van", "vehicle"}
+    backend = LocalBackend()
+    print("[*] warming detector + OCR readers", flush=True)
+    backend.detect([np.zeros((544, 960, 3), np.uint8)])
+    rnames = [r.name for r in readers()]
+    print(f"[*] readers: {', '.join(rnames)}", flush=True)
+
+    per_cam: dict[str, dict[str, dict]] = {}
     for cid, clip in sorted(clips.items()):
-        worker = Worker({cid: str(clip)}, backend=backend, publisher=publisher,
-                        once=True, motion_gate=True)
-        if not warmed:
-            worker.warm(); warmed = True
         t0 = time.time()
-        try:
-            worker.run(seconds=900)
-        except Exception as exc:
-            print(f"  [{cid}] pipeline error: {type(exc).__name__}: {exc}", flush=True)
-        for _id, fields in client.xrange(stream, min="-", max="+"):
-            k = _id.decode() if isinstance(_id, bytes) else _id
-            if k in seen_ids:
+        framedir = Path(args.clipdir) / f"{cid}_frames"
+        framedir.mkdir(exist_ok=True)
+        for old in framedir.glob("*.jpg"):
+            old.unlink()
+        subprocess.run([FFMPEG, "-nostdin", "-loglevel", "error", "-y", "-i", str(clip),
+                        "-vf", f"fps={args.fps}", str(framedir / "f%04d.jpg")],
+                       capture_output=True, timeout=180)
+        frames = sorted(framedir.glob("*.jpg"))
+        hits: dict[str, dict] = {}
+        vehicles = 0
+        for fi, fp in enumerate(frames):
+            img = cv2.imread(str(fp))
+            if img is None:
                 continue
-            seen_ids.add(k)
-            raw = fields.get(b"data") or fields.get("data")
-            row = json.loads(raw.decode() if isinstance(raw, bytes) else raw)
-            per_cam[row["camera_id"]].append(row)
-        print(f"  [{cid}] {time.time()-t0:.0f}s, "
-              f"{len(per_cam.get(cid, []))} sightings", flush=True)
+            for d in backend.detect([img])[0]:
+                if d.label not in VEHICLE:
+                    continue
+                vehicles += 1
+                x1, y1, x2, y2 = (max(0, int(v)) for v in d.xyxy)
+                crop = img[y1:y2, x1:x2]
+                if crop.size == 0 or crop.shape[0] < 24 or crop.shape[1] < 24:
+                    continue
+                for rd in read_all(crop):
+                    g = grammar_fix(normalise(rd.text)) or ""
+                    if not g:
+                        continue
+                    shaped = bool(VALID.match(g))
+                    if not shaped and len(g) < 8:
+                        continue
+                    h = hits.setdefault(g, {"frames": set(), "conf": 0.0,
+                                            "readers": set(), "shaped": shaped})
+                    h["frames"].add(fi)
+                    h["readers"].add(rd.reader)
+                    h["conf"] = max(h["conf"], round(float(rd.conf), 3))
+        # keep a plate if a shaped read repeats across frames or >1 reader agrees
+        kept = {g: v for g, v in hits.items()
+                if (v["shaped"] and (len(v["frames"]) >= 2 or len(v["readers"]) >= 2))
+                or len(v["frames"]) >= 3}
+        per_cam[cid] = {g: {"conf": v["conf"], "frames": len(v["frames"]),
+                            "readers": sorted(v["readers"]), "plate_shaped": v["shaped"]}
+                        for g, v in kept.items()}
+        print(f"  [{cid}] {len(frames)} frames, {vehicles} vehicle crops, "
+              f"{len(kept)} plate(s), {time.time()-t0:.0f}s", flush=True)
 
     # report
-    print("\n" + "=" * 90)
-    print(f"{'cam':<7} {'name':<46} plates (band, conf)")
-    print("-" * 90)
+    print("\n" + "=" * 96)
+    print(f"{'cam':<7} {'name':<44} plates tracked (conf, frames, readers)")
+    print("-" * 96)
     result = []
     for c in cams:
         cid = c["id"]
-        rows = per_cam.get(cid, [])
-        plates: dict[str, dict] = {}
-        for r in rows:
-            p = r.get("plate_text")
-            if not p:
-                continue
-            cur = plates.get(p)
-            if cur is None or r.get("plate_conf", 0) > cur["conf"]:
-                plates[p] = {"conf": round(r.get("plate_conf", 0), 3),
-                             "band": r.get("plate_band"),
-                             "vehicle": r.get("vehicle_class")}
-        listing = "  ".join(f"{k} ({v['band']},{v['conf']})"
-                            for k, v in plates.items()) or "-"
-        note = "" if cid in clips else "  [no feed captured]"
-        print(f"{cid:<7} {c['name'][:46]:<46} {listing}{note}")
-        result.append({"camera_id": cid, "name": c["name"],
-                       "captured": cid in clips, "sightings": len(rows),
-                       "plates": [{"plate": k, **v} for k, v in plates.items()]})
+        plates = per_cam.get(cid, {})
+        if cid not in clips:
+            listing = "[no feed captured]"
+        elif not plates:
+            listing = "-  (no readable plate; wide junction view)"
+        else:
+            listing = "   ".join(f"{g} ({v['conf']}, {v['frames']}f, {'+'.join(v['readers'])})"
+                                  for g, v in plates.items())
+        print(f"{cid:<7} {c['name'][:44]:<44} {listing}")
+        result.append({"camera_id": cid, "name": c["name"], "captured": cid in clips,
+                       "plates": [{"plate": g, **v} for g, v in plates.items()]})
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps(result, indent=2))
     tp = sum(len(r["plates"]) for r in result)
-    print("-" * 90)
-    print(f"{tp} distinct plates across {len(clips)}/{len(cams)} captured cameras -> {args.out}")
+    print("-" * 96)
+    print(f"{tp} plates tracked across {len(clips)}/{len(cams)} captured cameras -> {args.out}")
     return 0
 
 
