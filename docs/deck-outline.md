@@ -9,7 +9,7 @@ Sources, in the order the slides use them:
 
 | marker | comes from |
 |---|---|
-| `‹accuracy›` | `python scripts/accuracy_report.py --golden fixtures/golden/` → `docs/accuracy-report.md` |
+| `‹accuracy›` | `python scripts/accuracy_report.py` → `docs/accuracy-report.md` |
 | `‹bench›` | `python -m services.worker.backend --bench` |
 | `‹decode›` | `python -m services.worker.decode --bench --cameras 10 --seconds 600` |
 | `‹latency›` | `python -m services.worker.selftest --assert-xadd` (row latency) |

@@ -17,10 +17,10 @@ Deadline: submission **7 Sep 2026**, event 10–11 Sep. Three developers, three 
 That is the entire allowance. Then write code.
 
 - **Never** read `TASK.md` whole (~500 lines) — grep your ticket.
-- **Never** read `sentinel-e2e-implementation-plan.md` whole (745 lines). Grep an anchor:
-  `grep -n -A 30 '^### B3' sentinel-e2e-implementation-plan.md`. Your ticket already carries what you need;
+- **Never** read `docs/internal/implementation-plan.md` whole (745 lines). Grep an anchor:
+  `grep -n -A 30 '^### B3' docs/internal/implementation-plan.md`. Your ticket already carries what you need;
   go here only when the ticket points you here or you are genuinely stuck.
-- **Never** read `SENTINEL_HACKATHON.md` unless the question is "what do the judges require".
+- **Never** read `docs/brief-sentinel-hackathon.md` unless the question is "what do the judges require".
 - **Never** read another lane's source. What you need from them is a frozen contract in `TASK.md §C`.
   If it is not in a contract, it is not a dependency — say so and move on.
 

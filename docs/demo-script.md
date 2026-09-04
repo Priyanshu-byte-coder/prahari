@@ -7,7 +7,7 @@ before anyone opens a browser:
 # legs 2-3 need an investigator credential - without it they skip, they never pass vacuously:
 export PRAHARI_TEST_USER=<investigator> PRAHARI_TEST_PASSWORD=<pw>   # or PRAHARI_TEST_JWT=<token>
 PRAHARI_INTEGRATION=1 pytest tests/test_integration.py -v     # every leg green or explicitly skipped
-python scripts/accuracy_report.py --golden fixtures/golden/   # regenerates docs/accuracy-report.md
+python scripts/accuracy_report.py                             # regenerates docs/accuracy-report.md
 ```
 
 If either is red, the demo is the fix, not the presentation. A run where legs 2-3 **skip** is
@@ -21,10 +21,12 @@ until all four legs are green.
 ```bash
 make up                                        # postgres+timescale, redis, minio, mediamtx, osrm
 make seed                                      # cameras.seed.json + camera_geo.json
-python -m services.worker.run --camera GJ-AHD-0001 --camera GJ-AHD-0002 --metrics-port 9108
-uvicorn services.api.main:app --host 0.0.0.0   # core
-python -m http.server 5173 -d web              # console
-scripts/replay_clip.sh                         # the known-plate camera, in its own shell
+python -m services.worker.run --camera 4 --camera 14 --metrics-port 9108
+python -m uvicorn --factory services.api.main:factory --host 0.0.0.0 --port 8000   # core + WS
+python scripts/console_serve.py --port 5173     # console (also proxies the API and the wall)
+python services/api/persister.py &              # stream -> Timescale
+python services/api/matcher.py &                # sightings -> alerts
+scripts/replay_clip.sh                          # the known-plate camera, in its own shell
 ```
 
 Checks, in this order, each one a thing that has failed before:

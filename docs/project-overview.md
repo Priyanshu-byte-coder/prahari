@@ -767,16 +767,16 @@ In rough order of how likely they are to sink the submission:
 | What is true right now, what's done, what broke | `knowledge_base.md` (read this first) |
 | The stable identity, stack, commands, conventions | `AGENTS.md` |
 | How the team is supposed to work | `CLAUDE.md` |
-| Exactly what the judges require and score | `SENTINEL_HACKATHON.md` |
+| Exactly what the judges require and score | `docs/brief-sentinel-hackathon.md` |
 | A specific developer's task and boundaries | `TASK.md` (grep the ticket, never read whole) |
-| Deep design detail | `sentinel-e2e-implementation-plan.md` (grep an anchor, never read whole) |
+| Deep design detail | `docs/internal/implementation-plan.md` (grep an anchor, never read whole) |
 | The High-Level Design | `docs/hld.md` |
 | What the ANPR model does and refuses | `docs/model-card.md` |
 | The demo run sheet, chaos drills, rehearsals | `docs/demo-script.md` |
 | The submission plan and the pre-submit gate | `docs/submission.md` |
 | The 10-slide deck (spec / rendered) | `docs/deck-outline.md` / `docs/deck.html` |
 | A visual status snapshot | `docs/status.html` |
-| **This overview** | `PROJECT_OVERVIEW.md` |
+| **This overview** | `docs/project-overview.md` |
 | The camera list and coordinates | `data/cameras.seed.json`, `data/camera_geo.json` |
 | How to run the whole thing | `make up`, `make seed`, `make check`, then the service commands in `AGENTS.md` |
 

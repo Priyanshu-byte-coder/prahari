@@ -18,12 +18,15 @@ uvicorn[standard]
 pydantic-settings
 requests
 
-# lane I — decode, detect and track. No OCR engines: see the note above.
+# lane I — decode, detect and track. Only the small OCR reader: see the note above.
 av
 opencv-python-headless>=4.10,<4.11   # pinned: OpenCV 5.x shifts cv2 geometry conventions
 numpy<2.4
 ultralytics>=8.3.0,<8.4   # pinned: see requirements.txt / #45
 lap
+# The one OCR reader small enough for CI: a 2 MB ONNX model against paddle's several hundred.
+# With it the multi-reader vote is exercised on every push rather than only on a laptop.
+fast-plate-ocr[onnx]
 
 # lane D — persistence, matching, RBAC, export
 psycopg2-binary

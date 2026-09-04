@@ -1,7 +1,7 @@
 # TASK.md — Prahari / SENTINEL: tickets, owners, contracts
 
 Frozen 2026-08-29. Source of truth for **who builds what**.
-Design detail lives in `sentinel-e2e-implementation-plan.md` (grep by anchor, never read whole).
+Design detail lives in `docs/internal/implementation-plan.md` (grep by anchor, never read whole).
 Live state lives in `knowledge_base.md`. Working rules live in `CLAUDE.md`.
 Tickets are mirrored as GitHub issues on `Priyanshu-byte-coder/prahari`; ticket id is the issue title prefix.
 
@@ -12,12 +12,12 @@ Never read this file whole. It is ~570 lines; your ticket is 15.
 ```bash
 grep -n -A 22 '^### I3'  TASK.md      # your ticket block
 grep -n -A 30 '^## C3 '  TASK.md      # a contract block your ticket names (keep the trailing space)
-grep -n -A 30 '^### B3'  sentinel-e2e-implementation-plan.md   # deep design, only if stuck
+grep -n -A 30 '^### B3'  docs/internal/implementation-plan.md   # deep design, only if stuck
 ```
 
 ---
 
-## 1. The clock (real dates, from SENTINEL_HACKATHON.md — the plan's §16 sprint dates are obsolete)
+## 1. The clock (real dates, from docs/brief-sentinel-hackathon.md — the plan's §16 sprint dates are obsolete)
 
 | Date | What |
 |---|---|

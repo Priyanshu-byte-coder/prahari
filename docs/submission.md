@@ -21,7 +21,7 @@ and every screenshot in the deck must be the running system on our own feed.
 
 ```bash
 PRAHARI_INTEGRATION=1 pytest tests/test_integration.py -v     # J1, every leg
-python scripts/accuracy_report.py --golden fixtures/golden/   # I7, regenerates the numbers
+python scripts/accuracy_report.py                             # I7, regenerates the numbers
 make check                                                    # unit suites + the RBAC scope test
 ```
 

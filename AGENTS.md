@@ -9,8 +9,8 @@ changelog — lives in `knowledge_base.md` and is patched after every task. One 
 | What is true right now, what is done, what broke | `knowledge_base.md` |
 | Your ticket, your owner boundaries, the frozen contracts | `TASK.md` (grep, never read whole) |
 | How to work, what to read, the update contract | `CLAUDE.md` |
-| Deep design detail | `sentinel-e2e-implementation-plan.md` (grep an anchor) |
-| What the judges require and score | `SENTINEL_HACKATHON.md` |
+| Deep design detail | `docs/internal/implementation-plan.md` (grep an anchor) |
+| What the judges require and score | `docs/brief-sentinel-hackathon.md` |
 
 ## Identity
 

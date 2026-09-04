@@ -132,8 +132,8 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 - `TASK.md` — tickets, lane boundaries, frozen contracts C1–C10. Grep, never read whole.
 - `CLAUDE.md` — read order, token rules, the KB update contract, ticket loop.
 - `AGENTS.md` — stable spine: identity, stack, commands, ownership, conventions.
-- `SENTINEL_HACKATHON.md` — scraped portal spec: deliverables, evaluation, grid endpoints, dates.
-- `sentinel-e2e-implementation-plan.md` — 745-line design reference. Grep an anchor (`^### B3`), never read whole.
+- `docs/brief-sentinel-hackathon.md` — scraped portal spec: deliverables, evaluation, grid endpoints, dates.
+- `docs/internal/implementation-plan.md` — 745-line design reference. Grep an anchor (`^### B3`), never read whole.
 
 ### lane I
 - `common/plate.py` — [C7] plate strings, pure and None-safe — `normalise` `canon` `grammar_fix`
