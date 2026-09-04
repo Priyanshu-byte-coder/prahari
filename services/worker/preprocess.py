@@ -60,7 +60,11 @@ GLYPH_H_FRACTION = PLATE_W_FRACTION * (PLATE_H_MM / PLATE_W_MM) * GLYPH_FRACTION
 # Recogniser floors. EasyOCR's CRNN and PaddleOCR's SVTR are trained on 32-48 px text lines;
 # below ~14 px of *native* glyph the upscale is interpolating strokes that were never sampled.
 GLYPH_OK_PX = 14.0
-GLYPH_MARGINAL_PX = 8.0
+# Measured, not guessed: scripts/lr_benchmark.py at night severity puts the cliff between a
+# 20 px plate (13 px glyph, 65 % exact with the MVCP ensemble) and a 16 px plate (10 px glyph,
+# 5 %). Below ~10 px of glyph the multi-frame path stops recovering characters, so that is
+# where "marginal" ends and "do not guess" begins.
+GLYPH_MARGINAL_PX = 10.0
 TARGET_GLYPH_PX = 32.0           # what we upscale to before handing a crop to a reader
 MAX_UPSCALE = 4.0                # past 4x the interpolation invents more than it recovers
 MIN_ALIGN_CC = 0.55              # ECC correlation below which a frame is not this plate
