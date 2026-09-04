@@ -89,12 +89,27 @@ def _access_token():
     return None
 
 
+# The camera the replayed clip is published as. It has to be a camera that exists in the
+# registry: the persister writes with a foreign key to `cameras`, so SELFTEST-000 - which
+# deliberately does not exist, so a stray selftest cannot pollute the real table - is dead-
+# lettered rather than persisted, and legs 2 and 3 then have nothing to correlate.
+INTEGRATION_CAMERA = os.environ.get("PRAHARI_INTEGRATION_CAMERA", "1")
+
+
 @pytest.fixture(scope="module")
 def replay():
-    """Leg 1: replay a clip with a known plate through the whole worker. ~40 s, once."""
+    """Leg 1: replay a clip with a known plate through the whole worker. ~40 s, once.
+
+    Onto the *real* `sightings` stream, under a real camera id. The standalone selftest
+    publishes to `sightings-selftest` on purpose (#48) so that running it never touches
+    production data - but an integration test whose sighting never reaches the persister or the
+    matcher is testing the worker alone while claiming to test the pipeline. That is precisely
+    the vacuous pass this file exists to prevent.
+    """
     from services.worker.selftest import run
 
-    return run(budget=None, require_plate=True)
+    return run(budget=None, require_plate=True,
+               stream="sightings", camera_id=INTEGRATION_CAMERA)
 
 
 # --- leg 1: the lane's own output ------------------------------------------------------------
@@ -156,9 +171,21 @@ def test_the_plate_raises_a_confirmed_alert(token, replay):
     from common.plate import canon, normalise
 
     plate = normalise(replay["plate_injected"])
+    # Remove any entry for this plate left by an earlier run first. The matcher keys its index by
+    # canonical plate and raises one alert for the vehicle, not one per duplicate entry - correct
+    # behaviour, but it means a stale entry absorbs the match and this leg then waits forever for
+    # an alert carrying *its* watchlist id.
+    status, existing = _http("/api/watchlist", "GET", token=token)
+    if status == 200:
+        for entry in existing or []:
+            if entry.get("plate_norm") == plate:
+                _http(f"/api/watchlist/{entry['id']}", "DELETE", token=token)
+
+    # The API takes `plate` and derives plate_norm/plate_canon itself, and `category` is a closed
+    # vocabulary - this leg was still posting the older shape, so it never got past validation.
     status, payload = _http("/api/watchlist", "POST",
-                            {"kind": "plate", "plate_norm": plate, "plate_canon": canon(plate),
-                             "category": "integration-test", "severity": "LOW",
+                            {"kind": "plate", "plate": plate,
+                             "category": "stolen vehicle", "severity": "LOW",
                              "reason": "J1 integration test"}, token=token)
     if status == 401:
         pytest.skip("the test credential lacks watchlist:write - use an investigator account")
@@ -166,7 +193,24 @@ def test_the_plate_raises_a_confirmed_alert(token, replay):
     watchlist_id = (payload or {}).get("id")
     assert watchlist_id, f"watchlist POST returned no id: {payload}"
 
-    deadline = time.time() + max(BUDGET_S, 5.0)   # leg 2 spans persist + match, not just publish
+    # Order matters, and getting it wrong makes this leg fail against a working pipeline. The
+    # matcher alerts on *new* sightings against the watchlist index it holds, and that index is
+    # reloaded every matcher.INDEX_TTL seconds. A clip replayed before the entry is in the index
+    # therefore raises nothing for it - which is exactly right, and exactly what this test used
+    # to do: leg 1's replay had already been consumed by the time the entry existed.
+    #
+    # So: wait for the index to pick the entry up, then replay again, then wait for the alert.
+    # That is also the real sequence - an officer adds a plate, and the next time it is seen,
+    # it fires.
+    sys.path.insert(0, str(ROOT / "services" / "api"))
+    from matcher import INDEX_TTL
+    from services.worker.selftest import run as replay_again
+
+    time.sleep(INDEX_TTL + 2.0)
+    replay_again(budget=None, require_plate=True, stream="sightings",
+                 camera_id=INTEGRATION_CAMERA)
+
+    deadline = time.time() + max(BUDGET_S, 30.0)
     seen_bands = set()
     while time.time() < deadline:
         status, alerts = _http("/api/alerts?limit=100", token=token)
@@ -177,8 +221,8 @@ def test_the_plate_raises_a_confirmed_alert(token, replay):
                 if a.get("band") == "CONFIRMED":
                     return
         time.sleep(0.2)
-    pytest.fail(f"no CONFIRMED alert for watchlist {watchlist_id} (plate {plate}) within "
-                f"{max(BUDGET_S, 5.0)}s; bands seen: {seen_bands or 'none'}")
+    pytest.fail(f"no CONFIRMED alert for watchlist {watchlist_id} (plate {plate}); "
+                f"bands seen: {seen_bands or 'none'}. Is the matcher running?")
 
 
 def test_the_alert_reaches_a_websocket_client(token):
