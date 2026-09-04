@@ -221,6 +221,27 @@ class EasyOCRReader(_Reader):
         return text, conf
 
 
+def _paddle_lines(page):
+    """(texts, scores) out of whichever result shape this PaddleOCR version shipped.
+
+    3.x `predict()` -> dict-like with `rec_texts` / `rec_scores`.
+    2.x `ocr()`     -> list of `[box, (text, conf)]`.
+    """
+    try:
+        if hasattr(page, "get") and page.get("rec_texts") is not None:
+            return list(page["rec_texts"]), list(page.get("rec_scores") or [])
+    except Exception:
+        pass
+    texts, scores = [], []
+    for ln in page or []:
+        try:
+            texts.append(ln[1][0])
+            scores.append(float(ln[1][1]))
+        except (IndexError, TypeError, ValueError):
+            continue
+    return texts, scores
+
+
 class PaddleReader(_Reader):
     """PaddleOCR - the ticket's second reader. Different architecture (DB + SVTR/CRNN) and a
     different training set from EasyOCR, which is the point: two readers that fail the same
@@ -242,19 +263,23 @@ class PaddleReader(_Reader):
                          enable_mkldnn=False)
 
     def _read(self, crop):
+        # A degenerate crop (1-2 px on a side, or a sliver aspect) makes PP-OCRv5/v6 raise
+        # "not enough values to unpack" deep in the PIR executor. It is caught upstream, but
+        # skipping it here keeps the log clean and costs nothing the reader would have found.
+        h, w = crop.shape[:2]
+        if h < 8 or w < 8 or max(h, w) / max(1, min(h, w)) > 30:
+            return "", 0.0
         engine = self.engine()
         # 3.x renamed ocr() to predict(); both ship in 3.x, only ocr() in 2.x.
         result = engine.predict(crop) if hasattr(engine, "predict") else engine.ocr(crop)
         best = ("", 0.0)
         for page in result or []:
-            # Paddle has shipped two result shapes; handle both rather than pin a version.
-            lines = page.get("rec_texts", []) if isinstance(page, dict) else page or []
-            scores = page.get("rec_scores", []) if isinstance(page, dict) else []
-            pairs = (zip(lines, scores) if scores
-                     else ((ln[1][0], ln[1][1]) for ln in lines if len(ln) > 1))
-            for text, conf in pairs:
+            texts, scores = _paddle_lines(page)
+            if texts and len(scores) != len(texts):
+                scores = (scores + [0.0] * len(texts))[: len(texts)]
+            for text, conf in zip(texts, scores):
                 if (len(clean(text)), conf) > (len(clean(best[0])), best[1]):
-                    best = (text, conf)
+                    best = (text, float(conf))
         return best
 
 
@@ -279,7 +304,37 @@ class TesseractReader(_Reader):
         return text, (sum(confs) / len(confs) / 100.0 if confs else 0.0)
 
 
-_AVAILABLE = (EasyOCRReader, PaddleReader, TesseractReader)
+class FastPlateReader(_Reader):
+    """fast-plate-ocr: a CCT (compact convolutional transformer) trained end to end on license
+    plates, not general scene text. No separate text detector - it wants a crop that is already
+    mostly plate, which is what `candidates()` hands it. Fast (ONNX, a few ms on CPU) and it
+    fails on a different axis from the scene-text readers: it is strong on skew and low light,
+    weak when the crop is the whole vehicle. That difference is exactly what the vote wants."""
+
+    name = "fastplate"
+
+    def _load(self):
+        from fast_plate_ocr import LicensePlateRecognizer
+        model = os.getenv("PRAHARI_FASTPLATE_MODEL", "cct-s-v2-global-model")
+        try:
+            return LicensePlateRecognizer(model)
+        except Exception:
+            # v2 hub names move; the xs global model is always present.
+            return LicensePlateRecognizer("cct-xs-v1-global-model")
+
+    def _read(self, crop):
+        if crop.ndim == 2:
+            crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR)
+        preds = self.engine().run(crop, return_confidence=True)
+        if not preds:
+            return "", 0.0
+        best = max(preds, key=lambda p: (len(clean(p.plate)),
+                                         float(np.mean(p.char_probs)) if p.char_probs is not None else 0.0))
+        conf = float(np.mean(best.char_probs)) if best.char_probs is not None else 0.0
+        return best.plate, conf
+
+
+_AVAILABLE = (EasyOCRReader, PaddleReader, TesseractReader, FastPlateReader)
 _READERS = None
 _READERS_LOCK = threading.Lock()
 
