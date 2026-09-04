@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -179,6 +180,8 @@ def main() -> int:
     ap.add_argument("--fps", type=float, default=8.0,
                     help="frames/sec sampled for OCR (higher = more frames per track for MFSR; "
                          "0 = native)")
+    ap.add_argument("--max-crops", type=int, default=24,
+                    help="max crops kept per track for the reconstruction ensemble")
     ap.add_argument("--reuse", action="store_true", help="skip capture, use existing clips")
     ap.add_argument("--only", help="comma-separated camera ids")
     ap.add_argument("--clipdir", default=str(ROOT / "runs" / "grid_clips"))
@@ -232,8 +235,11 @@ def main() -> int:
     from services.worker.plate import read_all, readers
     from services.worker.sighting import sharpness
     from services.worker.vote import PlateVote
-    from services.worker.preprocess import prepare_frame, prepare_for_ocr
+    from services.worker.preprocess import prepare_frame
+    from services.worker.plate import detect_plate_boxes, propose
+    from services.worker.mvcp import decode_track
 
+    MAX_TRACK_CROPS = args.max_crops
     VEHICLE = {"car", "truck", "bus", "motorcycle", "motorbike", "van", "vehicle"}
     imgsz = int(os.getenv("PRAHARI_DETECT_IMGSZ", "960"))
     backend = LocalBackend(imgsz=imgsz)
@@ -297,32 +303,77 @@ def main() -> int:
                 tr["crops"].append((sh, crop))
                 live.append(tr)
 
-        # per track: multi-frame super-resolve all its crops into one plate image, plus the
-        # sharpest few raw crops, and vote across the lot.
+        # Per track: localise the plate in every frame first, then reconstruct from the plate
+        # patches -- not from the vehicle crops. Registering a 500 px bus aligns the bus; what
+        # the fusion needs aligned is the 20 px glyph row, and a sub-pixel error there is a
+        # whole stroke. Then MVCP decides across the reconstruction ensemble.
         hits: dict[str, dict] = {}
+        name_chars = re.sub(r"[^A-Z0-9]", "", names.get(cid, "").upper())
+        plate_px = []
         for tr in tracks:
             tr["crops"].sort(key=lambda sc: -sc[0])
-            raw = [c for _, c in tr["crops"][:6]]
-            vote = PlateVote()
-            mf = prepare_for_ocr([c for _, c in tr["crops"]]) if len(tr["crops"]) >= 4 else None
-            if mf is not None:
-                r = read_all(mf)
-                if r:
-                    vote.add(r, sharpness=tr["crops"][0][0] * 2)   # weight the fused frame
-            for sh, crop in tr["crops"][:6]:
-                r = read_all(crop)
-                if r:
-                    vote.add(r, sharpness=sh)
-            text, conf, band = vote.result()
-            # CONFIRMED only, and never a substring of the camera's burned-in name overlay
-            # (cam01 reads "01 Chiman bhai Bridge" off the caption as "CH1MAN8HA").
-            name_chars = re.sub(r"[^A-Z0-9]", "", names.get(cid, "").upper())
-            if text and band == "CONFIRMED" and text not in name_chars:
-                h = hits.setdefault(text, {"conf": 0.0, "band": band, "tracks": 0})
-                h["conf"] = max(h["conf"], round(float(conf), 3))
+            keep = tr["crops"][:MAX_TRACK_CROPS]
+
+            # The plate detector fires on roughly 6 % of night vehicle crops (measured on
+            # cam01). Requiring it to fire on every frame of a track would mean it never
+            # accumulates enough patches to fuse. So detect *once*, on the sharpest frame it
+            # works on, then carry that box to every other frame of the track by relative
+            # coordinates -- the vehicle is the same object in the same part of its own crop,
+            # so one detection yields as many patches as the track has frames.
+            rel = None
+            for sh, crop in keep:
+                boxes = detect_plate_boxes(crop) or propose(crop)
+                if not boxes:
+                    continue
+                x1, y1, x2, y2 = boxes[0]
+                ch, cw = crop.shape[:2]
+                if not (0 < x2 - x1 <= cw and 0 < y2 - y1 <= ch):
+                    continue
+                rel = (x1 / cw, y1 / ch, x2 / cw, y2 / ch)
+                plate_px.append(y2 - y1)
+                break
+
+            patches = []
+            if rel is not None:
+                rx1, ry1, rx2, ry2 = rel
+                for sh, crop in keep:
+                    ch, cw = crop.shape[:2]
+                    x1, y1 = int(rx1 * cw), int(ry1 * ch)
+                    x2, y2 = int(rx2 * cw), int(ry2 * ch)
+                    pad_x, pad_y = int((x2 - x1) * 0.10) + 2, int((y2 - y1) * 0.35) + 2
+                    p = crop[max(0, y1 - pad_y):min(ch, y2 + pad_y),
+                             max(0, x1 - pad_x):min(cw, x2 + pad_x)]
+                    if p.size and p.shape[0] >= 6:
+                        patches.append(p)
+
+            text = conf = None
+            if len(patches) >= 2:
+                # the ensemble + character-position majority (mvcp.py)
+                text, conf, _detail = decode_track(patches)
+            if not text:
+                # no localised plate, or the ensemble refused: fall back to the per-crop vote
+                vote = PlateVote()
+                for sh, crop in tr["crops"][:6]:
+                    r = read_all(crop)
+                    if r:
+                        vote.add(r, sharpness=sh)
+                t, c, band = vote.result()
+                if t and band == "CONFIRMED":
+                    text, conf = t, c
+
+            # never a substring of the camera's burned-in name overlay (cam01 reads
+            # "01 Chiman bhai Bridge" off the caption as "CH1MAN8HA")
+            if text and text not in name_chars:
+                h = hits.setdefault(text, {"conf": 0.0, "tracks": 0})
+                h["conf"] = max(h["conf"], round(float(conf or 0.0), 3))
                 h["tracks"] += 1
         per_cam[cid] = {g: {"conf": v["conf"], "band": "CONFIRMED", "seen": v["tracks"]}
                         for g, v in hits.items()}
+        if plate_px:
+            arr = sorted(plate_px)
+            med = arr[len(arr) // 2]
+            print(f"    plate heights seen: median {med}px, max {arr[-1]}px "
+                  f"({len(arr)} localised)", flush=True)
         print(f"  [{cid}] {len(frames)} frames, {vehicles} vehicle dets, "
               f"{len(tracks)} tracks, {len(hits)} plate(s), {time.time()-t0:.0f}s", flush=True)
 
