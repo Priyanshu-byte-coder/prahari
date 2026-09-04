@@ -136,8 +136,9 @@ def capture_hls(cid, cookie, ua, seconds, outdir) -> Path | None:
         "-headers", f"Cookie: {cookie}\r\nUser-Agent: {ua}\r\n",
         "-user_agent", ua,
         "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "8",
-        "-rw_timeout", "15000000",
+        "-rw_timeout", "15000000", "-fflags", "+genpts",
         "-i", url,
+        "-map", "0:v:0",                     # grid clips carry a duplicate video stream
         "-t", str(int(seconds)), "-c", "copy", "-f", "mpegts", str(out),
     ]
     try:
@@ -227,15 +228,25 @@ def main() -> int:
     import numpy as np
     from services.worker.backend import LocalBackend
     from services.worker.plate import read_all, readers
-    from services.worker.vote import VALID
-    from common.plate import grammar_fix, normalise
+    from services.worker.sighting import sharpness
+    from services.worker.vote import PlateVote
+    from services.worker.preprocess import prepare_frame
 
     VEHICLE = {"car", "truck", "bus", "motorcycle", "motorbike", "van", "vehicle"}
-    backend = LocalBackend()
-    print("[*] warming detector + OCR readers", flush=True)
+    imgsz = int(os.getenv("PRAHARI_DETECT_IMGSZ", "960"))
+    backend = LocalBackend(imgsz=imgsz)
+    print(f"[*] warming detector (imgsz={imgsz}) + OCR readers", flush=True)
     backend.detect([np.zeros((544, 960, 3), np.uint8)])
-    rnames = [r.name for r in readers()]
-    print(f"[*] readers: {', '.join(rnames)}", flush=True)
+    print(f"[*] readers: {', '.join(r.name for r in readers())}", flush=True)
+
+    def iou(a, b):
+        ix1, iy1 = max(a[0], b[0]), max(a[1], b[1])
+        ix2, iy2 = min(a[2], b[2]), min(a[3], b[3])
+        inter = max(0, ix2 - ix1) * max(0, iy2 - iy1)
+        if inter == 0:
+            return 0.0
+        ua = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+        return inter / ua if ua else 0.0
 
     per_cam: dict[str, dict[str, dict]] = {}
     for cid, clip in sorted(clips.items()):
@@ -245,48 +256,68 @@ def main() -> int:
         for old in framedir.glob("*.jpg"):
             old.unlink()
         subprocess.run([FFMPEG, "-nostdin", "-loglevel", "error", "-y", "-i", str(clip),
-                        "-vf", f"fps={args.fps}", str(framedir / "f%04d.jpg")],
-                       capture_output=True, timeout=180)
+                        "-map", "0:v:0", "-vf", f"fps={args.fps}",
+                        str(framedir / "f%04d.jpg")], capture_output=True, timeout=180)
         frames = sorted(framedir.glob("*.jpg"))
-        hits: dict[str, dict] = {}
+
+        # frame -> conditioned frame -> vehicle detect -> IoU-link into tracks, keeping the
+        # sharpest few crops per track (a vehicle is plate-readable for only 1-2 frames of
+        # its pass).
+        tracks: list[dict] = []
         vehicles = 0
         for fi, fp in enumerate(frames):
             img = cv2.imread(str(fp))
             if img is None:
                 continue
-            for d in backend.detect([img])[0]:
-                if d.label not in VEHICLE:
-                    continue
+            try:
+                cond = prepare_frame(img)
+            except Exception:
+                cond = img
+            dets = [d for d in backend.detect([cond])[0] if d.label in VEHICLE]
+            live = []
+            for d in dets:
                 vehicles += 1
                 x1, y1, x2, y2 = (max(0, int(v)) for v in d.xyxy)
-                crop = img[y1:y2, x1:x2]
-                if crop.size == 0 or crop.shape[0] < 24 or crop.shape[1] < 24:
+                if x2 - x1 < 24 or y2 - y1 < 24:
                     continue
-                for rd in read_all(crop):
-                    g = grammar_fix(normalise(rd.text)) or ""
-                    if not g:
-                        continue
-                    shaped = bool(VALID.match(g))
-                    if not shaped and len(g) < 8:
-                        continue
-                    h = hits.setdefault(g, {"frames": set(), "conf": 0.0,
-                                            "readers": set(), "shaped": shaped})
-                    h["frames"].add(fi)
-                    h["readers"].add(rd.reader)
-                    h["conf"] = max(h["conf"], round(float(rd.conf), 3))
-        # keep a plate if a shaped read repeats across frames or >1 reader agrees
-        kept = {g: v for g, v in hits.items()
-                if (v["shaped"] and (len(v["frames"]) >= 2 or len(v["readers"]) >= 2))
-                or len(v["frames"]) >= 3}
-        per_cam[cid] = {g: {"conf": v["conf"], "frames": len(v["frames"]),
-                            "readers": sorted(v["readers"]), "plate_shaped": v["shaped"]}
-                        for g, v in kept.items()}
-        print(f"  [{cid}] {len(frames)} frames, {vehicles} vehicle crops, "
-              f"{len(kept)} plate(s), {time.time()-t0:.0f}s", flush=True)
+                box = (x1, y1, x2, y2)
+                crop = cond[y1:y2, x1:x2]
+                sh = sharpness(crop)
+                best = max((t for t in tracks if t["last"] >= fi - 2),
+                           key=lambda t: iou(t["box"], box), default=None)
+                if best is not None and iou(best["box"], box) >= 0.3:
+                    tr = best
+                else:
+                    tr = {"box": box, "crops": [], "last": fi}
+                    tracks.append(tr)
+                tr["box"], tr["last"] = box, fi
+                tr["crops"].append((sh, crop))
+                tr["crops"].sort(key=lambda sc: -sc[0])
+                tr["crops"] = tr["crops"][:4]
+                live.append(tr)
+
+        # vote each track's best crops
+        hits: dict[str, dict] = {}
+        for tr in tracks:
+            vote = PlateVote()
+            for sh, crop in tr["crops"]:
+                readings = read_all(crop)
+                if readings:
+                    vote.add(readings, sharpness=sh)
+            text, conf, band = vote.result()
+            if text and band in ("CONFIRMED", "PROBABLE"):
+                h = hits.setdefault(text, {"conf": 0.0, "band": band, "tracks": 0})
+                h["conf"] = max(h["conf"], round(float(conf), 3))
+                h["band"] = band if band == "CONFIRMED" else h["band"]
+                h["tracks"] += 1
+        per_cam[cid] = {g: {"conf": v["conf"], "band": v["band"], "seen": v["tracks"]}
+                        for g, v in hits.items()}
+        print(f"  [{cid}] {len(frames)} frames, {vehicles} vehicle dets, "
+              f"{len(tracks)} tracks, {len(hits)} plate(s), {time.time()-t0:.0f}s", flush=True)
 
     # report
     print("\n" + "=" * 96)
-    print(f"{'cam':<7} {'name':<44} plates tracked (conf, frames, readers)")
+    print(f"{'cam':<7} {'name':<44} plates tracked (band, conf, x seen)")
     print("-" * 96)
     result = []
     for c in cams:
@@ -295,9 +326,9 @@ def main() -> int:
         if cid not in clips:
             listing = "[no feed captured]"
         elif not plates:
-            listing = "-  (no readable plate; wide junction view)"
+            listing = "-  (no plate resolved)"
         else:
-            listing = "   ".join(f"{g} ({v['conf']}, {v['frames']}f, {'+'.join(v['readers'])})"
+            listing = "   ".join(f"{g} ({v['band']}, {v['conf']}, x{v['seen']})"
                                   for g, v in plates.items())
         print(f"{cid:<7} {c['name'][:44]:<44} {listing}")
         result.append({"camera_id": cid, "name": c["name"], "captured": cid in clips,

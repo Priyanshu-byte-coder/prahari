@@ -17,6 +17,7 @@ web/dist/
 *.pt
 *.onnx
 *.engine
+*.pb
 models/**/*.pt
 models/**/*.onnx
 models/**/*.engine

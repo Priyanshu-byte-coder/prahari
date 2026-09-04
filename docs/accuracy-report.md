@@ -1,18 +1,18 @@
 # Accuracy report — lane I (generated, do not edit)
 
-- generated: 2026-09-04 10:06:06+0530
+- generated: 2026-09-04 12:38:08+0530
 - crops: 120 in 40 tracks · sources: synthetic
 - readers: easyocr, paddleocr, tesseract, fastplate
-- runtime: 47.8s
+- runtime: 50.8s
 
 ## Per reader (single crop, no vote)
 
 | reader | n | exact | exact of read | CER | refused |
 |---|---|---|---|---|---|
-| easyocr | 120 | 69.2% | 72.8% | 0.235 | 5.0% |
-| fastplate | 120 | 60.0% | 61.0% | 0.229 | 1.7% |
-| paddleocr | 120 | 76.7% | 81.4% | 0.142 | 5.8% |
-| tesseract | 120 | 60.0% | 65.5% | 0.231 | 8.3% |
+| easyocr | 120 | 70.0% | 73.7% | 0.221 | 5.0% |
+| fastplate | 120 | 55.0% | 55.9% | 0.241 | 1.7% |
+| paddleocr | 120 | 79.2% | 83.3% | 0.121 | 5.0% |
+| tesseract | 120 | 42.5% | 46.0% | 0.257 | 7.5% |
 
 ## Fused vote (multi-frame, multi-reader) — what the pipeline emits
 
@@ -40,9 +40,9 @@
 | SYNTH-001|2026-09-12 | 3 | 100.0% | 0.0% |
 | SYNTH-002|2026-09-10 | 3 | 100.0% | 0.0% |
 | SYNTH-002|2026-09-11 | 3 | 66.7% | 33.3% |
-| SYNTH-002|2026-09-12 | 4 | 75.0% | 25.0% |
+| SYNTH-002|2026-09-12 | 4 | 100.0% | 0.0% |
 | SYNTH-003|2026-09-10 | 4 | 100.0% | 0.0% |
-| SYNTH-003|2026-09-11 | 3 | 100.0% | 0.0% |
+| SYNTH-003|2026-09-11 | 3 | 66.7% | 33.3% |
 | SYNTH-003|2026-09-12 | 3 | 100.0% | 0.0% |
 
 ## Verdict

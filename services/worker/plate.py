@@ -122,25 +122,85 @@ def upscale(crop, min_h=OCR_MIN_H):
     return cv2.resize(crop, (max(1, int(w * factor)), min_h), interpolation=cv2.INTER_CUBIC)
 
 
+_PLATE_DET = {}
+_PLATE_DET_NAME = os.getenv("PRAHARI_PLATE_DETECTOR", "yolo-v9-t-512-license-plate-end2end")
+_PLATE_DET_CONF = float(os.getenv("PRAHARI_PLATE_DETECTOR_CONF", "0.20"))
+
+
+def _plate_detector():
+    """Cached open-image-models YOLOv9 licence-plate detector, or None.
+
+    A model trained on plates finds the small, skewed, low-contrast ones the classical
+    blackhat proposal misses. Off with PRAHARI_PLATE_DETECTOR=off; falls back to propose().
+    """
+    if "d" in _PLATE_DET:
+        return _PLATE_DET["d"]
+    if _PLATE_DET_NAME.lower() in ("", "off", "none", "0"):
+        _PLATE_DET["d"] = None
+        return None
+    try:
+        from open_image_models import create_detector
+        _PLATE_DET["d"] = create_detector(_PLATE_DET_NAME, conf_thresh=_PLATE_DET_CONF)
+        logger.info("plate detector: %s", _PLATE_DET_NAME)
+    except Exception as exc:
+        logger.info("plate detector unavailable (%s); classical proposal in use",
+                    str(exc).split("\n")[0])
+        _PLATE_DET["d"] = None
+    return _PLATE_DET["d"]
+
+
+def detect_plate_boxes(crop):
+    """(x1,y1,x2,y2) plate boxes inside a vehicle crop from the trained detector, best first."""
+    det = _plate_detector()
+    if det is None or crop is None or crop.size == 0:
+        return []
+    try:
+        res = det.predict(crop)
+    except Exception:
+        return []
+    boxes = []
+    for r in res:
+        b = getattr(r, "bounding_box", None) or getattr(r, "bbox", None)
+        conf = float(getattr(r, "confidence", getattr(r, "conf", 0.0)))
+        if b is None:
+            continue
+        boxes.append((conf, (int(b.x1), int(b.y1), int(b.x2), int(b.y2))))
+    boxes.sort(reverse=True, key=lambda t: t[0])
+    return [xy for _, xy in boxes]
+
+
 def candidates(vehicle_crop, boxes=None):
     """Plate crops to read, best first, whole vehicle crop last. At most MAX_CANDIDATES.
 
-    `boxes` comes from a trained plate detector when there is one; otherwise `propose()`.
+    `boxes` is passed by a caller that already ran a plate detector; otherwise we try the
+    trained detector, then the classical `propose()`. Each localised plate is emitted twice:
+    the enhanced grey (unwarp / SR / illumination-flatten / deskew / CLAHE) that the CRNN
+    readers want, and the raw upscaled colour crop, because they fail differently.
     """
     if vehicle_crop is None or vehicle_crop.size == 0:
         return []
     if boxes is None:
-        boxes = propose(vehicle_crop)
+        boxes = detect_plate_boxes(vehicle_crop) or propose(vehicle_crop)
+    try:
+        from services.worker.preprocess import enhance_plate_crop
+    except Exception:
+        enhance_plate_crop = None
     out = []
-    for x1, y1, x2, y2 in boxes[:MAX_CANDIDATES - 1]:
+    h, w = vehicle_crop.shape[:2]
+    for x1, y1, x2, y2 in boxes[:2]:
         pad_x, pad_y = int((x2 - x1) * 0.06) + 2, int((y2 - y1) * 0.25) + 2
-        h, w = vehicle_crop.shape[:2]
         sub = vehicle_crop[max(0, int(y1) - pad_y): min(h, int(y2) + pad_y),
                            max(0, int(x1) - pad_x): min(w, int(x2) + pad_x)]
-        if sub.size:
-            out.append(upscale(sub))
+        if not sub.size:
+            continue
+        if enhance_plate_crop is not None:
+            try:
+                out.append(enhance_plate_crop(sub))
+            except Exception:
+                pass
+        out.append(upscale(sub))
     out.append(_fit(upscale(vehicle_crop, OCR_MIN_H * 2)))
-    return out[:MAX_CANDIDATES]
+    return out[:MAX_CANDIDATES + 2]
 
 
 def _fit(crop, max_w=MAX_CANDIDATE_W):
@@ -269,9 +329,16 @@ class PaddleReader(_Reader):
         h, w = crop.shape[:2]
         if h < 8 or w < 8 or max(h, w) / max(1, min(h, w)) > 30:
             return "", 0.0
+        # PP-OCRv6's pipeline wants 3-channel BGR; a grey crop from the enhance chain is what
+        # trips "not enough values to unpack" deep in the PIR executor.
+        if crop.ndim == 2:
+            crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR)
         engine = self.engine()
         # 3.x renamed ocr() to predict(); both ship in 3.x, only ocr() in 2.x.
-        result = engine.predict(crop) if hasattr(engine, "predict") else engine.ocr(crop)
+        try:
+            result = engine.predict(crop) if hasattr(engine, "predict") else engine.ocr(crop)
+        except (ValueError, IndexError):
+            return "", 0.0                       # PP-OCRv6 internal unpack on an awkward crop
         best = ("", 0.0)
         for page in result or []:
             texts, scores = _paddle_lines(page)

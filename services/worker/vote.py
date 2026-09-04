@@ -19,15 +19,19 @@ belongs to somebody else's vehicle.
 
 from __future__ import annotations
 
+import os
 import re
 from collections import defaultdict
 
 from common.plate import grammar_fix, normalise
 
 MAX_CROPS = 8
-MAJORITY = 2.0 / 3.0
+# On a clean feed the defaults are right. On a noisy eval feed, raise the bar for a named /
+# CONFIRMED plate so the "zero confident-wrong" guarantee holds -- PRAHARI_VOTE_MAJORITY
+# (char-agreement floor, default 0.667) and PRAHARI_VOTE_MIN_CONFIRMED (reads, default 3).
+MAJORITY = float(os.getenv("PRAHARI_VOTE_MAJORITY", "") or 2.0 / 3.0)
 MIN_READS_FOR_TEXT = 2        # one opinion is a read, not a vote
-MIN_READS_FOR_CONFIRMED = 3
+MIN_READS_FOR_CONFIRMED = int(os.getenv("PRAHARI_VOTE_MIN_CONFIRMED", "") or 3)
 
 VALID = re.compile(r"^[A-Z]{2}[0-9]{2}[A-Z]{1,3}[0-9]{4}$|^[0-9]{2}BH[0-9]{4}[A-Z]{1,2}$")
 BANDS = ("NONE", "POSSIBLE", "PROBABLE", "CONFIRMED")

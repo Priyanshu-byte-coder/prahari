@@ -23,6 +23,10 @@ paddlepaddle
 # Fails on a different axis from the scene-text readers, which is what the vote wants.
 fast-plate-ocr
 onnxruntime
+# trained licence-plate *detector* (YOLOv9-t, ONNX) for the plate-localisation step -- finds
+# the small / skewed / low-contrast plates the classical blackhat proposal misses. Optional:
+# plate.py falls back to propose() when it is not installed.
+open-image-models
 
 # lane D -- persistence, matching, RBAC, export
 psycopg2-binary
