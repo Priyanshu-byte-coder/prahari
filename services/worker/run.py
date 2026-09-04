@@ -54,6 +54,10 @@ _FEAS_GATE = os.getenv("PRAHARI_FEASIBILITY_GATE", "1").strip().lower() not in (
 # information from other frames (unlike a generative SR model, which invents it), so it lifts
 # a borderline read without risking a confident-wrong. On by default; PRAHARI_OCR_FUSION=0 off.
 _FUSE = os.getenv("PRAHARI_OCR_FUSION", "1").strip().lower() not in ("0", "false", "no")
+# SR-ensemble + majority vote by character position (mvcp.py). Costs several reconstructions
+# and an OCR pass over each, so it is gated on a track having enough crops to be worth it.
+_MVCP = os.getenv("PRAHARI_MVCP", "1").strip().lower() not in ("0", "false", "no")
+_MVCP_MIN_CROPS = int(os.getenv("PRAHARI_MVCP_MIN_CROPS", "4"))
 
 try:
     from services.worker.preprocess import feasibility as _feasibility
@@ -118,6 +122,12 @@ class OcrPool:
                         fused = self._fused(crops)
                         if fused is not None:
                             readings += list(self._read(fused))
+                    # On a small, degraded plate one reconstruction is a guess. Build several
+                    # and let the character-position majority decide - the step that takes the
+                    # published LR benchmark from ~31% to ~45% (mvcp.py). Only when the track
+                    # has enough crops to make the variants genuinely independent.
+                    if _MVCP and len(crops) >= _MVCP_MIN_CROPS:
+                        readings += self._mvcp_readings(crops)
                 sighting.add_readings(readings, sharpness(best))
             except Exception as exc:
                 logger.warning("OCR failed on a crop: %s", exc)
@@ -134,6 +144,25 @@ class OcrPool:
         except Exception as exc:
             logger.debug("fusion failed (%s) - reading the sharpest crop only", exc)
             return None
+
+    @staticmethod
+    def _mvcp_readings(crops):
+        """The SR-ensemble majority verdict, as one extra high-confidence Reading, or [].
+
+        Returned as a Reading rather than applied directly so the existing per-track vote
+        still owns the final call: MVCP is a strong opinion, not an override.
+        """
+        try:
+            from services.worker.backend import Reading
+            from services.worker.mvcp import decode_track
+            text, conf, detail = decode_track(crops)
+            if not text:
+                return []
+            logger.debug("mvcp %s conf=%.2f over %d variants", text, conf, detail["variants"])
+            return [Reading(text, float(conf), reader="mvcp")]
+        except Exception as exc:
+            logger.debug("mvcp failed (%s)", exc)
+            return []
 
     def drain(self, sighting, timeout=OCR_DRAIN_S):
         """Wait for this sighting's reads before its row is built. Bounded: a stuck reader
