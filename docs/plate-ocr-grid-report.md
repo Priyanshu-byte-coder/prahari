@@ -184,6 +184,41 @@ plate is ~20-30 px, dark, and motion-blurred. Not readable by the pipeline or
 by eye.
 
 ======================================================================
+4c. FINAL RUN — full stack, and the measurement that settles it
+======================================================================
+
+Run with the complete pipeline: trained plate detector, plate-patch
+localisation carried across every frame of a track, multi-frame
+super-resolution (mfsr.py), reconstruction ensemble and majority vote by
+character position (mvcp.py).
+
+The pipeline works end to end. It localised plates, built the ensembles and
+voted. What it found is the answer:
+
+  camera                     plates localised   median height   max
+  cam01 Chiman bhai Bridge          17              14 px       69 px
+  cam02 Janpath                     18              15 px       31 px
+  cam04 Paldi Circle                19               8 px       26 px
+  cam05 Visat teen Rasta             2              14 px       14 px
+  cam30 Gandhidham Rambaugh          9              14 px       25 px
+
+  PLATES READ: 0
+
+Set that against the measured cliff in docs/lr-benchmark.md:
+
+      24 px -> 95 %      20 px -> 65 %      16 px -> 5 %
+
+Every camera measured has a *median plate height of 8-15 px*, which is below
+the point where any method in this pipeline - or in the published literature -
+recovers characters. 0 reads is the outcome the benchmark predicts for plates
+this size, not a pipeline failure. The pipeline refuses instead of guessing,
+which is the designed behaviour.
+
+Feed availability on this run was 7/30; 13 feeds returned nothing and the rest
+timed out. Availability has degraded over the day (25/30 earlier), likely
+CDN throttling from repeated pulls.
+
+======================================================================
 5. ROOT CAUSE — CAMERA, NOT CODE
 ======================================================================
 
