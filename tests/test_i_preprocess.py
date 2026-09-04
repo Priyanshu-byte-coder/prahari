@@ -210,3 +210,35 @@ def test_the_sharpest_biggest_crop_is_the_one_chosen():
 def test_fuse_of_nothing_is_none_not_a_crash():
     assert fuse([]) is None
     assert fuse([None]) is None
+
+
+# --- reader selection ---------------------------------------------------------------------
+
+def test_expensive_readers_are_left_out_of_the_live_budget():
+    # PaddleOCR costs ~2 s a crop on a CPU box. With it in the live path the worker selftest
+    # landed at 6.7 s against a 3.0 s budget; without it, 0.76 s. The offline accuracy report
+    # asks for every reader by name, because there wall time does not matter.
+    from services.worker.plate import DEFAULT_READER_BUDGET_MS, _AVAILABLE, _selected
+
+    names = [c.name for c in _selected(_AVAILABLE)]
+    assert "fastplate" in names, "the cheapest reader must always be in the live path"
+    assert all(c.cost_ms <= DEFAULT_READER_BUDGET_MS for c in _selected(_AVAILABLE))
+
+
+def test_every_reader_can_be_asked_for_explicitly(monkeypatch):
+    from services.worker import plate
+
+    monkeypatch.setenv("PRAHARI_OCR_READERS", "all")
+    assert len(plate._selected(plate._AVAILABLE)) == len(plate._AVAILABLE)
+
+    monkeypatch.setenv("PRAHARI_OCR_READERS", "fastplate,easyocr")
+    assert {c.name for c in plate._selected(plate._AVAILABLE)} == {"fastplate", "easyocr"}
+
+
+def test_readers_are_ordered_cheapest_first():
+    # Vote order is load order: two cheap readers that agree settle the vote before an expensive
+    # engine is asked at all.
+    from services.worker.plate import _AVAILABLE
+
+    costs = [c.cost_ms for c in _AVAILABLE]
+    assert costs == sorted(costs)

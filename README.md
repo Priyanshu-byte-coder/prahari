@@ -82,10 +82,18 @@ python services/api/auth.py bootstrap --username field --role INVESTIGATOR
 Then, in separate shells:
 
 ```bash
+python scripts/run_stack.py start     # API, console, persister, matcher - with health checks
+```
+
+That starts four processes and waits until they answer; `status` and `stop` do what they say.
+To run them yourself, one per terminal — which is what to do for a demo, so a crash is visible
+rather than buried in a log:
+
+```bash
 python -m uvicorn --factory services.api.main:factory --host 127.0.0.1 --port 8000   # API + WS
 python scripts/console_serve.py --port 5173                                          # console
 python services/api/persister.py                                                     # stream → DB
-python services/api/matcher.py                                                        # DB → alerts
+python services/api/matcher.py                                                       # DB → alerts
 ```
 
 Open **http://127.0.0.1:5173/**.

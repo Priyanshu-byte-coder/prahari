@@ -26,8 +26,17 @@ make seed          # db/migrate.sql (re-runnable) + the camera registry
 make run           # API, console, persister, matcher — four processes, one command
 ```
 
-`make run` starts them in the foreground of one shell each; use `make stop` or Ctrl-C. For the
-demo, start them in separate terminals so a crash is visible rather than buried.
+Every `make` target is a one-line wrapper. Without `make` installed:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d
+psql "$POSTGRES_DSN" -v ON_ERROR_STOP=1 -f db/migrate.sql && python scripts/load_registry.py
+python scripts/run_stack.py start          # ... status | stop | restart
+```
+
+`run_stack.py start` polls until the API and console answer and prints which one did not come up,
+so "it started" and "it works" are the same statement. For a demo, prefer separate terminals — a
+crash is then visible rather than buried in a log.
 
 ## First-run checks, in order
 

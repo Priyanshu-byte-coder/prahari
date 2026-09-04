@@ -143,6 +143,11 @@ def summarise(cases):
 
 def score(rows, engines=None):
     """Run every reader over every crop, then the fused vote over each track."""
+    # Every engine present, not just the ones inside the live latency budget. This report is
+    # offline: wall time does not matter here, and the point is to measure each reader as well as
+    # the vote. The live worker deliberately loads fewer - see plate.DEFAULT_READER_BUDGET_MS -
+    # so the report states which engines it used and the deck must quote that, not "all of them".
+    os.environ.setdefault("PRAHARI_OCR_READERS", "all")
     engines = readers() if engines is None else engines
     per_reader = defaultdict(list)
     per_track = defaultdict(lambda: {"truth": None, "votes": PlateVote(), "group": None})

@@ -166,6 +166,11 @@ class _Reader:
     import this module and must not pay for it."""
 
     name = "base"
+    # Rough milliseconds per crop on the demo CPU, used only for ordering. Readers run
+    # cheapest-first so that two cheap agreeing opinions can settle the vote before an expensive
+    # engine is asked at all: with paddle first the selftest landed at 6.35 s against a 3.0 s
+    # budget, and with it last the same three readers come in comfortably under.
+    cost_ms = 500
 
     def __init__(self):
         self._engine = None
@@ -198,6 +203,8 @@ class EasyOCRReader(_Reader):
     CRNN recogniser, GPU when there is one. Its own detector runs over the crop, so it also
     covers plates the morphology proposal missed."""
 
+    cost_ms = 300
+
     name = "easyocr"
 
     def _load(self):
@@ -226,6 +233,8 @@ class PaddleReader(_Reader):
     different training set from EasyOCR, which is the point: two readers that fail the same
     way vote the same wrong answer with twice the confidence."""
 
+    cost_ms = 2000
+
     name = "paddleocr"
 
     def _load(self):
@@ -243,6 +252,13 @@ class PaddleReader(_Reader):
 
     def _read(self, crop):
         engine = self.engine()
+        # Paddle's pipeline needs three channels. Handed a greyscale crop it raises
+        # "not enough values to unpack (expected 3, got 2)" from inside its own predict(), which
+        # `_Reader.read` catches and turns into an empty reading - so the reader that scores best
+        # on the golden set was contributing *nothing* to the live vote, silently, because the
+        # worker hands on the greyscale crop that preprocessing produces. Convert here.
+        if crop.ndim == 2:
+            crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR)
         # 3.x renamed ocr() to predict(); both ship in 3.x, only ocr() in 2.x.
         result = engine.predict(crop) if hasattr(engine, "predict") else engine.ocr(crop)
         best = ("", 0.0)
@@ -271,6 +287,8 @@ class FastPlateReader(_Reader):
     on this machine and Tesseract needs a system binary. A "vote" of one reader is a single read
     wearing a vote's confidence, and that is the thing the accuracy target must not be built on.
     """
+
+    cost_ms = 10
 
     name = "fastplate"
 
@@ -302,6 +320,8 @@ class TesseractReader(_Reader):
     """A classical engine as a third opinion. Weakest of the three on dirty plates, and
     deliberately so - it fails differently, which is what a vote wants."""
 
+    cost_ms = 120
+
     name = "tesseract"
 
     def _load(self):
@@ -319,7 +339,9 @@ class TesseractReader(_Reader):
         return text, (sum(confs) / len(confs) / 100.0 if confs else 0.0)
 
 
-_AVAILABLE = (EasyOCRReader, PaddleReader, FastPlateReader, TesseractReader)
+# Cheapest first: see _Reader.cost_ms. Order is load order *and* vote order.
+_AVAILABLE = tuple(sorted((EasyOCRReader, PaddleReader, FastPlateReader,
+                           TesseractReader), key=lambda cls: cls.cost_ms))
 _READERS = None
 _READERS_LOCK = threading.Lock()
 
@@ -342,11 +364,42 @@ def readers(force=None):
     return _READERS
 
 
+# The live pipeline has a latency budget ([C1]: a sighting within seconds of the vehicle), and
+# on a CPU-only box PaddleOCR alone costs about two seconds a crop. Readers whose cost exceeds
+# this are loaded only when asked for by name - they are excellent for the offline accuracy
+# report, where wall time does not matter, and wrong for the path an operator is waiting on.
+# Set PRAHARI_OCR_BUDGET_MS=99999 (or PRAHARI_OCR_READERS=all) to use every engine present.
+DEFAULT_READER_BUDGET_MS = 500
+
+
+def _selected(classes):
+    """Which reader classes this deployment should load, and why - both are logged."""
+    wanted = os.getenv("PRAHARI_OCR_READERS", "").strip().lower()
+    if wanted in ("all", "*"):
+        return list(classes)
+    if wanted:
+        names = {n.strip() for n in wanted.split(",") if n.strip()}
+        chosen = [c for c in classes if c.name in names]
+        missing = names - {c.name for c in chosen}
+        if missing:
+            logger.warning("PRAHARI_OCR_READERS names unknown reader(s): %s",
+                           ", ".join(sorted(missing)))
+        return chosen
+    budget = int(os.getenv("PRAHARI_OCR_BUDGET_MS", DEFAULT_READER_BUDGET_MS))
+    within = [c for c in classes if c.cost_ms <= budget]
+    skipped = [c for c in classes if c.cost_ms > budget]
+    if skipped:
+        logger.info("not loading %s: over the %d ms per-crop budget. "
+                    "PRAHARI_OCR_READERS=all to include them.",
+                    ", ".join(f"{c.name} (~{c.cost_ms} ms)" for c in skipped), budget)
+    return within
+
+
 def _load_readers():
     global _READERS
     if True:
         found = []
-        for cls in _AVAILABLE:
+        for cls in _selected(_AVAILABLE):
             reader = cls()
             try:
                 reader.engine()
@@ -373,11 +426,22 @@ def _rank(reading):
     return (bool(VALID.match(text)), len(text), reading.conf)
 
 
-def read_all(vehicle_crop, boxes=None, engines=None):
-    """Every reader's best opinion of this vehicle crop. One Reading per reader, or []."""
+def read_all(vehicle_crop, boxes=None, engines=None, stop_on_agreement=True):
+    """Every reader's best opinion of this vehicle crop. One Reading per reader, or [].
+
+    `stop_on_agreement` stops once two readers have produced the same plate-shaped string. That
+    is not an optimisation bolted on: the vote needs a majority, and once two of three agree the
+    third cannot change the answer - it can only cost latency. With three engines loaded the
+    selftest was landing at 3.46 s against a 3.0 s budget; stopping at agreement puts it back
+    under, and on a disagreement every reader still runs, which is the case where the third
+    opinion is the one that matters.
+    """
+    from common.plate import grammar_fix, normalise
+
     engines = readers() if engines is None else engines
     crops = candidates(vehicle_crop, boxes)
     out = []
+    agreed = {}
     for engine in engines:
         best = None
         for crop in crops:
@@ -388,4 +452,9 @@ def read_all(vehicle_crop, boxes=None, engines=None):
                 break        # plate-shaped already; the remaining candidates cost latency only
         if best is not None and best.text:
             out.append(best)
+            if stop_on_agreement and _rank(best)[0]:
+                key = grammar_fix(normalise(best.text)) or ""
+                agreed[key] = agreed.get(key, 0) + 1
+                if agreed[key] >= 2:
+                    break
     return out
