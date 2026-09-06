@@ -11,21 +11,32 @@ say. Target **2:45**; the portal's cap is 3:00 and an overrun is a disqualificat
 
 ```bash
 cd C:/Users/Priyanshu/OneDrive/Desktop/All_projects/hackathon/cctv
-source run_demo_env.sh
+source run_demo_env.sh                      # required - without it nothing reaches Redis
 
-python scripts/run_stack.py restart        # API, console, persister, matcher
-python scripts/fake_sightings.py --rate 5 --duration 3600 &    # demo traffic
+python scripts/run_stack.py restart         # API, console, persister, matcher
+python scripts/fake_sightings.py --rate 6 --duration 7200 &    # demo traffic
 curl -s -X POST -H "Content-Type: application/json" -d '{}' http://127.0.0.1:5173/api/wall/start
 ```
 
-Then wait **three minutes** before recording. The wall rotates through cameras and you want
-several tiles carrying pictures before the camera rolls.
+Then wait **three minutes**. The wall rotates through the cameras a few at a time - the grid
+allows one session per IP - and you want several tiles carrying pictures before the camera rolls.
 
-Sanity check, all four must pass:
+**Then run the one command that checks everything:**
 
 ```bash
-python scripts/verify_stack.py             # 35/35
-python services/worker/selftest.py         # SELFTEST OK, under 1s
+.venv/Scripts/python.exe scripts/preflight.py
+```
+
+It must end with **"Nothing blocking. Good to record."** Every FIX line it prints comes with the
+command that repairs it. Do not start recording with an outstanding FIX - each one is something a
+viewer would see.
+
+Two commands must use the **venv interpreter**, because the CV stack is installed there and a
+bare `python` gives you a detector that silently does nothing:
+
+```bash
+.venv/Scripts/python.exe scripts/preflight.py
+.venv/Scripts/python.exe services/worker/selftest.py
 ```
 
 **Screen hygiene** — each of these has ruined a take:
@@ -63,8 +74,8 @@ Do not read the architecture aloud. The map is the argument.
 
 | Do | Say |
 |---|---|
-| Click **Wall**. Let it fill. Boxes are drawn on the live grid frames — amber boxes, vehicle class, confidence, and a count along the bottom. | "This is live footage from the Gujarat grid, and these boxes are our detector running on it right now. YOLO finds each vehicle, ByteTrack keeps its identity across frames, and every timestamp comes from the video frame's own presentation time — never the server clock. That is what lets two different cameras be compared later." |
-| Click one tile to open it larger. Point at the caption under a box. | "And here is the part I want you to see. Under each vehicle it says what the plate would be worth in pixels. On this camera: not resolvable. The vehicles are fifty-five pixels wide, which makes the plate characters about two pixels tall. Nothing reads that — so we say so, instead of printing four confident characters of noise." |
+| Click **Wall**. Boxes are drawn on the live grid frames — amber boxes with vehicle class and confidence, and one summary line along the bottom. | "This is live footage from the Gujarat grid, and these boxes are our detector running on it right now. YOLO finds each vehicle, ByteTrack keeps its identity across frames, and every timestamp comes from the video frame's own presentation time — never the server clock. That is what lets two different cameras be compared later." |
+| Click one tile to open it larger. Point at the line along the bottom: *"N vehicles tracked — none close enough for ANPR at this camera"*, and at the plate note under the nearest vehicle. | "And here is the part I want you to see. Under each vehicle it says what the plate would be worth in pixels. On this camera: not resolvable. The vehicles are fifty-five pixels wide, which makes the plate characters about two pixels tall. Nothing reads that — so we say so, instead of printing four confident characters of noise." |
 
 **This is the strongest 35 seconds in the video.** It shows the system working *and* shows
 judgement. Do not cut it for time.
@@ -75,7 +86,7 @@ judgement. Do not cut it for time.
 
 | Do | Say |
 |---|---|
-| Terminal, full screen, large font. Run `python services/worker/selftest.py`. Let the output scroll to `SELFTEST OK`. | "When the pixels are there, the same pipeline reads the plate. This is our own camera feed: decode, detect, track, four OCR engines voting, published — end to end in under a second, inside a three-second budget. Plate read back exactly." |
+| Terminal, full screen, large font. Run `.venv/Scripts/python.exe services/worker/selftest.py`. Let the output scroll to `SELFTEST OK`. | "When the pixels are there, the same pipeline reads the plate. This is our own camera feed: decode, detect, track, four OCR engines voting, published — end to end in under a second, inside a three-second budget. Plate read back exactly." |
 | Point at the `plate_band` field in the printed row. | "And it publishes a confidence band. Four readers vote; if they disagree, it refuses to name the plate rather than guessing. On our controlled set that is ninety-five per cent read exactly, with zero confidently-wrong answers." |
 
 ---
@@ -104,7 +115,7 @@ judgement. Do not cut it for time.
 
 | Do | Say |
 |---|---|
-| Log out. Log in as **console-audit**. Click **Map** — refused. Click **Admin → Audit** — works. | "One last thing. This is the System Administrator — the most privileged account in the system. It can configure everything and it cannot watch anybody. Administering a surveillance system and using one are different jobs, and the account that can do both is the one an insider abuses." |
+| Click the **account chip** at the bottom of the left rail (it shows `FI` for the field investigator). It turns red and reads `SA`. Now click **Alerts** — refused. Click **Trace**, run a plate — refused. Then **Admin → Audit** — works. | "One last thing. This is the System Administrator — the most privileged account in the system. It can configure everything and it cannot watch anybody. Administering a surveillance system and using one are different jobs, and the account that can do both is the one an insider abuses." |
 
 ---
 

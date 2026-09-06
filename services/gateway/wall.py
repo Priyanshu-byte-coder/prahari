@@ -114,6 +114,11 @@ class CameraFeed:
     rtsp_url: str | None
     hls_url: str | None
     jpeg: bytes | None = None
+    # The same frame with the detector's boxes drawn on it. Produced here, once, when the frame
+    # arrives - not per HTTP request. Annotating on request meant every browser refresh of a
+    # thirty-tile wall queued thirty inferences, which is why tiles took seconds to appear.
+    jpeg_boxed: bytes | None = None
+    detections: int = 0
     updated_at: float | None = None
     frames: int = 0
     status: str = "idle"        # idle | connecting | live | retrying | stopped
@@ -137,6 +142,10 @@ class CameraFeed:
             "age_s": round(age, 1) if age is not None else None,
             "stale": age is not None and age > STALE_AFTER_S,
             "has_frame": self.jpeg is not None,
+            # The console swaps a tile's picture only when this moves, so it can leave an
+            # unchanged frame alone instead of re-fetching thirty images every two seconds.
+            "updated_at": self.updated_at,
+            "detections": self.detections,
             "transport": self.transport,
             "codec": self.codec,
             "resolution": self.resolution,
@@ -223,9 +232,13 @@ class Wall:
             "cameras": [f.snapshot() for f in self.feeds.values()],
         }
 
-    def jpeg(self, camera_id: str) -> bytes | None:
+    def jpeg(self, camera_id: str, boxes: bool = False) -> bytes | None:
         feed = self.feeds.get(str(camera_id))
-        return feed.jpeg if feed else None
+        if feed is None:
+            return None
+        if boxes and feed.jpeg_boxed:
+            return feed.jpeg_boxed
+        return feed.jpeg
 
     # -- the worker ------------------------------------------------------
 
@@ -334,6 +347,7 @@ class Wall:
                                 feed.detail = "keyframe decoded as visibly corrupt, kept last good frame"
                                 break
                             feed.jpeg = _encode(img)
+                            feed.jpeg_boxed, feed.detections = _annotate(img)
                             feed.updated_at = time.time()
                             feed.frames += 1
                             last_emit = now
@@ -424,6 +438,37 @@ def _looks_corrupt(img) -> bool:
         return False
     _, sat, val = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
     return sat >= _CORRUPT_MIN_SAT and val >= _CORRUPT_MIN_VAL
+
+
+_ANNOTATE_WARNED = False
+
+
+def _annotate(img):
+    """The frame with boxes drawn, and how many the detector found. Never raises.
+
+    The first failure is logged at warning, once. Swallowing it at debug meant a wall with no
+    boxes and a silent log, which is indistinguishable from a detector that found nothing.
+    """
+    global _ANNOTATE_WARNED
+    try:
+        import numpy as np
+
+        from services.gateway.annotate import draw_on_image
+
+        # The wall carries PIL images in RGB; the detector and OpenCV want a numpy array in BGR.
+        # Handing the PIL object straight over failed inside ultralytics, and the failure was
+        # swallowed at debug - which is exactly how a wall ends up with no boxes and a quiet log.
+        # Thumbnail first so the boxes land on the same picture the tile actually shows.
+        small = img.copy()
+        small.thumbnail(THUMB)
+        bgr = np.asarray(small)[:, :, ::-1].copy()
+        return draw_on_image(bgr)
+    except Exception as exc:
+        if not _ANNOTATE_WARNED:
+            _ANNOTATE_WARNED = True
+            logger.warning("wall annotation unavailable (%s: %s) - tiles will have no boxes",
+                           type(exc).__name__, exc)
+        return None, 0
 
 
 def _encode(img) -> bytes:

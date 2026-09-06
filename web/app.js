@@ -31,6 +31,7 @@ const S = {
   alerts: { rows: null, sel: null, severity: 'all', state: 'all', error: null },
   watch: { rows: null, sel: null, severity: 'all', error: null },
   admin: { tab: 'health', audit: null, error: null, verifying: false, verified: null },
+  session: null,
 };
 
 /* ── plumbing ───────────────────────────────────────────────────── */
@@ -611,7 +612,7 @@ function viewWall() {
     return `<div class="tile ${sel && sel.camera_id === c.camera_id ? 'on' : ''}" data-cam="${esc(c.camera_id)}">
       <div class="frame">
         ${w.has_frame
-          ? `<img src="/tile/${encodeURIComponent(c.camera_id)}.jpg?boxes=1&t=${stamp}" alt="" loading="lazy">`
+          ? `<img src="/tile/${encodeURIComponent(c.camera_id)}.jpg?boxes=1&t=${Math.round((w.updated_at || 0) * 1000) || stamp}" data-at="${w.updated_at || 0}" alt="" loading="lazy">`
           : `<div class="ph">${svg(I.cam, 20, '#2E4248', 1.5)}<span>${h === 'DOWN' ? 'NO SIGNAL' : (w.status === 'connecting' ? 'connecting…' : 'idle')}</span>${h === 'DOWN' && w.detail ? `<span style="color:var(--ghost)">${esc(String(w.detail).slice(0, 40))}</span>` : ''}</div>`}
         <div class="tag tl"><span class="sq" style="border-radius:50%;background:${hcol(h)}"></span>${h}</div>
         <div class="tag tr" style="color:${w.stale ? 'var(--amber)' : 'var(--dim)'}">${w.age_s == null ? '—' : `${w.age_s.toFixed(1)} s`}</div>
@@ -724,7 +725,7 @@ function viewTrace() {
       <div class="scroll" style="padding:14px 16px">
         ${t.error ? `<div class="empty" style="color:var(--coral)">${esc(t.error)}</div>` : ''}
         ${!t.error && !t.data ? `<div class="empty">${t.plate.trim() ? 'Press Trace to reconstruct this plate’s route.' : 'Enter a plate above, then press Trace.'}</div>` : ''}
-        ${!t.error && t.data && shown.length === 0 ? '<div class="empty">No sighting of this plate in the window.</div>' : ''}
+        ${!t.error && t.data && shown.length === 0 ? `<div class="empty">No sighting of <span class="mono">${esc(t.data.plate || t.plate)}</span> between ${fmtWindow(t.data.from)} and ${fmtWindow(t.data.to)}.<br><span style="color:var(--ghost)">The default window is the last 24 hours. If the generator or the workers were stopped, there may be nothing recent to find.</span></div>` : ''}
         ${shown.map((h, i) => {
           const col = kindCol(h);
           const isSel = cur && cur.n === h.n;
@@ -1368,6 +1369,104 @@ async function loadCameras() {
   }
 }
 
+/* The wall used to be re-rendered wholesale every two seconds, which threw away every <img>
+ * and built new ones. A browser drops the decoded picture with the element, so all thirty
+ * tiles went blank and re-fetched on every poll - the flicker was the wall deleting itself on
+ * a timer. Now the tiles are built once and only what changed is touched: a frame is swapped
+ * in through a preloader, so the visible image is only replaced once its successor has fully
+ * decoded, and a tile whose frame has not moved is left completely alone.
+ */
+function refreshWallTiles() {
+  const root = $('#views');
+  if (!root) return;
+  const tiles = root.querySelectorAll('[data-cam]');
+  if (!tiles.length) { render(); return; }        // first paint, or the view was rebuilt
+
+  tiles.forEach((el) => {
+    const id = el.dataset.cam;
+    const w = S.wall[id] || {};
+
+    const age = el.querySelector('.tag.tr');
+    if (age) {
+      age.textContent = w.age_s == null ? '—' : `${w.age_s.toFixed(1)} s`;
+      age.style.color = w.stale ? 'var(--amber)' : 'var(--dim)';
+    }
+
+    const img = el.querySelector('img');
+    if (!w.has_frame) return;                     // nothing to show yet; keep the placeholder
+    if (!img) { render(); return; }               // a tile just gained its first frame
+
+    const seen = Number(img.dataset.at || 0);
+    const at = Number(w.updated_at || 0);
+    if (at && at <= seen) return;                 // same frame; leave the picture untouched
+
+    const next = new Image();
+    next.onload = () => { img.src = next.src; img.dataset.at = String(at); };
+    next.src = `/tile/${encodeURIComponent(id)}.jpg?boxes=1&t=${Math.round(at * 1000)}`;
+  });
+}
+
+/* Who the console is acting as, and switching it.
+ *
+ * The console holds its credential server-side so an operator never meets a login form, which
+ * is right for daily use and left [C10] undemonstrable: there was no way to *see* that the
+ * system administrator cannot watch video. Switching the account makes the rule visible - as
+ * the admin, the map, the wall and the trace answer 403 and the audit log keeps working. The
+ * refusals come from the API, not from this file; the console only asks a different question.
+ */
+async function loadSession() {
+  try {
+    S.session = await getJSON('/api/session');
+  } catch (e) {
+    S.session = null;
+  }
+  paintWhoami();
+}
+
+function fmtWindow(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? String(iso).slice(0, 16) : d.toLocaleString();
+}
+
+function paintWhoami() {
+  const el = $('#whoami');
+  if (!el) return;
+  const s = S.session;
+  if (!s) { el.textContent = '--'; el.title = 'console account unavailable'; return; }
+  el.textContent = s.role === 'SYSTEM_ADMIN' ? 'SA' : (s.username || '').slice(0, 2).toUpperCase();
+  el.classList.toggle('admin', s.role === 'SYSTEM_ADMIN');
+  el.title = `${s.username} · ${s.role} — click to switch role`;
+}
+
+async function switchAccount() {
+  const s = S.session;
+  if (!s) return;
+  const next = s.account === 'live' ? 'audit' : 'live';
+  const target = (s.accounts || []).find((a) => a.account === next);
+  if (target && !target.configured) {
+    toast(`no password configured for the ${next} account`);
+    return;
+  }
+  try {
+    S.session = await postJSON('/api/session', { account: next });
+  } catch (e) {
+    toast('could not switch account: ' + e.message);
+    return;
+  }
+  paintWhoami();
+  toast(S.session.role === 'SYSTEM_ADMIN'
+    ? 'Now acting as SYSTEM_ADMIN — this role administers the system and cannot view live data'
+    : `Now acting as ${S.session.role}`);
+  // Everything on screen was fetched under the previous role; refetch it under this one.
+  S.alerts.rows = null; S.watch.rows = null; S.admin.audit = null;
+  S.trace.data = null; S.trace.error = null;
+  await loadCameras();
+  loadAlerts();
+  loadWatchlist();
+  render();
+}
+
 async function pollWall() {
   try {
     const w = await getJSON('/api/wall');
@@ -1421,7 +1520,8 @@ function refreshLive() {
     if (m && m.map) paintMap(m);
     return;
   }
-  if (S.view === 'wall' || (S.view === 'admin' && S.admin.tab === 'health')) render();
+  if (S.view === 'wall') { refreshWallTiles(); return; }
+  if (S.view === 'admin' && S.admin.tab === 'health') render();
 }
 
 function paintBadge() {
@@ -1610,6 +1710,9 @@ async function loadGrid() {
   // showed its placeholder text, which reads exactly like a real value at a
   // glance, so "Trace" appeared to do nothing. Load it at boot instead.
   loadWatchlist();
+  loadSession();
+  const who = $('#whoami');
+  if (who) who.addEventListener('click', switchAccount);
   pollWall();
   setInterval(pollWall, 2000);
   setInterval(pollAlerts, 5000);

@@ -69,6 +69,14 @@ ADMIN_PASS = os.environ.get("PRAHARI_CONSOLE_ADMIN_PASSWORD", "")
 
 ACCOUNTS = {"live": (API_USER, API_PASS), "audit": (ADMIN_USER, ADMIN_PASS)}
 
+# Which account the console is currently acting as. Normally "live", and admin paths are routed
+# to the audit account automatically. Switching this to "audit" makes *every* call go as the
+# SYSTEM_ADMIN - which is how an operator, or a judge, can see [C10] enforced rather than being
+# told about it: the map, the wall and the trace all start answering 403 while the audit log
+# keeps working. It is a view of the real authorisation rules, not a UI mode.
+SESSION = {"account": "live"}
+ROLES = {"live": "INVESTIGATOR", "audit": "SYSTEM_ADMIN"}
+
 # [#44] The console must not answer /api/cameras around the API's RBAC. It draws
 # the API's scoped list; this flag is the one exception, for demoing with no core
 # API running, and it announces itself so nobody mistakes it for the real thing.
@@ -151,8 +159,22 @@ def grid_headers() -> str | None:
     return f"Cookie: {GRID['cookie']}\r\n" if GRID.get("cookie") else None
 
 
+def _session_state() -> dict:
+    account = SESSION["account"]
+    return {"account": account, "username": ACCOUNTS[account][0], "role": ROLES[account],
+            "accounts": [{"account": key, "username": name, "role": ROLES[key],
+                          "configured": bool(password)}
+                         for key, (name, password) in ACCOUNTS.items()]}
+
+
 def account_for(path: str) -> str:
-    """Which console account a proxied path is called under."""
+    """Which console account a proxied path is called under.
+
+    While the console is acting as the system admin, everything goes as the system admin - the
+    point of that mode is to show what that role can and cannot reach.
+    """
+    if SESSION["account"] == "audit":
+        return "audit"
     return "audit" if path.startswith("admin/") else "live"
 
 
@@ -306,6 +328,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if path.startswith("/api/v1/"):
             status, payload = api_call("POST", path[len("/api/v1/"):], body=self._body())
             return self._json(payload, status)
+        if path == "/api/session":
+            wanted = (self._body().get("account") or "").strip().lower()
+            if wanted not in ACCOUNTS:
+                return self._json({"detail": f"account must be one of {sorted(ACCOUNTS)}"}, 422)
+            if not ACCOUNTS[wanted][1]:
+                return self._json({"detail": f"no password configured for the {wanted} account"},
+                                  503)
+            SESSION["account"] = wanted
+            return self._json(_session_state())
         if path == "/api/wall/start":
             self._json(WALL.start(self._body().get("ids")))
         elif path == "/api/wall/stop":
@@ -319,6 +350,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if path.startswith("/api/v1/"):
             status, payload = api_call("GET", path[len("/api/v1/"):], query=parsed.query)
             return self._json(payload, status)
+        if path == "/api/session":
+            return self._json(_session_state())
         if path == "/api/grid":
             return self._json({"state": GRID["state"], "detail": GRID["detail"],
                                "auth_url": GRID_AUTH, "key_set": bool(GRID_KEY)})
@@ -351,13 +384,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         two readings of it.
         """
         cam_id = path[len("/tile/"):].removesuffix(".jpg")
-        data = WALL.jpeg(cam_id) if WALL else None
-        if data and self._wants_boxes():
-            try:
-                from services.gateway.annotate import annotate_jpeg
-                data = annotate_jpeg(cam_id, data)
-            except Exception:
-                pass                    # a tile without boxes beats no tile
+        # The annotated frame was produced when the frame arrived, so this is a lookup rather
+        # than an inference. Annotating per request meant one browser refresh of a thirty-tile
+        # wall queued thirty detections, and the tiles took seconds to appear.
+        data = WALL.jpeg(cam_id, boxes=self._wants_boxes()) if WALL else None
         if not data:
             # 204: the page keeps its placeholder instead of showing a broken
             # image while a camera is still connecting.

@@ -428,3 +428,14 @@ input, select, textarea, button { font: inherit; color: inherit; background: non
   background: var(--raised); font-size: 13px;
   box-shadow: 0 18px 40px -16px #000; z-index: 50;
 }
+
+
+/* The account chip in the rail. It is a button because it does something: switching the console
+   between its investigator and system-admin accounts, which is how [C10] is demonstrated rather
+   than described - as the admin, the map and the trace start refusing. */
+.me { border: 1px solid var(--line); background: #10191D; color: var(--dim);
+      font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em;
+      width: 34px; height: 34px; border-radius: 50%; cursor: pointer; padding: 0;
+      display: flex; align-items: center; justify-content: center; transition: .15s; }
+.me:hover { border-color: var(--amber); color: var(--paper); }
+.me.admin { border-color: var(--coral); color: var(--coral); }

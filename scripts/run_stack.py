@@ -27,7 +27,22 @@ ROOT = Path(__file__).resolve().parent.parent
 LOGS = ROOT / "logs"
 PIDS = LOGS / "stack.pids"
 
-PY = sys.executable
+def _interpreter() -> str:
+    """The project's virtualenv if there is one, otherwise whatever is running this.
+
+    This is not a nicety. The CV stack - torch, ultralytics, the OCR engines - is installed in
+    .venv, and launching the console with a bare `python` gave a console whose detector silently
+    did nothing: the wall drew no boxes and the log said so only at debug level. The same trap
+    catches anyone running selftest.py by hand.
+    """
+    for candidate in (ROOT / ".venv" / "Scripts" / "python.exe",      # Windows
+                      ROOT / ".venv" / "bin" / "python"):             # POSIX
+        if candidate.exists():
+            return str(candidate)
+    return sys.executable
+
+
+PY = _interpreter()
 
 # name -> (argv, health url, what "healthy" looks like)
 SERVICES = {
@@ -113,10 +128,15 @@ def status():
         print(line)
 
 
-def stop():
+def stop(only=None):
+    """Stop the recorded processes. `only` narrows it, so `restart --only console` restarts one
+    service instead of stopping all four and starting one - which is what it used to do."""
     running = _read_pids()
+    if only:
+        running = {n: p for n, p in running.items() if n in only}
     if not running:
         print("nothing recorded as running; if a process survived, kill it by port")
+    survivors = {n: p for n, p in _read_pids().items() if n not in running}
     for name, pid in running.items():
         if not _alive(pid):
             print(f"{name:10} already gone")
@@ -130,7 +150,10 @@ def stop():
             print(f"{name:10} stopped (pid {pid})")
         except OSError as exc:
             print(f"{name:10} could not stop pid {pid}: {exc}")
-    PIDS.unlink(missing_ok=True)
+    if survivors:
+        _write_pids(survivors)
+    else:
+        PIDS.unlink(missing_ok=True)
 
 
 def _alive(pid):
@@ -171,7 +194,7 @@ def main():
     args = ap.parse_args()
 
     if args.action in ("stop", "restart"):
-        stop()
+        stop(args.only)
     if args.action in ("start", "restart"):
         start(args.only)
         if not args.no_wait:
