@@ -121,3 +121,30 @@ def test_the_wall_can_re_authenticate_mid_run():
 
     static = Wall([], headers="Cookie: fixed\r\n")
     assert static.headers == "Cookie: fixed\r\n"
+
+
+def test_the_overlay_never_invents_a_box():
+    # The wall draws what the detector returned on that frame and nothing else. A frame with no
+    # detections comes back unmarked - decorating an empty frame would be the one thing this
+    # overlay must never do, because a judge reads a box as a claim.
+    import numpy as np
+
+    from services.gateway.annotate import draw
+
+    frame = np.zeros((240, 320, 3), dtype=np.uint8)
+    painted = draw(frame, [])
+    assert painted.shape == frame.shape
+    # Only the banner strip is allowed to differ on an empty frame.
+    assert (painted[:200] == frame[:200]).all(), "nothing may be drawn where nothing was found"
+
+
+def test_the_overlay_captions_a_plate_it_cannot_read():
+    import numpy as np
+
+    from services.gateway.annotate import draw
+    from services.worker.backend import Detection
+
+    frame = np.zeros((480, 640, 3), dtype=np.uint8)
+    # 55 px vehicle: cam04's median. Its glyphs are ~2 px, so the caption must be the refusal.
+    painted = draw(frame, [Detection(xyxy=(10, 10, 65, 60), conf=0.8, label="car")])
+    assert not (painted == frame).all(), "a detection must be drawn"

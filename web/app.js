@@ -611,7 +611,7 @@ function viewWall() {
     return `<div class="tile ${sel && sel.camera_id === c.camera_id ? 'on' : ''}" data-cam="${esc(c.camera_id)}">
       <div class="frame">
         ${w.has_frame
-          ? `<img src="/tile/${encodeURIComponent(c.camera_id)}.jpg?t=${stamp}" alt="" loading="lazy">`
+          ? `<img src="/tile/${encodeURIComponent(c.camera_id)}.jpg?boxes=1&t=${stamp}" alt="" loading="lazy">`
           : `<div class="ph">${svg(I.cam, 20, '#2E4248', 1.5)}<span>${h === 'DOWN' ? 'NO SIGNAL' : (w.status === 'connecting' ? 'connecting…' : 'idle')}</span>${h === 'DOWN' && w.detail ? `<span style="color:var(--ghost)">${esc(String(w.detail).slice(0, 40))}</span>` : ''}</div>`}
         <div class="tag tl"><span class="sq" style="border-radius:50%;background:${hcol(h)}"></span>${h}</div>
         <div class="tag tr" style="color:${w.stale ? 'var(--amber)' : 'var(--dim)'}">${w.age_s == null ? '—' : `${w.age_s.toFixed(1)} s`}</div>
@@ -650,7 +650,7 @@ function viewWall() {
     <div class="stage">
       <div class="player">
         ${selWall.has_frame
-          ? `<img src="/tile/${encodeURIComponent(sel.camera_id)}.jpg?t=${stamp}" alt="">`
+          ? `<img src="/tile/${encodeURIComponent(sel.camera_id)}.jpg?boxes=1&t=${stamp}" alt="">`
           : `<div class="ph">${svg(I.cam, 34, '#2E4248', 1.4)}
                <span class="mono" style="font-size:12.5px">${selHealth === 'DOWN' ? 'NO SIGNAL — neither transport is reachable' : 'no frame yet — start the wall'}</span></div>`}
         <div class="hud top">

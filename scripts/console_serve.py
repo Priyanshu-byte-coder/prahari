@@ -278,6 +278,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     # -- helpers ---------------------------------------------------------
 
+    def _wants_boxes(self) -> bool:
+        query = urlparse(self.path).query
+        return "boxes=1" in query
+
     def _json(self, payload, status=200):
         body = json.dumps(payload).encode()
         self.send_response(status)
@@ -340,8 +344,20 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def _tile(self, path: str):
+        """One wall frame. `?boxes=1` runs the detector over it and draws what it found.
+
+        The overlay is opt-in per request rather than baked into the frame the wall caches: the
+        map's thumbnails want the plain picture, and the Wall view wants the boxes. Same frame,
+        two readings of it.
+        """
         cam_id = path[len("/tile/"):].removesuffix(".jpg")
         data = WALL.jpeg(cam_id) if WALL else None
+        if data and self._wants_boxes():
+            try:
+                from services.gateway.annotate import annotate_jpeg
+                data = annotate_jpeg(cam_id, data)
+            except Exception:
+                pass                    # a tile without boxes beats no tile
         if not data:
             # 204: the page keeps its placeholder instead of showing a broken
             # image while a camera is still connecting.
