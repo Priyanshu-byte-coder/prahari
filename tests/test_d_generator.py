@@ -77,3 +77,52 @@ def test_canon_fallback_matches_i5_once_it_lands():
     from common.plate import canon as real
     for s in ("GJ01AB1234", "GJ38BS9593", "MH12DQ0000", "6J01A81234"):
         assert fs.canon(s) == real(s), s
+
+
+# --- the scripted demo vehicle ---------------------------------------------------------------
+
+def test_the_demo_vehicle_plate_cannot_collide_with_a_real_registration():
+    # This plate ends up in a video shown to a police audience. "DM" is not an issued Gujarat
+    # letter pair, so the demo cannot accidentally name somebody's actual vehicle.
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import demo_vehicle
+
+    assert demo_vehicle.DEMO_PLATE.startswith("GJ01DM")
+    from common.plate_compat import is_valid_plate
+
+    assert is_valid_plate(demo_vehicle.DEMO_PLATE), "must still satisfy the [C7] plate grammar"
+
+
+def test_the_demo_route_is_ordered_and_ends_somewhere_impossible():
+    import sys
+    from datetime import datetime, timedelta, timezone
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import demo_vehicle
+
+    start = datetime(2026, 9, 6, 9, 0, tzinfo=timezone(timedelta(hours=5, minutes=30)))
+    rows = demo_vehicle.rows(start)
+
+    stamps = [datetime.fromisoformat(r["pts_first"]) for r in rows]
+    assert stamps == sorted(stamps), "a route the judge reads must be in order"
+    assert len({r["camera_id"] for r in rows}) == len(rows), "one hop per camera"
+    assert all(r["plate_norm"] == demo_vehicle.DEMO_PLATE for r in rows)
+    # The last hop is the deliberate misread the implausibility flag exists to catch.
+    assert rows[-1]["camera_id"] == demo_vehicle.IMPLAUSIBLE[0]
+    assert rows[-1]["plate_band"] == "POSSIBLE", "the impossible hop is the least confident one"
+
+
+def test_the_demo_vehicle_can_be_laid_down_without_the_impossible_hop():
+    import sys
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import demo_vehicle
+
+    rows = demo_vehicle.rows(datetime(2026, 9, 6, tzinfo=timezone.utc), include_implausible=False)
+    assert demo_vehicle.IMPLAUSIBLE[0] not in {r["camera_id"] for r in rows}

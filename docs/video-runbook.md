@@ -14,9 +14,20 @@ cd C:/Users/Priyanshu/OneDrive/Desktop/All_projects/hackathon/cctv
 source run_demo_env.sh                      # required - without it nothing reaches Redis
 
 python scripts/run_stack.py restart         # API, console, persister, matcher
-python scripts/fake_sightings.py --rate 6 --duration 7200 &    # demo traffic
+python scripts/fake_sightings.py --rate 6 --duration 7200 &    # background traffic
+python scripts/demo_vehicle.py --watchlist --password "$PRAHARI_CONSOLE_PASSWORD"
 curl -s -X POST -H "Content-Type: application/json" -d '{}' http://127.0.0.1:5173/api/wall/start
 ```
+
+`demo_vehicle.py` lays down **one scripted vehicle** you can actually show: plate
+**`GJ01DM0042`**, seven hops from southern Ahmedabad up to Gandhinagar over about 45 minutes,
+and a final sighting in Rajkot two minutes later that the route builder flags IMPLAUSIBLE. With
+`--watchlist` it also puts the plate on the watchlist first, so the alert in Take 4 and the route
+in Take 5 are the *same vehicle* - the story connects instead of being two unrelated demos.
+
+It publishes to the same Redis stream a camera publishes to, so the rows go through the real
+persister, matcher and route builder. Undo it completely with
+`python scripts/demo_vehicle.py --clear`.
 
 Then wait **three minutes**. The wall rotates through the cameras a few at a time - the grid
 allows one session per IP - and you want several tiles carrying pictures before the camera rolls.
@@ -95,7 +106,7 @@ judgement. Do not cut it for time.
 
 | Do | Say |
 |---|---|
-| **Watch** → add a plate you can see in the sightings list. Category *stolen vehicle*, severity *HIGH*. Save. | "An officer adds a plate to the watchlist. Stolen vehicle, high severity." |
+| **Watch** → the demo plate `GJ01DM0042` is already listed as *stolen vehicle · HIGH* (the setup script added it). Point at it. Or add a second plate live if you prefer showing the form. | "An officer puts a plate on the watchlist. Stolen vehicle, high severity." |
 | Go to **Alerts** or **Map**. **Do not refresh.** Wait for the badge to increment and the alert to appear. | "And the alert arrives on its own. No polling — one socket, and the server decides what this operator is allowed to see before the frame is ever on the wire. The matcher also collapses the characters cameras confuse — zero against O, eight against B — so one misread character doesn't lose the vehicle." |
 | Open the alert, click **Acknowledge**. | "Acknowledged, by a named officer, and that transition is recorded." |
 
@@ -105,8 +116,8 @@ judgement. Do not cut it for time.
 
 | Do | Say |
 |---|---|
-| **Trace** → type `GJ01AB1234` → the route draws. | "The test case the brief asks for: give it a registration number, get the route. Ordered hops, each with the camera, the coordinates and the timestamp, snapped to roads." |
-| Point at the hop flagged **IMPLAUSIBLE**. | "This hop is flagged implausible — two hundred kilometres in a minute is a misread, not a journey. We show it flagged rather than hiding it, because the officer decides what to do with it, not the software." |
+| **Trace** → type **`GJ01DM0042`** → the route draws: seven numbered hops, Ahmedabad up to Gandhinagar. | "The test case the brief asks for: give it a registration number, get the route. Ordered hops, each with the camera, the coordinates and the timestamp, snapped to roads." |
+| Point at hop 7, flagged **IMPLAUSIBLE** in coral, with the implied speed beside it — about 6,000 km/h. | "This hop is flagged implausible — two hundred kilometres in a minute is a misread, not a journey. We show it flagged rather than hiding it, because the officer decides what to do with it, not the software." |
 | Click **Export → PDF**. Then **Admin → Audit**. Your export is the top row. Click **Verify** → `ok: true`. | "Export it — and the export is already in the audit log. Every row is hash-chained to the one before, so if somebody edits a row directly in the database, this button says so." |
 
 ---
