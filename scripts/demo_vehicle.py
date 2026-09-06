@@ -134,6 +134,41 @@ def add_to_watchlist(api_base, username, password):
     return True, f"watchlist entry {body.get('id')}"
 
 
+def _wait_for_rows(expected, since, dsn=None, deadline_s=25):
+    """Block until this journey's rows are in the database, or the deadline passes."""
+    import psycopg2
+
+    conn = psycopg2.connect(dsn or os.environ["POSTGRES_DSN"])
+    seen = 0
+    end = time.time() + deadline_s
+    try:
+        while time.time() < end:
+            with conn, conn.cursor() as cur:
+                cur.execute("""SELECT count(*) FROM sightings
+                               WHERE plate_norm = %s AND pts_first >= %s""",
+                            (DEMO_PLATE, since))
+                seen = cur.fetchone()[0]
+            if seen >= expected:
+                return seen
+            time.sleep(1.5)
+    finally:
+        conn.close()
+    return seen
+
+
+def _prune_older_than(since, dsn=None):
+    """Delete this plate's rows from before the current journey - and their alerts."""
+    import psycopg2
+
+    conn = psycopg2.connect(dsn or os.environ["POSTGRES_DSN"])
+    with conn, conn.cursor() as cur:
+        cur.execute("""DELETE FROM sightings
+                       WHERE plate_norm = %s AND pts_first < %s""", (DEMO_PLATE, since))
+        removed = cur.rowcount
+    conn.close()
+    return removed
+
+
 def clear(dsn=None):
     """Remove the demo vehicle from the database. Returns (sightings, alerts, watchlist)."""
     import psycopg2
@@ -176,6 +211,17 @@ def main():
               f"for {DEMO_PLATE}")
         return 0
 
+    # Always start from nothing. Re-running this used to leave the previous journey behind and
+    # the trace then showed twelve hops instead of seven - rows published just before a `--clear`
+    # are still in the stream and land in the database a moment *after* it. So: clear, let the
+    # persister drain, clear again. A demo you re-run between takes has to give the same picture
+    # every time.
+    before, _, _ = clear()
+    if before:
+        time.sleep(4)
+        again, _, _ = clear()
+        print(f"cleared {before + again} row(s) from a previous run")
+
     if args.watchlist:
         if not args.password:
             print("--watchlist needs a password: set PRAHARI_CONSOLE_PASSWORD or pass --password")
@@ -191,6 +237,19 @@ def main():
     start = datetime.now(fs.IST) - timedelta(minutes=args.minutes_ago)
     journey = rows(start, include_implausible=not args.no_implausible)
     published = publish(journey)
+
+    # Wait for our own rows to land, then drop anything older for this plate. Clearing *before*
+    # publishing is not enough on its own: rows from the previous run can still be in the stream
+    # and get persisted a moment after the delete, and the trace then shows fourteen hops
+    # instead of seven. Pruning by the journey's own start time is exact - a re-run between
+    # takes gives the same seven hops every time.
+    landed = _wait_for_rows(len(journey), start)
+    pruned = _prune_older_than(start)
+    if pruned:
+        print(f"pruned {pruned} row(s) left over from an earlier run")
+    if landed < len(journey):
+        print(f"note: {landed} of {len(journey)} rows visible so far - the persister is behind; "
+              "give it a few seconds before tracing")
 
     print(f"\npublished {published} sighting(s) for {DEMO_PLATE} to the `{fs.STREAM}` stream")
     print(f"journey starts {args.minutes_ago} min ago and covers {len(journey)} cameras\n")
