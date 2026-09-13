@@ -139,10 +139,17 @@ class AlertRepo:
         params.update(scope.department_filter() if scope is not None
                       else {"all_departments": True, "departments": []})
         with self.store.conn as conn, conn.cursor() as cur:
+            # The watchlist join is what makes an alert readable. Without it every row in the
+            # triage queue rendered as "no plate" - the console had the watchlist_id and nothing
+            # to show for it, which is the least useful thing a queue of sixty alerts can say.
             cur.execute("""SELECT a.id, a.watchlist_id, a.sighting_id, a.camera_id, a.pts,
-                                  a.band, a.state, a.count, a.created_at
+                                  a.band, a.state, a.count, a.created_at,
+                                  w.plate_norm AS plate_text, w.category, w.severity,
+                                  w.description, w.reason,
+                                  c.name AS camera_name, c.district_code
                            FROM alerts a
                            LEFT JOIN cameras c ON c.camera_id = a.camera_id
+                           LEFT JOIN watchlist w ON w.id = a.watchlist_id
                            WHERE (%(state)s::text IS NULL OR a.state = %(state)s)
                              AND (%(all_departments)s
                                   OR c.owner_dept_id = ANY(%(departments)s))

@@ -278,3 +278,19 @@ def test_trigram_fallback_finds_a_plain_misread(rig):
     assert matcher.index.candidates("GJ01AC1234") == []
     hit = best_match(a_sighting(camera, plate="GJ01AC1234"), matcher.index)
     assert hit is not None and hit[1] == "POSSIBLE"
+
+
+def test_an_alert_carries_the_plate_that_raised_it(rig):
+    # Without the watchlist join every row in the triage queue rendered as "no plate": the
+    # console had a watchlist_id and nothing to show for it, which is the least useful thing a
+    # queue of sixty alerts can say to an operator deciding which one to open first.
+    store, alerts, watchlist_id, camera, _tag = rig
+    alerts.raise_alert(watchlist_id=watchlist_id, sighting=a_sighting(camera), band="CONFIRMED")
+
+    mine = [r for r in alerts.list(limit=100) if r["watchlist_id"] == watchlist_id]
+    assert mine, "the alert was not returned"
+    row = mine[0]
+    assert row["plate_text"] == WATCHED
+    assert row["severity"] == "HIGH"
+    assert row["category"] == "stolen vehicle"
+    assert row["camera_name"], "an operator triages by camera name, not by camera id"
