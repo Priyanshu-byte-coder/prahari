@@ -230,6 +230,9 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 - `scripts/fake_sightings.py` — synthetic [C1] rows on the `sightings` stream — `ulid`, `sighting`, `route_schedule`, `ROUTE`.
 - `tests/test_d_schema.py` — schema.sql vs migrate.sql drift, index and re-runnability checks.
 - `tests/test_d_registry.py` — the seed/geo join, including every way lane G's two files disagree.
+- `docs/diagrams/build_diagrams.py` — generates both submission diagrams as self-contained 16:9 SVG — `architecture`, `workflow`, `icon`, `chip_row`, `ICONS`.
+- `docs/hld.html` — the HLD as a printable A4 document; both diagrams inlined. Source for `submission/02-*.pdf`.
+- `scripts/build_submission.py` — renders the submission pack with headless Chrome, checks page count and page size — `find_chrome`, `print_pdf`, `check`, `JOBS`.
 - `tests/test_d_generator.py` — [C1] field set, ULID ordering, route hop order and gaps.
 - `common/plate_compat.py` — the single stand-in for I5 — `canon`, `normalise`, `is_valid_plate`, `USING_I5`. Delete when `common/plate.py` lands.
 - `services/api/store.py` — Postgres + Redis access — `Store.insert_sightings`, `cache_recent`, `recent_sighting_ids`, `crop_url`.
@@ -425,6 +428,13 @@ State: `TODO` → `WIP` → `DONE` | `BLOCKED`. Flip your own cell only. Full ti
 - `[D]` Expensive accuracy paths (multi-frame SR, multi-reconstruction voting) belong behind an
   escalation gate, not always-on: run them when two readers have *not* agreed. Same accuracy on
   the hard plates, 10.3 s -> 0.68 s on the easy ones.
+
+- [P] Chrome headless is the only renderer here that agrees with the browser on flexbox inside a
+  fixed-height print page (a 16:9 slide). WeasyPrint isn't installed and wkhtmltopdf disagrees.
+  `--virtual-time-budget=20000` is not optional: without it the PDF prints before the webfonts
+  land and every heading silently falls back to system sans.
+- [P] A `cat > file <<'EOF'` heredoc through the Bash tool keeps truncating mid-SVG here. Use the
+  Write tool for anything longer than a few lines, or a Python script that writes the file.
 
 ## 4. Decisions
 
@@ -711,6 +721,14 @@ changing one without a line here breaks somebody else's lane silently.
 - 08-29 | G1 | scripts/probe_grid.py, data/cameras.seed.json, data/catalogue/ingest.json.bootstrap | seed built and verified (`--check`); grid host was 502, used salvaged catalogue as bootstrap
 
 ### lane D
+- 09-13 | submission pack | docs/deck.html, docs/hld.html, docs/diagrams/, scripts/build_submission.py,
+  submission/ | Deliverables 1-3 built: presentation (15pp, 16:9), HLD (14pp, A4), architecture and
+  workflow diagrams (1pp each, also PNG + SVG). Deck placeholders replaced with measured numbers —
+  `pytest` **372 passed, 6 skipped** (stack up; 283/95 with no services), selftest 0.68 s, audit 728
+  rows ok, accuracy 95.0%/0 wrong. Fixed stale claims: two readers -> four, alert FSM was
+  NEW/ACK/IN_PROGRESS/RESOLVED and is NEW/ACKNOWLEDGED/ACTIONED|DISMISSED, driver table now states
+  the grid carries 30/30 on HLS and 401s RTSP. Diagrams rewritten icon-led after review feedback
+  that the first pass was a paragraph in a box.
 - 09-04 | submission | README.md, LICENSE, docs/{api,operations,video-script,submission}.md, scripts/{run_stack,verify_stack}.py | repo made submission-shaped; 7 issues fixed and closed; lane I's OCR branch merged and its latency brought back inside the budget
 - 09-03 | a-z | services/worker/preprocess.py, tests/test_i_preprocess.py | full A-Z test of main; CI unblocked (minAreaRect angle convention); 8 issues filed #51-#58 and put on the board as Todo
 - 09-03 | grid-live | scripts/console_serve.py, services/gateway/wall.py, run_demo_env.sh | grid sign-in fixed (email+key) and UA passed as its own PyAV option; wall pulls real HLS video, 6 cameras live in the console

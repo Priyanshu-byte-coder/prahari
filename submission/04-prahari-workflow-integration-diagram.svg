@@ -1,0 +1,196 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1760 990" width="1760" height="990" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif">
+<title>Prahari — workflow and integration</title>
+<desc>Two paths: a vehicle passing a camera through to an acknowledged alert, and a registration number through to an audited route export.</desc>
+<defs>
+<g id="i-camera" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5 17 4.2a1 1 0 0 1 1.2.7l1 3.6a1 1 0 0 1-.7 1.2L4.6 13.4a1 1 0 0 1-1.2-.7l-1-3.6a1 1 0 0 1 .6-1.6z"/>
+                 <circle cx="16.4" cy="8.2" r="1.5" fill="#fff"/>
+                 <path d="M6 13.9 7 17M11 10.5v10M8.6 20.5h4.8"/></g>
+<g id="i-hub" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.3"/>
+              <circle cx="3.6" cy="5" r="2.1"/><circle cx="20.4" cy="5" r="2.1"/>
+              <circle cx="3.6" cy="19" r="2.1"/><circle cx="20.4" cy="19" r="2.1"/>
+              <path d="M5.2 6.4 9.6 10M18.8 6.4 14.4 10M5.2 17.6 9.6 14M18.8 17.6 14.4 14"/></g>
+<g id="i-chip" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2.2"/>
+               <rect x="9.4" y="9.4" width="5.2" height="5.2" rx="1"/>
+               <path d="M9.5 6V3M14.5 6V3M9.5 21v-3M14.5 21v-3M6 9.5H3M6 14.5H3M21 9.5h-3M21 14.5h-3"/></g>
+<g id="i-stream" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7h12"/><path d="M12 4.2 15.3 7 12 9.8"/>
+                 <path d="M21.5 12h-12"/><path d="M12 9.2 8.7 12 12 14.8"/>
+                 <path d="M2.5 17h12"/><path d="M12 14.2 15.3 17 12 19.8"/></g>
+<g id="i-db" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.6" rx="8" ry="3.1"/>
+             <path d="M4 5.6v12.8c0 1.7 3.6 3.1 8 3.1s8-1.4 8-3.1V5.6"/>
+             <path d="M4 12c0 1.7 3.6 3.1 8 3.1s8-1.4 8-3.1"/></g>
+<g id="i-monitor" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="19" height="13" rx="1.8"/>
+                  <path d="M9 20.5h6M12 16.5v4"/>
+                  <path d="M6.5 12.5 9.5 9l2.5 2.6L15 7.5l2.5 3.4"/></g>
+<g id="i-shield" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.6 20 5.6v6.1c0 4.6-3.3 8.6-8 9.7-4.7-1.1-8-5.1-8-9.7V5.6z"/>
+                 <path d="M8.6 12.2 11 14.6l4.6-4.8"/></g>
+<g id="i-chain" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.6 14.4a4.2 4.2 0 0 1 0-5.9l2.4-2.4a4.2 4.2 0 0 1 5.9 5.9l-1.3 1.3"/>
+                <path d="M14.4 9.6a4.2 4.2 0 0 1 0 5.9l-2.4 2.4a4.2 4.2 0 1 1-5.9-5.9l1.3-1.3"/></g>
+<g id="i-clock" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 6.8V12l3.4 2.1"/></g>
+<g id="i-open" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M3.6 12h16.8"/>
+               <path d="M12 3.4a13 13 0 0 1 0 17.2 13 13 0 0 1 0-17.2z"/></g>
+<g id="i-pin" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21.5c4.2-5.3 6.4-9 6.4-11.5a6.4 6.4 0 1 0-12.8 0c0 2.5 2.2 6.2 6.4 11.5z"/>
+              <circle cx="12" cy="10" r="2.4"/></g>
+<g id="i-bell" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.2 16.4V10.6a5.8 5.8 0 0 1 11.6 0v5.8l1.8 2.3H4.4z"/>
+               <path d="M9.8 21.4h4.4"/></g>
+<g id="i-route" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.4" cy="18.6" r="2.6"/><circle cx="18.6" cy="5.4" r="2.6"/>
+                <path d="M8 18.6h5.8a4.4 4.4 0 0 0 0-8.8H10a4.4 4.4 0 0 1 0-8.8"/></g>
+<g id="i-user" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.9"/><path d="M4.6 20.8a7.4 7.4 0 0 1 14.8 0"/></g>
+<g id="i-eye" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 12S5.6 5.4 12 5.4 22.2 12 22.2 12 18.4 18.6 12 18.6 1.8 12 1.8 12z"/>
+              <circle cx="12" cy="12" r="3"/></g>
+<g id="i-ban" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M6 18 18 6"/></g>
+<g id="i-box" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 21 7.4v9.2L12 21.2 3 16.6V7.4z"/><path d="M3 7.4 12 12l9-4.6M12 12v9.2"/></g>
+<marker id="ma" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker>
+<marker id="mb" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b5731a"/></marker>
+<marker id="mc" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f7a3d"/></marker>
+<marker id="md" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b23020"/></marker>
+</defs>
+<rect x="0" y="0" width="1760" height="990" rx="0" fill="#f4f5f7" stroke="#f4f5f7" stroke-width="0"/>
+<text x="48" y="54" font-size="28" fill="#1b1f27" font-weight="800" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Prahari — workflow &amp; integration</text>
+<text x="48" y="82" font-size="15" fill="#6b7280" font-weight="400" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Two paths. Both end on the same hash-chained audit log.</text>
+<rect x="48" y="112" width="1664" height="300" rx="10" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.4"/>
+<rect x="48" y="112" width="1664" height="44" rx="12" fill="#1b1f27" stroke="#1b1f27" stroke-width="0"/>
+<rect x="48" y="144" width="1664" height="12" rx="0" fill="#1b1f27" stroke="#1b1f27" stroke-width="0"/>
+<text x="70" y="141" font-size="15" fill="#e0a24a" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start" letter-spacing="0.06em">A · VEHICLE  →  ACKNOWLEDGED ALERT</text>
+<text x="1690" y="141" font-size="13" fill="#9aa1ad" font-weight="400" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="end">measured 0.68 s frame to sighting, against a 3.0 s budget</text>
+<rect x="63" y="188" width="178" height="202" rx="11" fill="#f7ead6" stroke="#d9a45e" stroke-width="1.5"/>
+<circle cx="89" cy="214" r="15" fill="#b5731a"/>
+<text x="89" y="219" font-size="14" fill="#ffffff" font-weight="800" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">1</text>
+<g transform="translate(173 198) scale(1.91667)" color="#b5731a" stroke-width="0.886957"><use href="#i-camera"/></g>
+<text x="79" y="268" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Vehicle passes a</text>
+<text x="79" y="289" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">camera</text>
+<rect x="79" y="318" width="79.4" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="118.7" y="334.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">frame PTS</text>
+<path d="M246 289 L266 289" stroke="#b5731a" stroke-width="2.6" fill="none" marker-end="url(#mb)"/>
+<rect x="271" y="188" width="178" height="202" rx="11" fill="#f7ead6" stroke="#d9a45e" stroke-width="1.5"/>
+<circle cx="297" cy="214" r="15" fill="#b5731a"/>
+<text x="297" y="219" font-size="14" fill="#ffffff" font-weight="800" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">2</text>
+<g transform="translate(381 198) scale(1.91667)" color="#b5731a" stroke-width="0.886957"><use href="#i-chip"/></g>
+<text x="287" y="268" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Detect, track, read</text>
+<text x="287" y="289" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">the plate</text>
+<rect x="287" y="318" width="46.4" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="310.2" y="334.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">YOLO</text>
+<rect x="340.4" y="318" width="59.6" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="370.2" y="334.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">OCR ×4</text>
+<path d="M454 289 L474 289" stroke="#b5731a" stroke-width="2.6" fill="none" marker-end="url(#mb)"/>
+<rect x="479" y="188" width="178" height="202" rx="11" fill="#f7ead6" stroke="#d9a45e" stroke-width="1.5"/>
+<circle cx="505" cy="214" r="15" fill="#b5731a"/>
+<text x="505" y="219" font-size="14" fill="#ffffff" font-weight="800" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">3</text>
+<g transform="translate(589 198) scale(1.91667)" color="#b5731a" stroke-width="0.886957"><use href="#i-shield"/></g>
+<text x="495" y="268" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Band it — or refuse</text>
+<text x="495" y="289" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">it</text>
+<rect x="495" y="318" width="79.4" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="534.7" y="334.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">CONFIRMED</text>
+<rect x="495" y="349" width="86" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="538" y="365.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">UNREADABLE</text>
+<path d="M662 289 L682 289" stroke="#b5731a" stroke-width="2.6" fill="none" marker-end="url(#mb)"/>
+<rect x="687" y="188" width="178" height="202" rx="11" fill="#eceef1" stroke="#d3d7dd" stroke-width="1.5"/>
+<circle cx="713" cy="214" r="15" fill="#b5731a"/>
+<text x="713" y="219" font-size="14" fill="#ffffff" font-weight="800" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">4</text>
+<g transform="translate(797 198) scale(1.91667)" color="#454b57" stroke-width="0.886957"><use href="#i-stream"/></g>
+<text x="703" y="268" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Sighting on the bus</text>
+<rect x="703" y="297" width="59.6" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="732.8" y="313.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">~200 B</text>
+<rect x="769.6" y="297" width="33.2" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="786.2" y="313.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">C1</text>
+<path d="M870 289 L890 289" stroke="#b5731a" stroke-width="2.6" fill="none" marker-end="url(#mb)"/>
+<rect x="895" y="188" width="178" height="202" rx="11" fill="#eceef1" stroke="#d3d7dd" stroke-width="1.5"/>
+<circle cx="921" cy="214" r="15" fill="#b5731a"/>
+<text x="921" y="219" font-size="14" fill="#ffffff" font-weight="800" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">5</text>
+<g transform="translate(1005 198) scale(1.91667)" color="#454b57" stroke-width="0.886957"><use href="#i-db"/></g>
+<text x="911" y="268" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Match against</text>
+<text x="911" y="289" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">watchlist</text>
+<rect x="911" y="318" width="53" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="937.5" y="334.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">canon</text>
+<rect x="971" y="318" width="86" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="1014" y="334.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">dedup 60 s</text>
+<path d="M1078 289 L1098 289" stroke="#b5731a" stroke-width="2.6" fill="none" marker-end="url(#mb)"/>
+<rect x="1103" y="188" width="178" height="202" rx="11" fill="#eceef1" stroke="#d3d7dd" stroke-width="1.5"/>
+<circle cx="1129" cy="214" r="15" fill="#b5731a"/>
+<text x="1129" y="219" font-size="14" fill="#ffffff" font-weight="800" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">6</text>
+<g transform="translate(1213 198) scale(1.91667)" color="#454b57" stroke-width="0.886957"><use href="#i-bell"/></g>
+<text x="1119" y="268" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Alert pushed to</text>
+<text x="1119" y="289" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">console</text>
+<rect x="1119" y="318" width="79.4" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="1158.7" y="334.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">WebSocket</text>
+<rect x="1205.4" y="318" width="59.6" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="1235.2" y="334.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">scoped</text>
+<path d="M1286 289 L1306 289" stroke="#b5731a" stroke-width="2.6" fill="none" marker-end="url(#mb)"/>
+<rect x="1311" y="188" width="178" height="202" rx="11" fill="#eceef1" stroke="#d3d7dd" stroke-width="1.5"/>
+<circle cx="1337" cy="214" r="15" fill="#b5731a"/>
+<text x="1337" y="219" font-size="14" fill="#ffffff" font-weight="800" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">7</text>
+<g transform="translate(1421 198) scale(1.91667)" color="#454b57" stroke-width="0.886957"><use href="#i-user"/></g>
+<text x="1327" y="268" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Officer</text>
+<text x="1327" y="289" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">acknowledges</text>
+<rect x="1327" y="318" width="66.2" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="1360.1" y="334.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">by name</text>
+<rect x="1327" y="349" width="112.4" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="1383.2" y="365.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">409 on illegal</text>
+<path d="M1494 289 L1514 289" stroke="#b5731a" stroke-width="2.6" fill="none" marker-end="url(#mb)"/>
+<rect x="1519" y="188" width="178" height="202" rx="11" fill="#eceef1" stroke="#d3d7dd" stroke-width="1.5"/>
+<circle cx="1545" cy="214" r="15" fill="#b5731a"/>
+<text x="1545" y="219" font-size="14" fill="#ffffff" font-weight="800" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">8</text>
+<g transform="translate(1629 198) scale(1.91667)" color="#454b57" stroke-width="0.886957"><use href="#i-chain"/></g>
+<text x="1535" y="268" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Audit row appended</text>
+<rect x="1535" y="297" width="99.2" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="1584.6" y="313.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">sha256 chain</text>
+<rect x="48" y="442" width="1664" height="300" rx="10" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.4"/>
+<rect x="48" y="442" width="1664" height="44" rx="12" fill="#1b1f27" stroke="#1b1f27" stroke-width="0"/>
+<rect x="48" y="474" width="1664" height="12" rx="0" fill="#1b1f27" stroke="#1b1f27" stroke-width="0"/>
+<text x="70" y="471" font-size="15" fill="#e0a24a" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start" letter-spacing="0.06em">B · REGISTRATION NUMBER  →  AUDITED ROUTE</text>
+<text x="1690" y="471" font-size="13" fill="#9aa1ad" font-weight="400" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="end">the graded test case</text>
+<rect x="63" y="518" width="178" height="202" rx="11" fill="#e3f2e6" stroke="#7cb98d" stroke-width="1.5"/>
+<circle cx="89" cy="544" r="15" fill="#1f7a3d"/>
+<text x="89" y="549" font-size="14" fill="#ffffff" font-weight="800" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">1</text>
+<g transform="translate(173 528) scale(1.91667)" color="#1f7a3d" stroke-width="0.886957"><use href="#i-user"/></g>
+<text x="79" y="598" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Investigator types</text>
+<text x="79" y="619" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">a plate</text>
+<rect x="79" y="648" width="86" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="122" y="664.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">GJ01DM0042</text>
+<path d="M246 619 L266 619" stroke="#1f7a3d" stroke-width="2.6" fill="none" marker-end="url(#mc)"/>
+<rect x="271" y="518" width="178" height="202" rx="11" fill="#e3f2e6" stroke="#7cb98d" stroke-width="1.5"/>
+<circle cx="297" cy="544" r="15" fill="#1f7a3d"/>
+<text x="297" y="549" font-size="14" fill="#ffffff" font-weight="800" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">2</text>
+<g transform="translate(381 528) scale(1.91667)" color="#1f7a3d" stroke-width="0.886957"><use href="#i-shield"/></g>
+<text x="287" y="598" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Capability and</text>
+<text x="287" y="619" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">scope</text>
+<rect x="287" y="648" width="39.8" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="306.9" y="664.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">C10</text>
+<rect x="333.8" y="648" width="92.6" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="380.1" y="664.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">403 or rows</text>
+<path d="M454 619 L474 619" stroke="#1f7a3d" stroke-width="2.6" fill="none" marker-end="url(#mc)"/>
+<rect x="479" y="518" width="178" height="202" rx="11" fill="#eceef1" stroke="#d3d7dd" stroke-width="1.5"/>
+<circle cx="505" cy="544" r="15" fill="#1f7a3d"/>
+<text x="505" y="549" font-size="14" fill="#ffffff" font-weight="800" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">3</text>
+<g transform="translate(589 528) scale(1.91667)" color="#454b57" stroke-width="0.886957"><use href="#i-db"/></g>
+<text x="495" y="598" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Hypertable query</text>
+<rect x="495" y="627" width="99.2" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="544.6" y="643.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">by pts_first</text>
+<path d="M662 619 L682 619" stroke="#1f7a3d" stroke-width="2.6" fill="none" marker-end="url(#mc)"/>
+<rect x="687" y="518" width="178" height="202" rx="11" fill="#eceef1" stroke="#d3d7dd" stroke-width="1.5"/>
+<circle cx="713" cy="544" r="15" fill="#1f7a3d"/>
+<text x="713" y="549" font-size="14" fill="#ffffff" font-weight="800" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">4</text>
+<g transform="translate(797 528) scale(1.91667)" color="#454b57" stroke-width="0.886957"><use href="#i-route"/></g>
+<text x="703" y="598" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Hops, in order</text>
+<rect x="703" y="627" width="112.4" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="759.2" y="643.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">one per camera</text>
+<path d="M870 619 L890 619" stroke="#1f7a3d" stroke-width="2.6" fill="none" marker-end="url(#mc)"/>
+<rect x="895" y="518" width="178" height="202" rx="11" fill="#e3f2e6" stroke="#7cb98d" stroke-width="1.5"/>
+<circle cx="921" cy="544" r="15" fill="#1f7a3d"/>
+<text x="921" y="549" font-size="14" fill="#ffffff" font-weight="800" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">5</text>
+<g transform="translate(1005 528) scale(1.91667)" color="#1f7a3d" stroke-width="0.886957"><use href="#i-ban"/></g>
+<text x="911" y="598" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Impossible hop</text>
+<text x="911" y="619" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">flagged</text>
+<rect x="911" y="648" width="99.2" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="960.6" y="664.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">&gt;150 km/h</text>
+<path d="M1078 619 L1098 619" stroke="#1f7a3d" stroke-width="2.6" fill="none" marker-end="url(#mc)"/>
+<rect x="1103" y="518" width="178" height="202" rx="11" fill="#eceef1" stroke="#d3d7dd" stroke-width="1.5"/>
+<circle cx="1129" cy="544" r="15" fill="#1f7a3d"/>
+<text x="1129" y="549" font-size="14" fill="#ffffff" font-weight="800" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">6</text>
+<g transform="translate(1213 528) scale(1.91667)" color="#454b57" stroke-width="0.886957"><use href="#i-pin"/></g>
+<text x="1119" y="598" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Snapped to roads</text>
+<rect x="1119" y="627" width="46.4" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="1142.2" y="643.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">OSRM</text>
+<path d="M1286 619 L1306 619" stroke="#1f7a3d" stroke-width="2.6" fill="none" marker-end="url(#mc)"/>
+<rect x="1311" y="518" width="178" height="202" rx="11" fill="#eceef1" stroke="#d3d7dd" stroke-width="1.5"/>
+<circle cx="1337" cy="544" r="15" fill="#1f7a3d"/>
+<text x="1337" y="549" font-size="14" fill="#ffffff" font-weight="800" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">7</text>
+<g transform="translate(1421 528) scale(1.91667)" color="#454b57" stroke-width="0.886957"><use href="#i-box"/></g>
+<text x="1327" y="598" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">CSV / PDF export</text>
+<rect x="1327" y="627" width="119" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="1386.5" y="643.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">presigned crops</text>
+<path d="M1494 619 L1514 619" stroke="#1f7a3d" stroke-width="2.6" fill="none" marker-end="url(#mc)"/>
+<rect x="1519" y="518" width="178" height="202" rx="11" fill="#eceef1" stroke="#d3d7dd" stroke-width="1.5"/>
+<circle cx="1545" cy="544" r="15" fill="#1f7a3d"/>
+<text x="1545" y="549" font-size="14" fill="#ffffff" font-weight="800" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="middle">8</text>
+<g transform="translate(1629 528) scale(1.91667)" color="#454b57" stroke-width="0.886957"><use href="#i-chain"/></g>
+<text x="1535" y="598" font-size="14.5" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Audit row appended</text>
+<rect x="1535" y="627" width="132.2" height="24" rx="6" fill="#ffffff" stroke="#d3d7dd" stroke-width="1.1"/><text x="1601.1" y="643.5" font-size="11" fill="#454b57" font-weight="500" font-family="'IBM Plex Mono',Consolas,monospace" text-anchor="middle">no export without</text>
+<rect x="48" y="776" width="820" height="150" rx="10" fill="#f7ead6" stroke="#d9a45e" stroke-width="1.4"/>
+<g transform="translate(74 810) scale(1.83333)" color="#b23020" stroke-width="0.927273"><use href="#i-ban"/></g>
+<text x="136" y="832" font-size="19" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Never print a plate it cannot read</text>
+<text x="136" y="862" font-size="13.5" fill="#454b57" font-weight="400" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Below the pixel floor, or with the readers in disagreement, it says so.</text>
+<text x="136" y="884" font-size="13.5" fill="#454b57" font-weight="400" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">A wrong plate on a police report is worse than no plate.</text>
+<rect x="892" y="776" width="820" height="150" rx="10" fill="#f7ead6" stroke="#d9a45e" stroke-width="1.4"/>
+<g transform="translate(918 810) scale(1.83333)" color="#b23020" stroke-width="0.927273"><use href="#i-eye"/></g>
+<text x="980" y="832" font-size="19" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">The account that configures it cannot watch through it</text>
+<text x="980" y="862" font-size="13.5" fill="#454b57" font-weight="400" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">SYSTEM_ADMIN holds config and audit, and is refused live data, alerts and route.</text>
+<text x="980" y="884" font-size="13.5" fill="#454b57" font-weight="400" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Administering a surveillance system and using one are different jobs.</text>
+</svg>
