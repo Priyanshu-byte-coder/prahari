@@ -1,571 +1,174 @@
-<title>Prahari</title>
+<title>Prahari — High-Level Design</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 
 <style>
   :root {
-    /* neutrals — slate with a blue bias, picked not defaulted */
-    --ground:        #f4f5f7;
-    --surface:       #ffffff;
-    --surface-2:     #eceef1;
-    --line:          #d3d7dd;
-    --line-strong:   #b6bcc6;
-    --ink:           #1b1f27;
-    --ink-2:         #454b57;
-    --ink-3:         #6b7280;
-    /* one accent — the amber of an ANPR capture box and an alert badge */
-    --accent:        #b5731a;
-    --accent-bg:     #f7ead6;
-    /* semantic — separate from the accent */
-    --ok:            #1f7a3d;
-    --warn:          #9a6a12;
-    --crit:          #b23020;
-    --ok-bg:         #e3f2e6;
-    --crit-bg:       #f6e3df;
-
-    --maxw: 62rem;
-    --slide-pad: clamp(1.75rem, 5vw, 5rem);
+    --ground:#f4f5f7; --surface:#ffffff; --surface-2:#eceef1;
+    --line:#d3d7dd; --line-strong:#b6bcc6;
+    --ink:#1b1f27; --ink-2:#454b57; --ink-3:#6b7280;
+    --accent:#b5731a; --accent-bg:#f7ead6;
+    --ok:#1f7a3d; --ok-bg:#e3f2e6; --warn:#9a6a12;
+    --crit:#b23020; --crit-bg:#f6e3df;
   }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --ground:      #0c0e12;
-      --surface:     #14171d;
-      --surface-2:   #1b1f27;
-      --line:        #272c36;
-      --line-strong: #3a4150;
-      --ink:         #e7e9ee;
-      --ink-2:       #b3b9c4;
-      --ink-3:       #7f8794;
-      --accent:      #e0a24a;
-      --accent-bg:   #2b2114;
-      --ok:          #4cc46a;
-      --warn:        #d7a53f;
-      --crit:        #ef6b56;
-      --ok-bg:       #14231a;
-      --crit-bg:     #2a1613;
-    }
-  }
-
-  :root[data-theme="dark"] {
-    --ground:      #0c0e12;
-    --surface:     #14171d;
-    --surface-2:   #1b1f27;
-    --line:        #272c36;
-    --line-strong: #3a4150;
-    --ink:         #e7e9ee;
-    --ink-2:       #b3b9c4;
-    --ink-3:       #7f8794;
-    --accent:      #e0a24a;
-    --accent-bg:   #2b2114;
-    --ok:          #4cc46a;
-    --warn:        #d7a53f;
-    --crit:        #ef6b56;
-    --ok-bg:       #14231a;
-    --crit-bg:     #2a1613;
-  }
-
   * { box-sizing: border-box; }
-
   body {
     margin: 0;
     background: var(--ground);
     color: var(--ink);
-    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-    font-size: 16px;
-    line-height: 1.6;
+    font-family: "IBM Plex Sans", -apple-system, Segoe UI, sans-serif;
+    font-size: 10.4pt;
+    line-height: 1.55;
     -webkit-font-smoothing: antialiased;
   }
+  .doc { max-width: 210mm; margin: 0 auto; background: var(--surface); }
+  .page { padding: 16mm 18mm; }
 
-  .deck { max-width: 78rem; margin: 0 auto; padding: clamp(1rem, 3vw, 2.5rem); }
-
-  /* ---- slide frame ---- */
-  .slide {
-    position: relative;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 3px;
-    padding: var(--slide-pad);
-    margin-bottom: clamp(1rem, 2.5vw, 2rem);
-    overflow: hidden;
+  h1, h2, h3, h4 { font-family: "Archivo", sans-serif; line-height: 1.15; margin: 0; letter-spacing: -0.012em; }
+  h1 { font-size: 30pt; font-weight: 800; }
+  h2 {
+    font-size: 15pt; font-weight: 800; margin: 11mm 0 3.5mm;
+    padding-top: 3mm; border-top: 1.5px solid var(--line-strong);
   }
-  .slide::before {
-    content: "";
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: 3px;
-    background: var(--accent);
-  }
-  .slide__num {
-    font-family: "IBM Plex Mono", ui-monospace, monospace;
-    font-size: 0.72rem;
-    letter-spacing: 0.16em;
-    color: var(--ink-3);
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    border-bottom: 1px solid var(--line);
-    padding-bottom: 0.6rem;
-    margin-bottom: clamp(1.25rem, 3vw, 2rem);
-  }
-  .slide__num b { color: var(--accent); font-weight: 600; }
-  .slide__eyebrow {
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    font-weight: 600;
-    font-size: 0.7rem;
-  }
-
-  h1, h2, h3 {
-    font-family: "Archivo", "IBM Plex Sans", sans-serif;
-    text-wrap: balance;
-    line-height: 1.12;
-    letter-spacing: -0.015em;
-    margin: 0;
-  }
-  .slide h2 {
-    font-size: clamp(1.65rem, 4vw, 2.7rem);
-    font-weight: 800;
-    max-width: 26ch;
-  }
-  .slide h2 + .lede {
-    margin-top: 1rem;
-    font-size: clamp(1rem, 1.6vw, 1.18rem);
-    color: var(--ink-2);
-    max-width: 60ch;
-  }
-  .slide h3 {
-    font-size: 1.05rem;
-    font-weight: 700;
-    margin: 2rem 0 0.75rem;
-  }
-  p { max-width: 66ch; }
-  .body-cols { margin-top: 1.5rem; }
-  .body-cols p { margin: 0 0 1rem; }
-
+  h2 .n { color: var(--accent); font-family: "IBM Plex Mono", monospace; font-size: 12pt; margin-right: .5em; }
+  h3 { font-size: 11.5pt; font-weight: 700; margin: 6mm 0 2mm; }
+  h4 { font-size: 10pt; font-weight: 700; margin: 4mm 0 1.5mm; color: var(--ink-2); }
+  p { margin: 0 0 2.6mm; }
+  ul, ol { margin: 0 0 2.6mm; padding-left: 5mm; }
+  li { margin-bottom: 1.2mm; }
   strong { font-weight: 600; }
-  .muted { color: var(--ink-3); }
+  em { color: var(--ink-2); }
+  code, .mono { font-family: "IBM Plex Mono", monospace; font-size: 0.88em; }
+  code { background: var(--surface-2); padding: 0.05em 0.32em; border-radius: 2px; }
 
-  /* ---- cover ---- */
-  .cover {
-    padding: clamp(3rem, 9vw, 7rem) var(--slide-pad) clamp(2.5rem, 7vw, 5rem);
-  }
-  .cover::before { width: 5px; }
-  .cover__mark {
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 0.75rem;
-    letter-spacing: 0.34em;
-    text-transform: uppercase;
-    color: var(--accent);
-  }
-  .cover h1 {
-    font-size: clamp(2.9rem, 10vw, 6.5rem);
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    margin: 1.25rem 0 0;
-  }
-  .cover__tag {
-    font-size: clamp(1.05rem, 2.4vw, 1.5rem);
-    color: var(--ink-2);
-    max-width: 34ch;
-    margin: 1.25rem 0 0;
-    font-weight: 400;
-  }
-  .cover__thesis {
-    margin-top: clamp(2rem, 5vw, 3.5rem);
-    padding: 1.4rem 1.6rem;
-    background: var(--accent-bg);
-    border-left: 3px solid var(--accent);
-    font-family: "Archivo", sans-serif;
-    font-weight: 600;
-    font-size: clamp(1.1rem, 2.5vw, 1.55rem);
-    line-height: 1.3;
-    max-width: 40ch;
-  }
-  .cover__meta {
-    margin-top: clamp(2rem, 5vw, 3rem);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.6rem 2rem;
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 0.78rem;
-    color: var(--ink-3);
-  }
-  .cover__meta span b { color: var(--ink-2); font-weight: 500; }
-
-  /* ---- tables ---- */
-  .table-wrap { overflow-x: auto; margin-top: 1.5rem; }
-  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 34rem; }
-  th, td {
-    text-align: left;
-    padding: 0.7rem 0.9rem;
-    border-bottom: 1px solid var(--line);
-    vertical-align: top;
-  }
+  table { border-collapse: collapse; width: 100%; font-size: 9.2pt; margin: 3mm 0 4mm; }
+  th, td { text-align: left; padding: 1.8mm 2.4mm; border-bottom: 1px solid var(--line); vertical-align: top; }
   thead th {
-    font-family: "Archivo", sans-serif;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--ink-3);
-    border-bottom: 1px solid var(--line-strong);
+    font-family: "Archivo", sans-serif; font-size: 8pt; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--ink-3); border-bottom: 1.5px solid var(--line-strong);
   }
   tbody tr:last-child td { border-bottom: none; }
-  td.take { color: var(--ink); }
-  td.reject { color: var(--ink-3); }
-  .cell-mono { font-family: "IBM Plex Mono", monospace; font-size: 0.82rem; }
-  .num { font-variant-numeric: tabular-nums; }
 
-  /* ---- status pills ---- */
   .pill {
-    display: inline-block;
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 0.68rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    padding: 0.15rem 0.5rem;
-    border-radius: 2px;
-    white-space: nowrap;
+    display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: 7.6pt;
+    font-weight: 600; letter-spacing: .04em; padding: .12em .5em; border-radius: 2px; white-space: nowrap;
   }
-  .pill--live { background: var(--ok-bg); color: var(--ok); }
-  .pill--wait { background: var(--accent-bg); color: var(--accent); }
-  .pill--crit { background: var(--crit-bg); color: var(--crit); }
+  .pill--built { background: var(--ok-bg); color: var(--ok); }
+  .pill--stub  { background: var(--accent-bg); color: var(--accent); }
+  .pill--no    { background: var(--crit-bg); color: var(--crit); }
 
-  /* ---- pipeline / flow diagram ---- */
-  .flow {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 1.75rem;
-    align-items: stretch;
+  .callout {
+    border-left: 3px solid var(--accent); background: var(--accent-bg);
+    padding: 3mm 4mm; margin: 4mm 0; border-radius: 0 4px 4px 0;
   }
-  .flow__step {
-    flex: 1 1 8rem;
-    min-width: 7.5rem;
-    background: var(--surface-2);
-    border: 1px solid var(--line);
-    border-radius: 2px;
-    padding: 0.8rem 0.85rem;
-    position: relative;
-  }
-  .flow__step .k {
-    font-family: "Archivo", sans-serif;
-    font-weight: 700;
-    font-size: 0.82rem;
-    display: block;
-  }
-  .flow__step .d {
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 0.7rem;
-    color: var(--ink-3);
-    line-height: 1.45;
-    margin-top: 0.25rem;
-    display: block;
-  }
-  .flow__step[data-arrow]::after {
-    content: "→";
-    position: absolute;
-    right: -0.5rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--accent);
-    font-size: 0.9rem;
-    z-index: 2;
-  }
-  .flow__step:last-child::after { content: none; }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout--crit { border-left-color: var(--crit); background: var(--crit-bg); }
+  .callout--ok { border-left-color: var(--ok); background: var(--ok-bg); }
+  .callout b { font-family: "Archivo", sans-serif; }
 
-  /* ---- the sighting row card ---- */
-  .record {
-    margin-top: 1.75rem;
-    background: var(--surface-2);
-    border: 1px solid var(--line);
-    border-radius: 2px;
-    padding: 1rem 1.1rem;
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 0.8rem;
-    line-height: 1.7;
-    overflow-x: auto;
+  pre {
+    background: #14171d; color: #e7e9ee; font-family: "IBM Plex Mono", monospace;
+    font-size: 8.4pt; line-height: 1.5; padding: 3.5mm 4mm; border-radius: 4px;
+    overflow-x: auto; margin: 3mm 0 4mm;
   }
-  .record .key { color: var(--accent); }
-  .record .cmt { color: var(--ink-3); }
+  pre .c { color: #7f8794; }
+  pre .k { color: #e0a24a; }
 
-  /* ---- measurement-pending chip ---- */
-  .run {
-    display: inline-flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    border: 1px dashed var(--accent);
-    background: var(--accent-bg);
-    border-radius: 2px;
-    padding: 0.35rem 0.6rem;
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 0.72rem;
-    color: var(--accent);
-    line-height: 1.4;
-    vertical-align: middle;
-  }
-  .run b { font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.62rem; }
-  .run code { color: var(--ink-2); word-break: break-all; }
-  .runbar {
-    margin-top: 1.5rem;
-    padding: 0.9rem 1.1rem;
-    border: 1px dashed var(--line-strong);
-    border-radius: 2px;
-    background: var(--surface-2);
-    font-size: 0.82rem;
-    color: var(--ink-2);
-  }
-  .runbar b { color: var(--accent); font-family: "IBM Plex Mono", monospace; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; }
+  figure { margin: 5mm 0 6mm; page-break-inside: avoid; break-inside: avoid; }
+  figure svg { width: 100%; height: auto; display: block; border: 1px solid var(--line); border-radius: 5px; }
+  figcaption { font-size: 8.6pt; color: var(--ink-3); margin-top: 2mm; }
+  figcaption b { color: var(--ink-2); font-family: "Archivo", sans-serif; }
 
-  /* ---- FSM ---- */
-  .fsm {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.4rem 0.55rem;
-    margin-top: 1.5rem;
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 0.78rem;
+  .cover { padding: 34mm 18mm 18mm; }
+  .cover .mark {
+    font-family: "IBM Plex Mono", monospace; font-size: 8.5pt; letter-spacing: .3em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 6mm;
   }
-  .fsm .st {
-    background: var(--surface-2);
-    border: 1px solid var(--line-strong);
-    padding: 0.3rem 0.55rem;
-    border-radius: 2px;
+  .cover .tag { font-family: "Archivo", sans-serif; font-size: 14pt; font-weight: 600; color: var(--ink-2); margin-top: 4mm; max-width: 130mm; }
+  .cover .thesis {
+    margin-top: 12mm; padding: 5mm 6mm; background: var(--accent-bg);
+    border-left: 3px solid var(--accent); font-family: "Archivo", sans-serif;
+    font-size: 12pt; font-weight: 600; line-height: 1.35;
   }
-  .fsm .ar { color: var(--accent); }
-  .fsm .end { border-style: dashed; color: var(--ink-3); }
+  .meta { margin-top: 12mm; display: grid; grid-template-columns: 1fr 1fr; gap: 3mm 8mm; font-size: 9pt; }
+  .meta div { border-top: 1px solid var(--line); padding-top: 1.6mm; }
+  .meta b { display: block; font-family: "IBM Plex Mono", monospace; font-size: 7.6pt;
+            letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; }
 
-  /* ---- arithmetic block ---- */
-  .calc {
-    margin-top: 1.25rem;
-    font-family: "IBM Plex Mono", monospace;
-    font-size: clamp(0.72rem, 1.5vw, 0.85rem);
-    background: var(--surface-2);
-    border: 1px solid var(--line);
-    border-left: 3px solid var(--accent);
-    border-radius: 2px;
-    padding: 1rem 1.1rem;
-    overflow-x: auto;
-    white-space: pre;
-    line-height: 1.8;
-    color: var(--ink-2);
-  }
-  .calc .r { color: var(--ink); font-weight: 600; }
-  .verdict {
-    margin-top: 1.25rem;
-    font-family: "Archivo", sans-serif;
-    font-weight: 700;
-    font-size: clamp(1.1rem, 2.6vw, 1.5rem);
-    color: var(--accent);
-  }
+  .toc { margin-top: 10mm; column-count: 2; column-gap: 10mm; font-size: 9.4pt; }
+  .toc a { color: var(--ink-2); text-decoration: none; display: block; padding: 1mm 0; border-bottom: 1px dotted var(--line); }
+  .toc a b { color: var(--accent); font-family: "IBM Plex Mono", monospace; margin-right: .6em; }
 
-  /* ---- two-up ---- */
-  .grid2 {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-    gap: 1rem;
-    margin-top: 1.5rem;
-  }
-  .panel {
-    background: var(--surface-2);
-    border: 1px solid var(--line);
-    border-radius: 2px;
-    padding: 1rem 1.1rem;
-  }
-  .panel h3 { margin-top: 0; }
-  .panel ul { margin: 0.5rem 0 0; padding-left: 1.1rem; }
-  .panel li { margin: 0.35rem 0; font-size: 0.9rem; color: var(--ink-2); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+  .newpage { page-break-before: always; break-before: page; }
+  .keep { page-break-inside: avoid; break-inside: avoid; }
 
-  /* ---- roadmap ---- */
-  .road { display: grid; gap: 0.75rem; margin-top: 1.5rem; }
-  .road__row {
-    display: grid;
-    grid-template-columns: 8rem 1fr;
-    gap: 1rem;
-    padding: 0.85rem 0;
-    border-bottom: 1px solid var(--line);
-    align-items: baseline;
-  }
-  .road__row:last-child { border-bottom: none; }
-  .road__when {
-    font-family: "Archivo", sans-serif;
-    font-weight: 700;
-    font-size: 0.82rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--accent);
-  }
-  .road__what { font-size: 0.9rem; color: var(--ink-2); }
-  @media (max-width: 34rem) { .road__row { grid-template-columns: 1fr; gap: 0.2rem; } }
-
-  /* ---- closing ---- */
-  .close {
-    background: var(--ink);
-    color: var(--ground);
-    border-color: var(--ink);
-  }
-  .close::before { background: var(--accent); }
-  .close .slide__num { border-color: rgba(255,255,255,0.15); color: rgba(255,255,255,0.55); }
-  .close blockquote {
-    margin: 1.5rem 0 0;
-    font-family: "Archivo", sans-serif;
-    font-weight: 600;
-    font-size: clamp(1.3rem, 4vw, 2.4rem);
-    line-height: 1.28;
-    letter-spacing: -0.02em;
-    max-width: 24ch;
-  }
-  .close .attrib {
-    margin-top: 1.75rem;
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 0.76rem;
-    color: rgba(255,255,255,0.6);
-    letter-spacing: 0.04em;
-  }
-
-  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid currentColor; }
-  a:hover { color: var(--ink); }
-  .linkbar {
-    display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; margin-top: 1.6rem;
-  }
-  .linkbar a {
-    display: inline-flex; align-items: baseline; gap: 0.55rem;
-    font-family: "IBM Plex Mono", monospace; font-size: 0.8rem;
-    padding: 0.5rem 0.85rem; border: 1px solid var(--line-strong); border-radius: 4px;
-    background: var(--surface); color: var(--ink-2); text-decoration: none;
-  }
-  .linkbar a b {
-    font-family: "Archivo", sans-serif; font-size: 0.68rem; letter-spacing: 0.12em;
-    text-transform: uppercase; color: var(--accent); font-weight: 700;
-  }
-  .close .linkbar a { background: transparent; border-color: rgba(255,255,255,0.28); color: #d6dae2; }
-  .close .linkbar a b { color: #e0a24a; }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-  /* ---- diagram slides ---- */
-  .diagwrap {
-    flex: 1 1 auto;
-    min-height: 0;
-    margin-top: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .diagwrap svg { width: 100%; height: 100%; max-height: 100%; }
-  .slide--diagram { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
-  .slide--diagram::before { display: none; }
-  .diagwrap svg { display: block; }
-  .diagnote { margin-top: 0.7rem; font-size: 0.8rem; color: var(--ink-3); max-width: none; }
-
-  /* ---- print: one 16:9 slide per page ---- */
-  @page { size: 338.67mm 190.5mm; margin: 0; }
+  @page { size: A4; margin: 14mm 0 12mm; }
   @media print {
     body { background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .deck { max-width: none; padding: 0; }
-    .slide, .cover, .close {
-      border: none;
-      border-radius: 0;
-      margin: 0;
-      width: 338.67mm;
-      height: 190.5mm;
-      overflow: hidden;
-      padding: 1.05cm 1.45cm;
-      page-break-after: always;
-      break-after: page;
-      min-height: 0;
-    }
-    .slide--diagram { padding: 0; }
-    .slide h2 { font-size: 2.12rem; max-width: 30ch; }
-    .slide h2 + .lede { margin-top: .75rem; font-size: 1.02rem; }
-    .slide p { max-width: 92ch; }
-    .table-wrap { margin-top: 1.1rem; }
-    .runbar { margin-top: 1.1rem; }
-    .slide h3 { margin-top: 1.4rem; }
-    .cover { display: flex; flex-direction: column; justify-content: center; }
-    .close { display: flex; flex-direction: column; justify-content: center; }
-    .slide::before, .cover::before, .close::before { width: 3pt; }
-    .close { background: #14171d !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .run, .runbar { border-color: #b5731a; }
+    .doc { max-width: none; }
+    .page { padding: 0 18mm; }
+    .cover { padding: 24mm 18mm 10mm; }
+    h2 { page-break-after: avoid; break-after: avoid; }
+    h3, h4 { page-break-after: avoid; break-after: avoid; }
+    table, pre, .callout { page-break-inside: avoid; break-inside: avoid; }
+    figure { margin-left: -11mm; margin-right: -11mm; }
+    figcaption { margin-left: 11mm; margin-right: 11mm; }
   }
 </style>
 
-<div class="deck">
+<div class="doc">
 
-  <!-- ========== COVER ========== -->
-  <header class="slide cover">
-    <div class="cover__mark">Sentinel · Gujarat Police CCTV Integration Hackathon 2026</div>
-    <h1>Prahari</h1>
-    <p class="cover__tag">Federation middleware for the state's CCTV, not another VMS.</p>
+<section class="cover">
+  <div class="mark">Sentinel &middot; Gujarat Police CCTV Integration Hackathon 2026</div>
+  <h1>Prahari</h1>
+  <div class="tag">High-Level Design — cross-camera vehicle tracking across 26 departments, without centralising a single frame of video.</div>
 
-    <div class="cover__thesis">We ship 200-byte sighting rows, not video. That is the whole architecture.</div>
+  <div class="thesis">The atom is the sighting: about 200 bytes describing one vehicle at one camera. Video stays where it was recorded. The sighting is what crosses the department boundary.</div>
 
-    <div class="cover__meta">
-      <span><b>Model</b> &nbsp;Hybrid — M1 foundation, M2 surface, M3 core</span>
-      <span><b>Mandatory analytic</b> &nbsp;ANPR</span>
-      <span><b>Grid</b> &nbsp;~50 heterogeneous cameras → 80,000</span>
-      <span><b>Stack</b> &nbsp;open-source, vendor-neutral</span>
-      <span><b>Licence</b> &nbsp;Apache-2.0</span>
-    </div>
+  <div class="meta">
+    <div><b>Architecture model</b> Hybrid — M1 foundation, M2 surface, M3 core</div>
+    <div><b>Mandatory analytic</b> ANPR, with a four-reader vote and an explicit refusal band</div>
+    <div><b>Scale target</b> ~50 heterogeneous cameras today, path to ~80,000</div>
+    <div><b>Licence</b> Apache-2.0 · open source end to end, no vendor lock-in</div>
+    <div><b>Repository</b> <a href="https://github.com/Priyanshu-byte-coder/prahari" style="color:var(--accent)">github.com/Priyanshu-byte-coder/prahari</a></div>
+    <div><b>Demo video</b> <a href="https://youtu.be/8lQsuXeH150" style="color:var(--accent)">youtu.be/8lQsuXeH150</a></div>
+    <div><b>Document status</b> Describes the system as built and measured, and names what is not</div>
+  </div>
 
-    <div class="linkbar">
-      <a href="https://youtu.be/8lQsuXeH150"><b>Demo video</b> youtu.be/8lQsuXeH150</a>
-      <a href="https://github.com/Priyanshu-byte-coder/prahari"><b>Source</b> github.com/Priyanshu-byte-coder/prahari</a>
-    </div>
+  <div class="toc">
+    <a href="#s1"><b>1</b> What the system is</a>
+    <a href="#s2"><b>2</b> Integration approach</a>
+    <a href="#s3"><b>3</b> Storage</a>
+    <a href="#s4"><b>4</b> Watchlist correlation</a>
+    <a href="#s5"><b>5</b> Alert workflow</a>
+    <a href="#s6"><b>6</b> Delivery to the console</a>
+    <a href="#s7"><b>7</b> Route reconstruction</a>
+    <a href="#s8"><b>8</b> Security model</a>
+    <a href="#s9"><b>9</b> The privacy answer</a>
+    <a href="#s10"><b>10</b> Interop assumptions</a>
+    <a href="#s11"><b>11</b> Scale tiers</a>
+    <a href="#s12"><b>12</b> Failure modes</a>
+    <a href="#s13"><b>13</b> What is measured</a>
+    <a href="#s14"><b>14</b> What is not built yet</a>
+  </div>
 
-    <p style="margin-top:2.2rem;font-size:0.82rem;color:var(--ink-3);max-width:none">Solution presentation &middot; deliverable 1 of 3. The High-Level Design and the workflow / integration diagram are submitted alongside it, and every number in this deck names the command that produced it.</p>
-  </header>
+  <p style="margin-top:10mm;font-size:9pt;color:var(--ink-3)">Status words in this document mean exactly what they say. <span class="pill pill--built">BUILT</span> is running and tested in the repository; <span class="pill pill--stub">STUB</span> is the real protocol behind a labelled placeholder; <span class="pill pill--no">NOT BUILT</span> is designed and not written. An engineer who has never seen the repository should be able to rebuild the integration from this file alone.</p>
+</section>
 
-  <!-- ========== 01 — THE HYBRID ========== -->
-  <section class="slide">
-    <div class="slide__num"><span>Prahari</span><span><b>01</b> / 13 · Solution model &amp; justification</span></div>
-    <p class="slide__eyebrow" style="color:var(--accent)">The hybrid</p>
-    <h2>It is not any one of the four reference models</h2>
-    <p class="lede">Model&nbsp;1 is the foundation the brief says it must be. Model&nbsp;3 is the architecture built on top of it. From Models&nbsp;2 and&nbsp;4 we take a technique and an ambition — and reject Model&nbsp;4's central video store outright.</p>
+<section class="page newpage">
 
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Model</th><th>What we take</th><th>What we reject</th><th>Where it lives</th></tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>M1</strong> Registry&nbsp;+&nbsp;GIS</td>
-            <td class="take">The camera registry as the spine of record; every asset on a map with a real coordinate</td>
-            <td class="reject">Its assumption that one department owns every camera</td>
-            <td class="cell-mono">cameras&nbsp;table, camera_geo.json</td>
-          </tr>
-          <tr>
-            <td><strong>M2</strong> Direct-attach viewing</td>
-            <td class="take">The direct RTSP / WHEP / HLS view — no transcode hop, no per-vendor console</td>
-            <td class="reject">M2 as an <em>architecture</em>: it forbids the federation layer we depend on</td>
-            <td class="cell-mono">MediaMTX + the wall</td>
-          </tr>
-          <tr>
-            <td><strong>M3</strong> Federation middleware</td>
-            <td class="take">The structure — drivers behind one interface, one event bus, one API</td>
-            <td class="reject">Its heavyweight per-site install</td>
-            <td class="cell-mono">gateway drivers, Redis Streams</td>
-          </tr>
-          <tr>
-            <td><strong>M4</strong> Central VMS</td>
-            <td class="take">Cross-department correlation and watchlist analytics</td>
-            <td class="reject"><strong>Central recording of 80,000 streams</strong> — the arithmetic is slide&nbsp;09</td>
-            <td class="cell-mono">matcher, alerts, access_grants</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+<h2 id="s1"><span class="n">1</span>What the system is</h2>
 
-    <p style="margin-top:1.5rem"><strong>One line for the jury:</strong> federation middleware with pluggable drivers — three drivers live, the departmental-VMS driver interface-complete pending vendor credentials.</p>
-  </section>
+<p>A vehicle passes a camera. Within a couple of seconds the plate is read, checked against a watchlist, and — if it matches — pushed to every console allowed to see that camera. Later, an investigator names that registration number and gets an ordered, timestamped path across the network, exportable and audited.</p>
 
-  <!-- ========== 02 — ARCHITECTURE ========== -->
-  <section class="slide slide--diagram">
-    <div class="diagwrap">
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1760 990" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif">
+<p>Twenty-six Gujarat government departments run independent CCTV: different vendors, analog and IP, separate VMS, separate storage, retention between seven and fifteen days. There is no unified asset inventory and no cross-department search. Prahari does not replace any of that. It federates it.</p>
+
+<p>The design decision everything else follows from: <strong>the product is the sighting, not the video.</strong> A sighting is roughly 200 bytes — contract <code>C1</code> — describing one vehicle seen at one camera over a short interval: plate text, confidence band, vehicle class, colour, bounding box, camera id, and the first and last frame presentation timestamps. Everything downstream reads sightings.</p>
+
+<figure>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1760 990" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif">
 <title>Prahari — system architecture</title>
 <desc>Five stages from the department camera estate to the operator console. Video is decoded at the edge and never crosses into the platform; a ~200-byte sighting does.</desc>
 <defs>
@@ -772,140 +375,152 @@
 <g transform="translate(1390 870) scale(1.25)" color="#1f7a3d" stroke-width="1.36"><use href="#i-eye"/></g>
 <text x="1432" y="884" font-size="13.5" fill="#1b1f27" font-weight="600" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Every lookup on the record</text>
 <text x="1432" y="904" font-size="11.5" fill="#6b7280" font-weight="400" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">including who looked</text>
-</svg>    </div>
-  </section>
+</svg>
+  <figcaption><b>Figure 1 — System architecture.</b> Frames are decoded where the camera already is and discarded. What crosses a department boundary is a ~200-byte row. The five stages map onto the reference models: the registry and GIS layer is M1, the single console surface is M2, and the federation gateway is M3. <em>A full-page version is submitted separately as <code>03-prahari-architecture-diagram.pdf</code>.</em></figcaption>
+</figure>
 
-<!-- ========== 03 — DRIVERS ========== -->
-  <section class="slide">
-    <div class="slide__num"><span>Prahari</span><span><b>03</b> / 13 · Interoperability</span></div>
-    <p class="slide__eyebrow" style="color:var(--accent)">Drivers</p>
-    <h2>Four transports live, one interface-complete — and we say which</h2>
+<h3>Why a hybrid rather than one of the four reference models</h3>
 
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Driver</th><th>Protocol</th><th>Status</th><th>Cameras carried on the Sentinel grid</th></tr></thead>
-        <tbody>
-          <tr><td class="cell-mono">hls</td><td>HLS over HTTPS</td><td><span class="pill pill--live">Live</span></td><td><strong>30 of 30.</strong> Every grid camera is pulled this way today.</td></tr>
-          <tr><td class="cell-mono">rtsp</td><td>RTSP / TCP</td><td><span class="pill pill--live">Live</span></td><td>0 — the grid answers <span class="cell-mono">401</span> on 8554 for our source IP. Proven on our own feed.</td></tr>
-          <tr><td class="cell-mono">mediamtx</td><td>RTSP / WHEP / HLS</td><td><span class="pill pill--live">Live</span></td><td>Carries our own camera in the recorded demo.</td></tr>
-          <tr><td class="cell-mono">onvif</td><td>ONVIF Profile S + events</td><td><span class="pill pill--live">Live</span></td><td>0 — the sandbox exposes no ONVIF endpoint. Discovery and PTZ tested against an ONVIF simulator.</td></tr>
-          <tr><td class="cell-mono">vms-stub</td><td>vendor VMS SDK</td><td><span class="pill pill--wait">Interface-complete</span></td><td>0 — awaiting vendor credentials.</td></tr>
-        </tbody>
-      </table>
-    </div>
+<table>
+  <thead><tr><th>Model</th><th>What it gives</th><th>Why it is not enough alone</th></tr></thead>
+  <tbody>
+    <tr><td><strong>M1</strong> Centralised registry &amp; GIS</td><td>One inventory, one map, department ownership per camera</td><td>Metadata only — it cannot answer where a vehicle went</td></tr>
+    <tr><td><strong>M2</strong> Unified viewing &amp; analytics</td><td>One place for an officer to look</td><td>A viewing surface with nothing federating behind it is a bookmark folder</td></tr>
+    <tr><td><strong>M3</strong> VMS federation / middleware</td><td>Interop across vendors without centralising</td><td>No shared search unless something correlates across the seams</td></tr>
+    <tr><td><strong>M4</strong> Central VMS</td><td>Complete control</td><td>~160&nbsp;Gbps and ~26&nbsp;PB at fifteen-day retention for 80,000 cameras. It also requires replacing working departmental systems, which is a procurement, not an integration</td></tr>
+  </tbody>
+</table>
 
-    <p style="margin-top:1.5rem">The honest thing, said out loud: the fourth driver is an interface, not a claim. On our own network port 8554 is filtered, so the gateway probes each camera and degrades to HLS by itself. Heterogeneity is exactly what the brief tests — that fallback is the demo, not an excuse.</p>
+<p>We take M1 as the mandatory foundation, M3 as the core, and M2 as the surface. The bonus the brief offers for a hybrid is not why: the reason is that correlation is the requirement, and correlation needs a registry to key on, a federation layer to reach heterogeneous cameras, and one surface to show the result.</p>
 
-    <div class="runbar"><b>the point</b> &nbsp; The grid permits exactly one of our four transports, and the platform found that out by itself — per camera, at startup, and recorded in <code>camera:transport:&lt;id&gt;</code>. Nothing downstream noticed.</div>
-  </section>
+<h3>Component ownership</h3>
 
-  <!-- ========== 04 — ANPR PIPELINE ========== -->
-  <section class="slide">
-    <div class="slide__num"><span>Prahari</span><span><b>04</b> / 13 · Video analytics — ANPR</span></div>
-    <p class="slide__eyebrow" style="color:var(--accent)">The mandatory analytic</p>
-    <h2>The pipeline, and the record it produces</h2>
+<table>
+  <thead><tr><th>Component</th><th>Contracts</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr><td>Federation gateway, transport probing, camera health, console</td><td><code>C6</code></td><td><span class="pill pill--built">BUILT</span></td></tr>
+    <tr><td>Decode, vehicle detection, tracking, plate localisation, OCR vote</td><td><code>C1</code></td><td><span class="pill pill--built">BUILT</span></td></tr>
+    <tr><td>Schema, persistence, matching, alerts, REST + WebSocket API, RBAC, audit</td><td><code>C3 C4 C5 C10</code></td><td><span class="pill pill--built">BUILT</span></td></tr>
+    <tr><td>VAHAN and e-GujCop feed clients</td><td><code>WatchlistFeed</code></td><td><span class="pill pill--stub">STUB</span> — awaiting agency credentials</td></tr>
+    <tr><td>Vendor VMS SDK driver</td><td><code>C6</code></td><td><span class="pill pill--stub">STUB</span> — interface complete</td></tr>
+  </tbody>
+</table>
 
-    <div class="flow">
-      <div class="flow__step" data-arrow><span class="k">Frame (PTS)</span><span class="d">decoded at 5 fps</span></div>
-      <div class="flow__step" data-arrow><span class="k">Vehicle detect</span><span class="d">YOLOv8s · batch 16 · 20 ms flush</span></div>
-      <div class="flow__step" data-arrow><span class="k">Track</span><span class="d">ByteTrack, one per camera</span></div>
-      <div class="flow__step" data-arrow><span class="k">Plate detect</span><span class="d">YOLOv9-t ONNX, inside the vehicle crop</span></div>
-      <div class="flow__step" data-arrow><span class="k">Four readers</span><span class="d">PaddleOCR · EasyOCR · fast-plate-ocr · Tesseract</span></div>
-      <div class="flow__step"><span class="k">Grammar + vote</span><span class="d">per-character (MVCP), refuses below 2/3</span></div>
-    </div>
+<h2 id="s2"><span class="n">2</span>Integration approach</h2>
 
-    <p style="margin-top:1.5rem">Plate detection runs on the <em>vehicle crop</em>, not the frame: a 20&nbsp;px plate in a 1920&nbsp;px frame is ~7&nbsp;px after letterboxing; inside a 300&nbsp;px crop it is a readable band. Grammar (<span class="cell-mono">^[A-Z]{2}[0-9]{2}[A-Z]{1,3}[0-9]{4}$</span>, BH series too) is applied before the vote, so the vote spends itself only on genuine ambiguity.</p>
+<h3>2.1 Cameras into the system</h3>
 
-    <div class="record">
-      <span class="cmt"># transcribed from `python services/worker/selftest.py` — injected GJ 25 BJ 8377</span><br>
-      {<br>
-      &nbsp;&nbsp;<span class="key">"sighting_id"</span>: "01M1W3M62K…",  <span class="key">"camera_id"</span>: "SELFTEST-000",<br>
-      &nbsp;&nbsp;<span class="key">"plate_text"</span>: "GJ25BJ8377",  <span class="key">"plate_conf"</span>: 0.989,  <span class="key">"plate_band"</span>: "CONFIRMED",<br>
-      &nbsp;&nbsp;<span class="key">"pts_first"</span>: 1725100841.20,  <span class="key">"ts_source"</span>: "frame_pts",  <span class="cmt">// never now()</span><br>
-      &nbsp;&nbsp;<span class="key">"vehicle_class"</span>: "car",  <span class="key">"crop_uri"</span>: "s3://…"<br>
-      }
-    </div>
-    <p class="muted" style="margin-top:0.75rem;font-size:0.85rem">Read back exactly, <strong>0.68&nbsp;s end to end</strong> against a 3.0&nbsp;s budget.</p>
-  </section>
+<p>Cameras are not integrated one protocol at a time; they are integrated behind one interface. <code>CameraSource</code> (contract <code>C6</code>) exposes <code>open / frames / close / health / capabilities</code>, and each transport is an implementation: MediaMTX-fronted RTSP, direct RTSP, HLS, and ONVIF where the camera supports events and PTZ.</p>
 
-  <!-- ========== 05 — MODEL CARD ========== -->
-  <section class="slide">
-    <div class="slide__num"><span>Prahari</span><span><b>05</b> / 13 · Analytics output quality</span></div>
-    <p class="slide__eyebrow" style="color:var(--accent)">Model card</p>
-    <h2>Four bands, never averaged into one number</h2>
+<p>Two field realities shaped this, and both were confirmed on the Sentinel grid:</p>
 
-    <div class="grid2" style="margin-top:1.25rem">
-      <div>
-        <h3 style="margin-top:0">Banded output — 40 tracks, 120 crops</h3>
-        <div class="table-wrap" style="margin-top:.6rem">
-          <table style="min-width:0">
-            <thead><tr><th>Band</th><th>n</th><th>Share</th><th>Wrong</th></tr></thead>
-            <tbody>
-              <tr><td><span class="pill pill--live">CONFIRMED</span></td><td class="num">38</td><td class="num">95.0%</td><td class="num"><strong>0</strong></td></tr>
-              <tr><td><span class="pill pill--wait">PROBABLE</span></td><td class="num">0</td><td class="num">0.0%</td><td class="num">0</td></tr>
-              <tr><td><span class="pill pill--wait">POSSIBLE</span></td><td class="num">2</td><td class="num">5.0%</td><td class="num">0</td></tr>
-              <tr><td><span class="pill pill--crit">NONE</span></td><td class="num">0</td><td class="num">0.0%</td><td class="num">0</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p style="margin-top:.8rem;font-size:.88rem">Exact match <strong>95.0%</strong> of all tracks and <strong>100%</strong> of the tracks it agreed to name. CER 0.050. <strong>Refusal rate 5.0%</strong> — on the slide, because leaving it off is how 70% becomes 95%.</p>
-        <p class="muted" style="font-size:.8rem;margin-top:.5rem">Source: <span class="cell-mono">scripts/accuracy_report.py</span>, synthetic set, 2026-09-04. The hand-labelled Gujarat set is open work, and this deck does not pretend otherwise.</p>
-      </div>
-      <div>
-        <h3 style="margin-top:0">Why a vote, and not the best single reader</h3>
-        <div class="table-wrap" style="margin-top:.6rem">
-          <table style="min-width:0">
-            <thead><tr><th>Reader alone</th><th>Exact</th><th>CER</th></tr></thead>
-            <tbody>
-              <tr><td class="cell-mono">paddleocr</td><td class="num">79.2%</td><td class="num">0.121</td></tr>
-              <tr><td class="cell-mono">easyocr</td><td class="num">70.0%</td><td class="num">0.221</td></tr>
-              <tr><td class="cell-mono">fast-plate-ocr</td><td class="num">55.0%</td><td class="num">0.241</td></tr>
-              <tr><td class="cell-mono">tesseract</td><td class="num">42.5%</td><td class="num">0.257</td></tr>
-              <tr><td><strong>fused vote</strong></td><td class="num"><strong>95.0%</strong></td><td class="num"><strong>0.050</strong></td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p style="margin-top:.8rem;font-size:.88rem">Four architectures disagree in different places. The vote is worth 16 points over the best of them — and it is what turns a wrong read into a refusal rather than a confident lie.</p>
-      </div>
-    </div>
-  </section>
+<ul>
+  <li><strong>RTSP over TCP, never UDP.</strong> UDP dies across NAT and firewalls, and the failure presents as a frozen frame rather than an error.</li>
+  <li><strong>Port 8554 is not reachable for every client.</strong> On the sandbox the grid returns <code>401</code> on RTSP for our source IP, so the gateway probes each camera at startup and degrades that camera — only that camera — to HLS, recording which transport actually worked in <code>camera:transport:&lt;id&gt;</code> in Redis.</li>
+</ul>
 
-  <!-- ========== 06 — LOW-RESOLUTION REALITY ========== -->
-  <section class="slide">
-    <div class="slide__num"><span>Prahari</span><span><b>06</b> / 13 &middot; Analytics on real CCTV</span></div>
-    <p class="slide__eyebrow" style="color:var(--accent)">The hard case, measured</p>
-    <h2 style="font-size:2rem;max-width:40ch">A wide-area camera is not an ANPR camera. We measured how far short it falls.</h2>
+<div class="callout">
+  <p><b>The whole G→I seam is one Redis key holding a URL string.</b> The inference worker imports no gateway code and the gateway knows nothing about models. That is what lets a new vendor arrive as one driver file rather than a release — and it is why the grid permitting exactly one of our four transports changed nothing downstream.</p>
+</div>
 
-    <p class="lede" style="margin-top:.7rem;max-width:92ch">Cameras on the Sentinel grid put a number plate into 20&ndash;30&nbsp;px of frame. That is the regime the brief means by &ldquo;challenging and varying CCTV conditions&rdquo;, so it is the regime we benchmarked &mdash; rather than reporting a number from a clean plate and hoping.</p>
+<p>A stalled RTSP connection does not raise; it simply stops delivering. Health is therefore a watchdog on frame arrival rather than a <code>try/except</code>, and it publishes <code>camera.health</code> so the console can turn a pin amber within fifteen seconds instead of showing a frozen picture indefinitely.</p>
 
-    <div class="grid2" style="margin-top:1.1rem">
-      <div>
-        <h3 style="margin-top:0">The case the grid actually presents: a 20&nbsp;px plate</h3>
-        <div class="table-wrap" style="margin-top:.6rem">
-          <table style="min-width:0">
-            <thead><tr><th>Plate height, night</th><th>LR → OCR</th><th>Single-image SR</th><th>Ours — MFSR + MVCP</th></tr></thead>
-            <tbody>
-              <tr><td class="num">16 px</td><td class="num">0.0%</td><td class="num">0.0%</td><td class="num"><strong>5.0%</strong></td></tr>
-              <tr><td class="num">20 px</td><td class="num">0.0%</td><td class="num">0.0%</td><td class="num"><strong>65.0%</strong></td></tr>
-              <tr><td class="num">24 px</td><td class="num">0.0%</td><td class="num">15.0%</td><td class="num"><strong>95.0%</strong></td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div>
-        <h3 style="margin-top:0">There is a cliff just under 20&nbsp;px, and we admit it</h3>
-        <p style="font-size:.88rem;margin-top:.6rem">The published reference for this regime — UFPR-SR-Plates, median plate height 18–21&nbsp;px — reports <strong>1.7–2.2%</strong> from a low-resolution crop straight to OCR, and <strong>42–45%</strong> with super-resolution plus a per-character vote. That is the bar, and it is why a wide-area camera cannot be treated as an ANPR camera.</p>
-        <p style="font-size:.88rem">A plate face is about 65% glyph, so 20&nbsp;px of plate is ~13&nbsp;px of glyph — the bottom of what CRNN and SVTR recognisers were trained on. Below ~10&nbsp;px the pipeline refuses, and the wall says so on the tile.</p>
-      </div>
-    </div>
+<h3>2.2 Inference into the system</h3>
 
-    <div class="runbar"><b>why this matters to a procurement</b> &nbsp; It separates a siting problem from a model problem. A plate under ~20&nbsp;px will not read on any software; the answer is a camera at the right place, and the platform saying so on the tile instead of printing noise.</div>
-  </section>
+<p>The worker consumes the transport URL, decodes at 5&nbsp;fps behind a motion gate, detects vehicles with YOLOv8s, tracks them with ByteTrack, localises the plate with a trained YOLOv9-t ONNX detector (falling back to a classical blackhat/Sobel proposal), reads it with a four-engine vote, and publishes <strong>one <code>C1</code> record per track</strong> — not one per frame. A vehicle in shot for 200 frames is one sighting with a first and last timestamp, the best plate read across the track, and one crop as evidence.</p>
 
-  <!-- ========== 07 — WORKFLOW ========== -->
-  <section class="slide slide--diagram">
-    <div class="diagwrap">
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1760 990" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif">
+<div class="callout callout--crit">
+  <p><b>Timestamps come from frame PTS, never <code>now()</code>.</b> Arrival order across cameras is meaningless — one camera's frames may sit in a buffer while another's do not. A route assembled from arrival times reorders itself under load, which is precisely the failure a judge would notice. Every host runs chrony.</p>
+</div>
+
+<h3>2.3 The seams</h3>
+
+<table>
+  <thead><tr><th>Seam</th><th>Shape</th><th>Direction</th></tr></thead>
+  <tbody>
+    <tr><td><code>camera:transport:&lt;id&gt;</code></td><td>JSON: url, transport, driver, probed_at</td><td>gateway → worker</td></tr>
+    <tr><td>stream <code>sightings</code></td><td><code>C1</code> record as one JSON field</td><td>worker → platform</td></tr>
+    <tr><td>REST + WebSocket</td><td>contracts <code>C4</code>, <code>C5</code></td><td>platform → console</td></tr>
+    <tr><td>exchange files</td><td><code>cameras.seed.json</code>, <code>camera_geo.json</code>, fixtures</td><td>one producer each</td></tr>
+  </tbody>
+</table>
+
+<h2 id="s3"><span class="n">3</span>Storage</h2>
+
+<p><span class="pill pill--built">BUILT</span> Postgres 16 with TimescaleDB, pgvector and pg_trgm (<code>db/schema.sql</code>, contract <code>C3</code>).</p>
+
+<ul>
+  <li><code>sightings</code> is a hypertable on <code>pts_first</code> with one-day chunks. The hypertable is created before the first insert — converting a populated table means a lock and an outage.</li>
+  <li>Five indexes carry every read path: <code>plate_norm</code>, <code>plate_canon</code>, <code>camera_id</code>, a trigram index for fuzzy search, and an HNSW index on the 512-dimension re-ID vector.</li>
+  <li>Compression after 7 days. Retention 90 days for sightings, 30 days for crops. <strong>Alerts and audit rows are kept</strong> — an alert nobody can look up a year later is worth little, and an audit chain with holes is not evidence.</li>
+  <li>Crops live in MinIO over the S3 API, not in the database, and are reachable only through presigned URLs with a five-minute expiry issued after the scope check.</li>
+</ul>
+
+<p><em>Measured:</em> 14,991 synthetic sightings ingested at 50 rows/s for five minutes with zero consumer-lag growth on a laptop. Over the life of the project <strong>100,366</strong> sightings have gone through the live pipeline on one machine.</p>
+
+<h2 id="s4"><span class="n">4</span>Watchlist correlation</h2>
+
+<p><span class="pill pill--built">BUILT</span> <code>services/api/watchlist.py</code>, <code>feeds.py</code>, <code>matcher.py</code>.</p>
+
+<h3>4.1 Getting entries in</h3>
+
+<table>
+  <thead><tr><th>Feed</th><th>Status</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Manual entry</td><td><span class="pill pill--built">BUILT</span></td><td>what an operator types into the console</td></tr>
+    <tr><td>CSV import</td><td><span class="pill pill--built">BUILT</span></td><td>all-or-nothing, with a per-line error report</td></tr>
+    <tr><td>VAHAN</td><td><span class="pill pill--stub">STUB</span></td><td>national vehicle registry: theft flag, blacklist status</td></tr>
+    <tr><td>e-GujCop (CCTNS)</td><td><span class="pill pill--stub">STUB</span></td><td>FIR entities: wanted vehicles and persons</td></tr>
+  </tbody>
+</table>
+
+<p>All four sit behind one protocol, <code>WatchlistFeed.pull(since)</code>. The two state-system feeds carry written-down request and response shapes and return sample rows labelled <code>STUB:&lt;feed&gt;</code>, so integration readiness is demonstrable without pretending the connection exists. Field names in those shapes are placeholders until the department issues API documentation and credentials — they are not a contract.</p>
+
+<p>CSV import validates every row before writing any of them. A partial import is worse than a rejected one: the operator believes 200 vehicles are watched when 188 are, and nothing says which 12 are missing. A rejected row names its spreadsheet line number and a reason in words.</p>
+
+<h3>4.2 Matching a sighting to an entry</h3>
+
+<p>Every sighting is checked by a <em>second</em> consumer group on the same stream, so a slow match never delays a write.</p>
+
+<ol>
+  <li><strong>Canon lookup, O(1).</strong> <code>canon()</code> collapses every confusion class — <code>{0,O,D,Q}</code>, <code>{1,I,L}</code>, <code>{8,B}</code>, <code>{5,S}</code>, <code>{2,Z}</code>, <code>{6,G}</code> — so any single confusion-pair misread lands on the same key as the true plate. One dictionary hit, no scan.</li>
+  <li><strong>Trigram fallback.</strong> A plain misread changes the canon key, so a Postgres <code>similarity()</code> query at a 0.4 retrieval floor catches it. Measured: one edit in a ten-character plate scores 0.57, two edits 0.47, an unrelated plate 0.0.</li>
+  <li><strong>Weighted Levenshtein decides the band.</strong> A confusion-pair substitution costs 0.5; anything else costs 1.0.</li>
+</ol>
+
+<table>
+  <thead><tr><th>Cost</th><th>Meaning</th><th>Band raised</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>exact string match, and the read itself was CONFIRMED</td><td><strong>CONFIRMED</strong></td></tr>
+    <tr><td>0</td><td>exact match on a less confident read</td><td>PROBABLE</td></tr>
+    <tr><td>0.5</td><td>one confusion-pair edit</td><td><strong>PROBABLE</strong></td></tr>
+    <tr><td>1.0 – 2.0</td><td>one plain edit, or two edits</td><td><strong>POSSIBLE</strong></td></tr>
+    <tr><td>&gt; 2.0</td><td>a different vehicle</td><td>no alert</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <p><b>An alert is never more confident than the read behind it.</b> A POSSIBLE read that happens to spell a watched plate does not put CONFIRMED in front of an officer. And only entries valid <em>now</em> are indexed: an expired entry that still fires produces an alert the operator has to dismiss, and a watchlist that cries wolf stops being read.</p>
+</div>
+
+<h2 id="s5"><span class="n">5</span>Alert workflow</h2>
+
+<p><span class="pill pill--built">BUILT</span> <code>services/api/alerts.py</code>.</p>
+
+<pre>match ─► dedup check ─► <span class="k">NEW</span> ─► <span class="k">ACKNOWLEDGED</span> ─┬─► <span class="k">ACTIONED</span>
+                                            └─► <span class="k">DISMISSED</span>  <span class="c"># reason required</span></pre>
+
+<ul>
+  <li><strong>Dedup</strong> per (watchlist entry, camera) for 60 seconds. A car at a red light is seen on twenty frames; twenty alerts is how an operator learns to ignore the panel. A repeat increments a count on the open alert. The window is per camera, so the same vehicle on the <em>next</em> camera is news.</li>
+  <li><strong>The state machine is enforced server-side.</strong> An illegal transition is HTTP 409 and writes nothing. <code>DISMISSED</code> requires a reason — dismissing without one is the failure mode that makes an audit log worthless.</li>
+  <li>Every transition writes an <code>alert_events</code> row and an audit row, against a named user.</li>
+  <li>The alert is published to a Redis stream, and the WebSocket fanout turns it into an <code>alert.new</code> frame for every console whose scope covers that camera.</li>
+</ul>
+
+<p><em>Latency:</em> the pipeline half — frame in to sighting published — is measured at <strong>0.68&nbsp;s</strong> against a 3.0&nbsp;s budget. Sighting to console is budgeted under 2&nbsp;s on the RTSP path and under 6&nbsp;s on HLS, where the floor is the segment duration rather than our code.</p>
+
+<figure>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1760 990" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif">
 <title>Prahari — workflow and integration</title>
 <desc>Two paths: a vehicle passing a camera through to an acknowledged alert, and a registration number through to an audited route export.</desc>
 <defs>
@@ -1100,169 +715,255 @@
 <text x="980" y="832" font-size="19" fill="#1b1f27" font-weight="700" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">The account that configures it cannot watch through it</text>
 <text x="980" y="862" font-size="13.5" fill="#454b57" font-weight="400" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">SYSTEM_ADMIN holds config and audit, and is refused live data, alerts and route.</text>
 <text x="980" y="884" font-size="13.5" fill="#454b57" font-weight="400" font-family="'IBM Plex Sans','Segoe UI',Helvetica,Arial,sans-serif" text-anchor="start">Administering a surveillance system and using one are different jobs.</text>
-</svg>    </div>
-  </section>
+</svg>
+  <figcaption><b>Figure 2 — Workflow and integration.</b> Path A is the real-time route from a vehicle passing a camera to an alert acknowledged by a named officer. Path B is the graded test case: a registration number in, an audited route out. Both terminate on the same hash-chained audit log. <em>A full-page version is submitted separately as <code>04-prahari-workflow-integration-diagram.pdf</code>.</em></figcaption>
+</figure>
 
-  <!-- ========== 07 — WATCHLIST + ALERTS ========== -->
-  <section class="slide">
-    <div class="slide__num"><span>Prahari</span><span><b>08</b> / 13 · Watchlist correlation &amp; alerts</span></div>
-    <p class="slide__eyebrow" style="color:var(--accent)">Real-time alerts</p>
-    <h2>Banded matching, an audited state machine</h2>
+<h2 id="s6"><span class="n">6</span>Delivery to the console</h2>
 
-    <p class="lede">Matching is banded, not binary: exact <span class="cell-mono">plate_norm</span>, then <span class="cell-mono">plate_canon</span> (confusion classes collapsed), then weighted edit distance&nbsp;≤&nbsp;1.0. Watchlist categories: stolen vehicles, wanted / missing persons, blacklisted vehicles, suspect lists.</p>
+<p><span class="pill pill--built">BUILT</span> <code>services/api/ws.py</code>, contract <code>C5</code>.</p>
 
-    <div class="fsm">
-      <span class="st">NEW</span><span class="ar">→</span>
-      <span class="st">ACKNOWLEDGED</span><span class="ar">→</span>
-      <span class="st end">ACTIONED</span>
-      <span class="ar">|</span>
-      <span class="st end">DISMISSED <span style="font-weight:400">(reason required)</span></span>
-    </div>
-    <p style="margin-top:1rem">Every transition is written to the audit log with a user and a reason. Repeated sightings of one vehicle bump a count on the open alert — twenty alerts for one event is how an operator learns to ignore them.</p>
+<p>One WebSocket per console replaces all polling. The client sends its JWT as the first frame; the server computes scope once and filters every frame server-side.</p>
 
-    <div class="runbar"><b>measured</b> &nbsp; Pipeline half — frame in to sighting published: <strong>0.68&nbsp;s</strong> against a 3.0&nbsp;s budget (<code>services/worker/selftest.py</code>). Dedup holds one alert per (entry, camera) for 60&nbsp;s; an illegal transition is HTTP&nbsp;409 and writes nothing.</div>
-  </section>
+<div class="callout callout--crit">
+  <p><b>A console that receives frames it must not display and hides them in JavaScript has already leaked them.</b> Scope is applied before the frame is on the wire, not after.</p>
+</div>
 
-  <!-- ========== 07 — ROUTE ========== -->
-  <section class="slide">
-    <div class="slide__num"><span>Prahari</span><span><b>09</b> / 13 · The graded test case</span></div>
-    <p class="slide__eyebrow" style="color:var(--accent)">Route reconstruction</p>
-    <h2>A registration number in. A defensible route out.</h2>
+<p>Frames carry a monotonic <code>seq</code>, and the last few thousand stay in a ring buffer. A console that drops off station wifi reconnects with <code>{"type":"resume","since":N}</code> and receives exactly what it missed, filtered through its scope again. Without that, a reconnect is a blank panel and the operator cannot tell <em>nothing happened</em> from <em>I missed it</em>. Heartbeat every 15 seconds, because a dead TCP connection is indistinguishable from a quiet grid at 3&nbsp;a.m.</p>
 
-    <p class="lede">A judge types a vehicle registration; the map draws that vehicle's hops across the grid with timestamps and locations, snapped to roads via OSRM.</p>
+<p>Fanout reads the Redis streams with <code>XREAD</code> rather than a consumer group: a group splits messages between its members, so two API replicas would each show half the alerts to half the consoles.</p>
 
-    <div class="grid2">
-      <div class="panel">
-        <h3>What it returns</h3>
-        <ul>
-          <li>Ordered hops: camera, coordinate, timestamp</li>
-          <li>Implied speed on each leg</li>
-          <li>CSV export, audited</li>
-        </ul>
-      </div>
-      <div class="panel">
-        <h3>What it refuses</h3>
-        <ul>
-          <li>A hop needing 180&nbsp;km/h through a city is flagged <span class="pill pill--crit">IMPLAUSIBLE</span>, not quietly drawn</li>
-          <li>A route that cannot lie to an officer is worth more than one that always answers</li>
-        </ul>
-      </div>
-    </div>
-    <p style="margin-top:1.5rem"><strong>Expected output for the jury:</strong> complete route, timestamped and location-wise, plus the live watchlist cross-referencing and auto-alerts running alongside it.</p>
-  </section>
+<h2 id="s7"><span class="n">7</span>Route reconstruction — the graded test case</h2>
 
-  <!-- ========== 08 — RBAC + AUDIT ========== -->
-  <section class="slide">
-    <div class="slide__num"><span>Prahari</span><span><b>10</b> / 13 · Security &amp; accountability</span></div>
-    <p class="slide__eyebrow" style="color:var(--accent)">RBAC + audit</p>
-    <h2>Enforced in SQL. Hiding a button is not access control.</h2>
+<p><span class="pill pill--built">BUILT</span> <code>services/api/route.py</code>. A judge names a plate and gets its path.</p>
 
-    <p class="lede">The department-scope matrix is enforced in the database with row-level security as the backstop — not in the UI. A district viewer's query simply returns fewer rows; a system administrator may not see live data at all.</p>
+<ol>
+  <li>Sightings for the plate over a window, ordered by <code>pts_first</code> off the hypertable.</li>
+  <li>Consecutive rows on one camera collapse into one hop. A route that lists the same junction five times is not a route.</li>
+  <li><strong>Plausibility.</strong> Great-circle distance over elapsed time gives an implied speed. Above 150&nbsp;km/h the pairing is far more likely to be a misread plate than a car that teleported, so the lower-confidence hop of the pair is flagged <code>IMPLAUSIBLE</code> <strong>and still shown</strong>.</li>
+  <li><strong>Fuzzy fallback</strong>, only when the exact plate returns nothing: canon key, then trigram at 0.7 — stricter than the matcher's retrieval floor, because this result goes in front of a person. The whole result set is labelled <em>fuzzy match; verify plate</em>, and the label survives into the CSV and the PDF.</li>
+  <li><strong>Road snapping</strong> through OSRM when <code>OSRM_URL</code> answers. When it does not, the response carries the straight line between cameras and says <code>snapped: false</code> rather than dressing it up as a road path.</li>
+</ol>
 
-    <div class="grid2">
-      <div class="panel">
-        <h3>Every action is logged</h3>
-        <ul>
-          <li>Every export and every live view writes an audit row</li>
-          <li>Cross-department access needs a case number, a 72&nbsp;h cap and target-department approval</li>
-          <li>The log is hash-chained; a tamper breaks the chain</li>
-        </ul>
-      </div>
-      <div class="panel">
-        <h3>Integration-ready</h3>
-        <ul>
-          <li>APIs shaped for VAHAN, SARTHI, eGujCop (CCTNS), AFIS, NAFIS</li>
-          <li>Documented, open protocols — no lock-in on cameras, VMS, analytics or storage</li>
-        </ul>
-      </div>
-    </div>
+<div class="callout callout--crit">
+  <p><b>Deleting an implausible hop silently hands the operator a clean-looking route with a hole in it.</b> A judge who watches the system catch its own bad read learns more than one who sees four suspiciously perfect hops. The officer decides what the flag means; the software does not decide for them.</p>
+</div>
 
-    <div class="runbar"><b>verified</b> &nbsp; <code>GET /api/admin/audit/verify</code> → <strong>728 rows, ok: true, first_broken_seq: null</strong>. And the row the matrix exists for: <strong>SYSTEM_ADMIN is refused live data, alerts and route</strong> — the most privileged account in the system cannot watch anybody.</div>
-  </section>
+<p>Exports are CSV and PDF, and neither is produced without an audit row.</p>
 
-  <!-- ========== 09 — SCALE ========== -->
-  <section class="slide">
-    <div class="slide__num"><span>Prahari</span><span><b>11</b> / 13 · Scalability &amp; PoC readiness</span></div>
-    <p class="slide__eyebrow" style="color:var(--accent)">The arithmetic, printed so the jury can check it</p>
-    <h2>Four orders of magnitude, in four multiplications</h2>
+<h2 id="s8"><span class="n">8</span>Security model</h2>
 
-    <p style="margin-top:1.25rem;font-weight:600">Centralised video — the M4 approach we reject:</p>
-<div class="calc">80,000 cameras × 2 Mbps (H.264, 720p, 5 fps)   = 160,000 Mbps  <span class="r">≈ 160 Gbps</span>
-160 Gbps × 86,400 s/day                        <span class="r">≈ 1.7 PB/day</span>
-                                              <span class="r">≈ 26 PB at ~15-day retention</span></div>
+<p><span class="pill pill--built">BUILT</span> <code>services/api/scope.py</code>, <code>auth.py</code>, <code>audit.py</code>, <code>db/migrate.sql</code>.</p>
 
-    <p style="margin-top:1.5rem;font-weight:600">Metadata — what we actually ship:</p>
-<div class="calc">~200 bytes per sighting row ([C1])
-80,000 cameras × ~1,000 sightings/camera/day   ≈ 80 M rows/day
-80 M × 200 B                                   ≈ 16 GB/day raw
-                                              <span class="r">≈ 2–3 GB/day compressed (Timescale)</span></div>
+<h3>8.1 Identity</h3>
 
-    <p class="verdict">26 PB → 16 GB/day. That is the entire case for edge inference.</p>
-    <p class="muted" style="margin-top:1rem;font-size:0.85rem">Scale plan also covers: central / regional / edge compute, GPU sizing, low-bandwidth operation, hot / warm / cold storage by retention, HA, backup, DR, cybersecurity, and a capex + opex estimate.</p>
-  </section>
+<p>argon2id password hashes. A 15-minute access token and an 8-hour refresh token — one shift. A refresh token presented as an access token is refused on its <code>typ</code> claim. An unknown username costs a full hash verification, because returning instantly is a timing oracle that enumerates accounts.</p>
 
-  <!-- ========== 11 — VERIFICATION ========== -->
-  <section class="slide">
-    <div class="slide__num"><span>Prahari</span><span><b>12</b> / 13 · Platform maturity</span></div>
-    <p class="slide__eyebrow" style="color:var(--accent)">Every claim on this deck, and the command that checks it</p>
-    <h2 style="font-size:2rem">Nothing here is a screenshot of an intention</h2>
+<h3>8.2 Authorisation — contract <code>C10</code></h3>
 
-    <div class="table-wrap" style="margin-top:1rem">
-      <table>
-        <thead><tr><th>Command</th><th>Result</th></tr></thead>
-        <tbody>
-          <tr><td class="cell-mono">pytest tests/ -q</td><td><strong>372 passed, 6 skipped</strong></td></tr>
-          <tr><td class="cell-mono">python scripts/verify_stack.py</td><td><strong>35 / 35 checks passed</strong> end to end against the running stack</td></tr>
-          <tr><td class="cell-mono">python services/worker/selftest.py</td><td><strong>SELFTEST OK</strong> — plate read back exactly, <strong>0.68&nbsp;s</strong> against a 3.0&nbsp;s budget</td></tr>
-          <tr><td class="cell-mono">PRAHARI_INTEGRATION=1 pytest tests/test_integration.py</td><td><strong>6 / 6</strong> — clip → worker → real Redis stream → persister → matcher → alert → route</td></tr>
-          <tr><td class="cell-mono">GET /api/admin/audit/verify</td><td><strong>728 rows, ok: true</strong></td></tr>
-          <tr><td class="cell-mono">python scripts/accuracy_report.py</td><td><strong>95.0% exact, 0 confidently-wrong reads</strong></td></tr>
-          <tr><td class="cell-mono">python scripts/preflight.py</td><td><strong>13 / 13</strong> — and every failure prints the command that repairs it</td></tr>
-        </tbody>
-      </table>
-    </div>
+<table>
+  <thead><tr><th>Role</th><th>Live</th><th>Detections</th><th>WL read</th><th>WL write</th><th>Route</th><th>Export</th><th>Admin</th></tr></thead>
+  <tbody>
+    <tr><td>Viewer (dept)</td><td>own</td><td>own</td><td>–</td><td>–</td><td>–</td><td>–</td><td>–</td></tr>
+    <tr><td>Operator</td><td>own</td><td>own</td><td>own</td><td>–</td><td>own</td><td>–</td><td>–</td></tr>
+    <tr><td>Investigator (Police)</td><td>all</td><td>all</td><td>all</td><td>own</td><td>statewide</td><td>yes, logged</td><td>–</td></tr>
+    <tr><td>Dept Admin</td><td>own</td><td>own</td><td>own</td><td>own</td><td>own</td><td>yes</td><td>users in dept</td></tr>
+    <tr><td><strong>System Admin</strong></td><td><strong>–</strong></td><td><strong>–</strong></td><td><strong>–</strong></td><td><strong>–</strong></td><td><strong>–</strong></td><td><strong>–</strong></td><td>config + audit only</td></tr>
+  </tbody>
+</table>
 
-    <p style="margin-top:1rem;max-width:none"><strong>100,366</strong> sightings have gone through the live pipeline on this machine. The brief says <em>not a simulation, not a proof of concept</em> — so the repository ships the checks, and a judge can re-run every line above. Open gaps are named on the roadmap slide rather than hidden here.</p>
+<div class="callout">
+  <p><b>The last row is the design, not an oversight: the most privileged account in the system cannot watch video.</b> Administering a surveillance system and using one are different jobs, and the account that does both is the one an insider abuses. This is verifiable in the running system — signing in as <code>console-audit</code> returns 403 on alerts and route, and 200 on the audit endpoints.</p>
+</div>
 
-    <div class="linkbar" style="margin-top:1.2rem">
-      <a href="https://github.com/Priyanshu-byte-coder/prahari"><b>Clone and check</b> github.com/Priyanshu-byte-coder/prahari</a>
-      <a href="https://youtu.be/8lQsuXeH150"><b>Watch it run</b> youtu.be/8lQsuXeH150</a>
-    </div>
-  </section>
+<p>Enforcement is three layers, in this order:</p>
 
-  <!-- ========== 12 — ROADMAP ========== -->
-  <section class="slide">
-    <div class="slide__num"><span>Prahari</span><span><b>13</b> / 13 · Roadmap &amp; operational impact</span></div>
-    <p class="slide__eyebrow" style="color:var(--accent)">What is built, what is next</p>
-    <h2>Honest about the line between the two</h2>
+<ol>
+  <li><strong>The capability check</strong> — the role either holds <code>watchlist:write</code> or gets a 403.</li>
+  <li><strong>The scope predicate in the SQL</strong> — every read carries <code>(statewide OR owner_dept_id = ANY(:departments))</code>. Hiding a button is not access control.</li>
+  <li><strong>Postgres row-level security</strong> — the backstop for a query somebody forgets to scope, keyed on session variables (<code>prahari.statewide</code>, <code>prahari.dept_ids</code>) set per request.</li>
+</ol>
 
-    <div class="road">
-      <div class="road__row">
-        <div class="road__when">Now</div>
-        <div class="road__what">Four live transports · ANPR with a four-reader banded vote · watchlist alerts with an audited state machine · route reconstruction with plausibility flags · RBAC + hash-chained audit · GIS console + 30-camera video wall with live detector overlays.</div>
-      </div>
-      <div class="road__row">
-        <div class="road__when">Next 30 days</div>
-        <div class="road__what">The VMS driver against real vendor credentials · detectors fine-tuned on labelled Gujarat footage (+ TensorRT) · re-ID as PROBABLE corroboration · crowd, wrong-way and loitering analytics.</div>
-      </div>
-      <div class="road__row">
-        <div class="road__when">Then</div>
-        <div class="road__what">Face matching under a separate legal authorisation · ANPR-grade camera-siting guidance — a plate under 100&nbsp;px wide is a siting fault, not a model fault.</div>
-      </div>
-    </div>
+<p>A user with no department matches nothing rather than everything: a misconfigured account should see an empty screen, not the state.</p>
 
-    <p style="margin-top:1.75rem"><strong>Operational impact:</strong> one console for 26 departments, a stolen vehicle traced across the state in seconds instead of phone calls, and every lookup on the record — so the system is trusted enough to be used.</p>
-  </section>
+<h3>8.3 Audit</h3>
 
-  <!-- ========== CLOSE ========== -->
-  <section class="slide close">
-    <div class="slide__num"><span>Prahari</span><span>Close</span></div>
-    <blockquote>The fusion refuses to guess below a two-thirds majority. We would rather report nothing than report the wrong vehicle to a police officer.</blockquote>
-    <div class="linkbar" style="margin-top:2rem">
-      <a href="https://youtu.be/8lQsuXeH150"><b>Demo video</b> youtu.be/8lQsuXeH150</a>
-      <a href="https://github.com/Priyanshu-byte-coder/prahari"><b>Source, Apache-2.0</b> github.com/Priyanshu-byte-coder/prahari</a>
-    </div>
-    <div class="attrib">Prahari · Sentinel 2026</div>
-  </section>
+<p>Append-only and hash-chained: <code>hash = sha256(prev_hash || canonical_json(fields))</code>. The chain does not <em>prevent</em> tampering — it makes tampering visible, which is the achievable property. Edit one row and every hash after it stops matching; <code>GET /api/admin/audit/verify</code> walks the chain and names the first break. <em>Verified:</em> 728 rows, <code>ok: true</code>, <code>first_broken_seq: null</code>.</p>
 
+<div class="callout callout--crit">
+  <p><b>Reads are logged, not just writes.</b> In a surveillance system the abuse worth catching is <em>looking</em>: an officer checking an ex-partner's vehicle leaves no other trace. Exports, live views, watchlist changes and every alert transition are on one chain.</p>
+</div>
+
+<h2 id="s9"><span class="n">9</span>The privacy answer, in full</h2>
+
+<p>This is the question a citizen asks, and the answer is architectural rather than a policy promise:</p>
+
+<ul>
+  <li><strong>No central video recording.</strong> Video is decoded at the edge and discarded. What leaves a camera site is a ~200-byte row and, at most, a small crop of the vehicle. There is no archive to subpoena, leak or trawl, because there is no archive.</li>
+  <li><strong>Retention is bounded and enforced by the database.</strong> Sightings 90 days, crops 30 days, both as automatic policies rather than a cleanup script somebody remembers to run.</li>
+  <li><strong>Access is purpose-bound.</strong> A cross-department lookup requires a case number and a stated reason, both recorded.</li>
+  <li><strong>Access is time-boxed.</strong> Such a grant expires automatically, at most 72 hours, rather than living until somebody remembers to revoke it.</li>
+  <li><strong>Access is scoped.</strong> A department sees its own cameras. Statewide access is one role, held by investigators, and every use of it is logged.</li>
+  <li><strong>Access is provable.</strong> The hash-chained audit log means <em>nobody looked at this</em> is a claim that can be checked rather than asserted.</li>
+  <li><strong>Crops are reached only through five-minute presigned URLs</strong>, issued after the scope check. A leaked URL expires; a leaked bucket path is useless.</li>
+</ul>
+
+<p>What the system deliberately does not do: face recognition against a general population, retention beyond the windows above, and any lookup that cannot name the case it belongs to.</p>
+
+<h2 id="s10"><span class="n">10</span>Interop assumptions</h2>
+
+<p>Stated so an integrator can check them before writing code:</p>
+
+<ol>
+  <li><strong>Cameras</strong> speak RTSP (TCP) or HLS. ONVIF is used where available for events and PTZ, and is not required. Mixed H.264 and H.265 in one grid is normal and handled.</li>
+  <li><strong>The grid catalogue</strong> is read before decoding rather than probed blindly, and per-camera properties come from it. <em>Observed on the sandbox:</em> <code>/api/ingest</code> and <code>/live/stream/</code> return 404 on that deployment, and the grid permits <strong>one session per source IP</strong> — a second sign-in takes the first one's session. Both facts are handled in the gateway rather than assumed away.</li>
+  <li><strong>Clocks</strong> are synchronised with chrony. Sighting order across cameras depends on it.</li>
+  <li><strong>VAHAN and e-GujCop</strong> are reachable only with agency credentials issued by the respective department. Until those exist both feeds run as labelled stubs; swapping in the live client changes one class each and no calling code.</li>
+  <li><strong>Coordinates</strong> come from a survey, not from district centroids. A centroid puts every camera in a district on one pixel and makes a traced vehicle teleport.</li>
+  <li><strong>Everything is open source.</strong> Postgres, TimescaleDB, Redis, MinIO, OSRM, FastAPI, MediaMTX, Ultralytics, Leaflet. No managed service is required to run this — a contest rule, and also the difference between a pilot and a procurement.</li>
+</ol>
+
+<h2 id="s11"><span class="n">11</span>Scale tiers</h2>
+
+<p>The deployment shape changes three times between a demo and a state rollout. The code does not.</p>
+
+<h3>The arithmetic that decides it</h3>
+
+<div class="grid2 keep">
+  <div>
+    <h4>Centralised video — the M4 approach we reject</h4>
+    <pre>80,000 cameras x 2 Mbps  = 160,000 Mbps
+                         <span class="k">~ 160 Gbps</span>
+160 Gbps x 86,400 s/day  <span class="k">~ 1.7 PB/day</span>
+at ~15-day retention     <span class="k">~ 26 PB</span></pre>
+  </div>
+  <div>
+    <h4>Metadata — what we actually ship</h4>
+    <pre>~200 bytes per sighting row
+80,000 cam x ~1,000/day  ~ 80 M rows/day
+80 M x 200 B             ~ 16 GB/day raw
+Timescale compressed     <span class="k">~ 2-3 GB/day</span></pre>
+  </div>
+</div>
+
+<h3>Tier 1 — one node (today, and the demo)</h3>
+<p>Everything on one machine: gateway, one or two workers, Redis, Postgres/Timescale, MinIO, API, console. Handles roughly 30 cameras at 5&nbsp;fps analysis. The limit is GPU decode: H.264 decodes every frame even when analysis runs at 5&nbsp;fps, so 30 cameras at 25&nbsp;fps is ~750&nbsp;fps of decode, near the ceiling of one consumer-grade NVDEC. Watch <code>nvidia-smi dmon</code>; above 90% decode utilisation, move cameras to CPU decode.</p>
+
+<h3>Tier 2 — a district (tens to a few hundred cameras)</h3>
+<p>Workers move to their own boxes, one per GPU, each pinned to a set of cameras from the registry. Redis stays central to the district. Postgres stays single-node; a Timescale hypertable on commodity hardware absorbs a few hundred sightings per second without trouble. The API scales horizontally behind a load balancer — the WebSocket fanout is broadcast-safe because every process reads the whole stream.</p>
+
+<h3>Tier 3 — statewide (thousands of cameras)</h3>
+<ul>
+  <li><strong>Edge workers</strong> keep doing exactly what they do now, and buffer locally when the uplink drops.</li>
+  <li><strong>Kafka replaces Redis Streams</strong> as the trunk between districts and the centre. The migration is contained: the producer and the two consumer groups are the only code that knows which broker it is talking to, and the <code>C1</code> record does not change. Kafka is chosen for retention and replay across a WAN, which is where Redis Streams stops being the right tool.</li>
+  <li><strong>Central Postgres/Timescale</strong> with district-level partitioning, plus read replicas for the console.</li>
+  <li><strong>Object storage</strong> (MinIO or S3-compatible) for crops, with lifecycle rules enforcing the 30-day window.</li>
+  <li>Re-ID vectors move to a dedicated index if HNSW inside Postgres stops keeping up.</li>
+</ul>
+
+<p>The seams that make this possible already exist: a stream between inference and storage, a REST/WebSocket boundary between storage and the console, and no shared code across either.</p>
+
+<h2 id="s12"><span class="n">12</span>Failure modes, and what the operator sees</h2>
+
+<p>The system is judged on a live grid, so this section is about what a person sees at 3&nbsp;a.m., not about ideal behaviour.</p>
+
+<table>
+  <thead><tr><th>Failure</th><th>Detection</th><th>What the operator sees</th><th>Recovery</th></tr></thead>
+  <tbody>
+    <tr><td>A district uplink drops</td><td>frame watchdog, no <code>camera.health</code> for 15&nbsp;s</td><td>that district's pins turn red within 15&nbsp;s, with a buffering badge</td><td>edge workers buffer locally and replay when the link returns; no gap in the timeline</td></tr>
+    <tr><td>A GPU or worker dies</td><td>its cameras stop producing sightings</td><td>affected pins go amber, then red</td><td>the registry reassigns those cameras to a surviving worker within 30&nbsp;s</td></tr>
+    <tr><td>Postgres restarts</td><td>persister insert fails</td><td>nothing — the console keeps receiving live alerts</td><td>the consumer group has not acked, so the batch is redelivered; <code>ON CONFLICT DO NOTHING</code> absorbs the replay</td></tr>
+    <tr><td>A consumer dies mid-batch</td><td>its messages stay pending</td><td>nothing</td><td><code>XAUTOCLAIM</code> moves anything idle past the threshold to a live consumer; without this a killed worker is a permanent hole</td></tr>
+    <tr><td>RTSP refused for a camera</td><td>transport probe fails at startup</td><td>that camera shows an HLS badge</td><td>the gateway degrades that camera to HLS; latency rises to the segment duration</td></tr>
+    <tr><td>A console loses connectivity</td><td>socket closes</td><td>reconnect banner</td><td>it reconnects with <code>resume: seq</code> and the server backfills exactly the gap</td></tr>
+    <tr><td>OSRM is down</td><td>request times out in 3&nbsp;s</td><td>the route still draws, as straight lines, labelled unsnapped</td><td>none needed; the hops, times and flags are the evidence</td></tr>
+    <tr><td>MinIO is unreachable</td><td>presign raises</td><td>hops render without thumbnails</td><td>the route and the alert are unaffected</td></tr>
+    <tr><td>A plate is misread into a watched plate</td><td>plausibility check on the route</td><td>the hop is shown, flagged <code>IMPLAUSIBLE</code>, with the implied speed</td><td>the operator sees the doubt instead of a confident lie</td></tr>
+  </tbody>
+</table>
+
+<h2 id="s13"><span class="n">13</span>What is measured</h2>
+
+<p>Every number in this document comes from a command in the repository, and every one of them can be re-run by a judge.</p>
+
+<table>
+  <thead><tr><th>Command</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr><td><code>pytest tests/ -q</code></td><td><strong>372 passed, 6 skipped</strong></td></tr>
+    <tr><td><code>python scripts/verify_stack.py</code></td><td><strong>35 / 35 checks passed</strong> against the running stack</td></tr>
+    <tr><td><code>python services/worker/selftest.py</code></td><td><strong>SELFTEST OK</strong> — plate read back exactly, <strong>0.68&nbsp;s</strong> against a 3.0&nbsp;s budget</td></tr>
+    <tr><td><code>PRAHARI_INTEGRATION=1 pytest tests/test_integration.py</code></td><td><strong>6 / 6</strong> — clip → worker → real Redis stream → persister → matcher → alert → route</td></tr>
+    <tr><td><code>python scripts/accuracy_report.py</code></td><td><strong>95.0% exact</strong> on 40 tracks, <strong>0 confidently-wrong reads</strong>, 5.0% refused</td></tr>
+    <tr><td><code>GET /api/admin/audit/verify</code></td><td><strong>728 rows, ok: true</strong></td></tr>
+    <tr><td><code>python scripts/preflight.py</code></td><td><strong>13 / 13</strong>, and every failure prints the command that repairs it</td></tr>
+  </tbody>
+</table>
+
+<h3>ANPR accuracy, banded</h3>
+
+<div class="grid2 keep">
+  <div>
+    <table>
+      <thead><tr><th>Band</th><th>n</th><th>Share</th><th>Wrong</th></tr></thead>
+      <tbody>
+        <tr><td>CONFIRMED</td><td>38</td><td>95.0%</td><td><strong>0</strong></td></tr>
+        <tr><td>PROBABLE</td><td>0</td><td>0.0%</td><td>0</td></tr>
+        <tr><td>POSSIBLE</td><td>2</td><td>5.0%</td><td>0</td></tr>
+        <tr><td>NONE</td><td>0</td><td>0.0%</td><td>0</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div>
+    <table>
+      <thead><tr><th>Reader alone</th><th>Exact</th><th>CER</th></tr></thead>
+      <tbody>
+        <tr><td>paddleocr</td><td>79.2%</td><td>0.121</td></tr>
+        <tr><td>easyocr</td><td>70.0%</td><td>0.221</td></tr>
+        <tr><td>fast-plate-ocr</td><td>55.0%</td><td>0.241</td></tr>
+        <tr><td>tesseract</td><td>42.5%</td><td>0.257</td></tr>
+        <tr><td><strong>fused vote</strong></td><td><strong>95.0%</strong></td><td><strong>0.050</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<p class="keep"><em>Provenance:</em> this set is synthetic, generated by <code>scripts/accuracy_report.py</code> on 2026-09-04, and the document says so rather than rounding it into a headline. A hand-labelled Gujarat set is open work.</p>
+
+<h3>Low-resolution plates — the case the grid actually presents</h3>
+
+<p>Wide-area cameras on the Sentinel grid put a plate into 20–30&nbsp;px of frame. The published reference for this regime (UFPR-SR-Plates, median plate height 18–21&nbsp;px) reports <strong>1.7–2.2%</strong> recognition from a low-resolution crop straight to OCR, rising to <strong>42.3–44.7%</strong> with super-resolution plus majority vote by character position. Our measurement on the same regime:</p>
+
+<table>
+  <thead><tr><th>Plate height (night)</th><th>LR → OCR</th><th>Single-image SR</th><th>Ours — MFSR ensemble + MVCP</th></tr></thead>
+  <tbody>
+    <tr><td>16&nbsp;px</td><td>0.0%</td><td>0.0%</td><td><strong>5.0%</strong></td></tr>
+    <tr><td>20&nbsp;px</td><td>0.0%</td><td>0.0%</td><td><strong>65.0%</strong></td></tr>
+    <tr><td>24&nbsp;px</td><td>0.0%</td><td>15.0%</td><td><strong>95.0%</strong></td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <p><b>There is a cliff just under 20&nbsp;px, and the system is built around admitting it.</b> A plate face is roughly 65% glyph, so 20&nbsp;px of plate is about 13&nbsp;px of glyph — right at the bottom of what CRNN and SVTR recognisers were trained on. <code>preprocess.GLYPH_MARGINAL_PX</code> is set from this measurement: below about 10&nbsp;px of glyph the pipeline refuses and reports <em>plate not resolvable</em>, and the video wall says so on the tile rather than printing four confident characters of noise.</p>
+</div>
+
+<h2 id="s14"><span class="n">14</span>What is not built yet</h2>
+
+<p>Named plainly, because a design document that hides its gaps is not useful:</p>
+
+<ul>
+  <li><strong>Re-ID corroboration of route hops</strong> — the route ships plate-keyed; a hop supported by appearance similarity is a planned upgrade, and the vector column and index already exist.</li>
+  <li><strong>Cross-department grants</strong> — the schema and the audit fields exist; the request and approval flow is next.</li>
+  <li><strong>Live VAHAN and e-GujCop connections</strong> — blocked on agency credentials, stubbed behind the real protocol.</li>
+  <li><strong>Fine-tuned detection and TensorRT export</strong> — pretrained models ship first; a detector fine-tuned on labelled Gujarat footage is the single biggest accuracy lever remaining.</li>
+  <li><strong>A hand-labelled accuracy set</strong> — the banded numbers above are honest about being synthetic.</li>
+  <li><strong>Analytics beyond ANPR</strong> — crowd counting, wrong-way and loitering detection are designed against the same <code>C1</code> record and not yet written.</li>
+</ul>
+
+<div class="callout callout--ok">
+  <p><b>Two rules run through every decision in this document.</b> Never print a plate the system cannot read — a wrong plate on a police report is worse than no plate. And the account that configures the system cannot watch through it — because administering a surveillance system and using one are different jobs.</p>
+</div>
+
+<p style="margin-top:8mm;font-size:8.6pt;color:var(--ink-3);border-top:1px solid var(--line);padding-top:3mm">Prahari &middot; Sentinel 2026 &middot; Apache-2.0 &middot; <a href="https://github.com/Priyanshu-byte-coder/prahari" style="color:var(--accent)">source</a> &middot; <a href="https://youtu.be/8lQsuXeH150" style="color:var(--accent)">demo video</a></p>
+
+</section>
 </div>
